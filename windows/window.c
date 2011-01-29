@@ -3124,7 +3124,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		    /* trigger a scroll */
 		    term_scroll(term, 0,
 				b == MBT_WHEEL_UP ?
-				-term->rows / 2 : term->rows / 2);
+				-3 : 3);
 		}
 	    }
 	    return 0;
