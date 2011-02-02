@@ -531,6 +531,7 @@ struct config_tag {
     char wintitle[256];		       /* initial window title */
     /* Terminal options */
     int savelines;
+    int scrolllines;
     int dec_om;
     int wrap_mode;
     int lfhascr;

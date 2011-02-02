@@ -3122,9 +3122,13 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		    } /* else: not sure when this can fail */
 		} else {
 		    /* trigger a scroll */
+		    int scrollLines = cfg.scrolllines == -1 ? term->rows/2
+		            : cfg.scrolllines == -2          ? term->rows
+		            : cfg.scrolllines < -2            ? 3
+		            : cfg.scrolllines;
 		    term_scroll(term, 0,
 				b == MBT_WHEEL_UP ?
-				-3 : 3);
+				-scrollLines : scrollLines);
 		}
 	    }
 	    return 0;

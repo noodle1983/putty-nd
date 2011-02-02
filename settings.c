@@ -413,6 +413,7 @@ void save_open_settings(void *sesskey, Config *cfg)
 #endif
 		    );
     write_setting_i(sesskey, "ScrollbackLines", cfg->savelines);
+    write_setting_i(sesskey, "LinesAtAScroll", cfg->scrolllines);
     write_setting_i(sesskey, "DECOriginMode", cfg->dec_om);
     write_setting_i(sesskey, "AutoWrapMode", cfg->wrap_mode);
     write_setting_i(sesskey, "LFImpliesCR", cfg->lfhascr);
@@ -732,6 +733,7 @@ void load_open_settings(void *sesskey, Config *cfg)
 #endif
 	;
     gppi(sesskey, "ScrollbackLines", 200, &cfg->savelines);
+    gppi(sesskey, "LinesAtAScroll", 3, &cfg->scrolllines);
     gppi(sesskey, "DECOriginMode", 0, &cfg->dec_om);
     gppi(sesskey, "AutoWrapMode", 1, &cfg->wrap_mode);
     gppi(sesskey, "LFImpliesCR", 0, &cfg->lfhascr);
