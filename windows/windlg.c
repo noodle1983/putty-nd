@@ -292,6 +292,7 @@ static int CALLBACK NullDlgProc(HWND hwnd, UINT msg,
 enum {
     IDCX_ABOUT = IDC_ABOUT,
     IDCX_TVSTATIC,
+    IDCX_SESSIONTREEVIEW,
     IDCX_TREEVIEW,
     IDCX_STDBASE,
     IDCX_PANELBASE = IDCX_STDBASE + 32
@@ -351,7 +352,7 @@ static void create_controls(HWND hwnd, char *path)
 	 * Otherwise, we're creating the controls for a particular
 	 * panel.
 	 */
-	ctlposinit(&cp, hwnd, 100, 3, 13);
+	ctlposinit(&cp, hwnd, 200, 3, 13);
 	wc = &ctrls_panel;
 	base_id = IDCX_PANELBASE;
     }
@@ -370,7 +371,7 @@ static void create_controls(HWND hwnd, char *path)
 static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 				       WPARAM wParam, LPARAM lParam)
 {
-    HWND hw, treeview;
+    HWND hw, sessionview, treeview;
     struct treeview_faff tvfaff;
     int ret;
 
@@ -404,7 +405,65 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 			   (rs.bottom + rs.top + rd.top - rd.bottom) / 2,
 			   rd.right - rd.left, rd.bottom - rd.top, TRUE);
 	}
+      /*
+	 * Create the session tree view.
+	 */
+	{
+	    RECT r;
+	    WPARAM font;
+	    HWND tvstatic;
 
+	    r.left = 3;
+	    r.right = r.left + 94;
+	    r.top = 3;
+	    r.bottom = r.top + 10;
+	    MapDialogRect(hwnd, &r);
+	    tvstatic = CreateWindowEx(0, "STATIC", "&Sessions:",
+				      WS_CHILD | WS_VISIBLE,
+				      r.left, r.top,
+				      r.right - r.left, r.bottom - r.top,
+				      hwnd, (HMENU) IDCX_TVSTATIC, hinst,
+				      NULL);
+	    font = SendMessage(hwnd, WM_GETFONT, 0, 0);
+	    SendMessage(tvstatic, WM_SETFONT, font, MAKELPARAM(TRUE, 0));
+
+	    r.left = 3;
+	    r.right = r.left + 94;
+	    r.top = 13;
+	    r.bottom = r.top + 219;
+	    MapDialogRect(hwnd, &r);
+	    sessionview = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, "",
+				      WS_CHILD | WS_VISIBLE |
+				      WS_TABSTOP | TVS_HASLINES |
+				      TVS_DISABLEDRAGDROP | TVS_HASBUTTONS
+				      | TVS_LINESATROOT |
+				      TVS_SHOWSELALWAYS, r.left, r.top,
+				      r.right - r.left, r.bottom - r.top,
+				      hwnd, (HMENU) IDCX_SESSIONTREEVIEW, hinst,
+				      NULL);
+	    font = SendMessage(hwnd, WM_GETFONT, 0, 0);
+	    SendMessage(sessionview, WM_SETFONT, font, MAKELPARAM(TRUE, 0));
+	    tvfaff.treeview = sessionview;
+	    memset(tvfaff.lastat, 0, sizeof(tvfaff.lastat));
+
+	}
+
+    /*
+	 * Set up the session view contents.
+	 */
+    {
+        HTREEITEM hfirst = NULL;
+		HTREEITEM item;
+	    int i;
+        struct sesslist sesslist;
+	    get_sesslist(&sesslist, TRUE);
+        for (i = 0; i < sesslist.nsessions; i++){
+            item = treeview_insert(&tvfaff, 0, sesslist.sessions[i], sesslist.sessions[i]);
+		    if (!hfirst)
+		        hfirst = item;
+		}
+	    TreeView_SelectItem(sessionview, hfirst);
+	} 
 	/*
 	 * Create the tree view.
 	 */
@@ -413,7 +472,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 	    WPARAM font;
 	    HWND tvstatic;
 
-	    r.left = 3;
+	    r.left = 103;
 	    r.right = r.left + 95;
 	    r.top = 3;
 	    r.bottom = r.top + 10;
@@ -427,7 +486,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 	    font = SendMessage(hwnd, WM_GETFONT, 0, 0);
 	    SendMessage(tvstatic, WM_SETFONT, font, MAKELPARAM(TRUE, 0));
 
-	    r.left = 3;
+	    r.left = 103;
 	    r.right = r.left + 95;
 	    r.top = 13;
 	    r.bottom = r.top + 219;
@@ -569,7 +628,36 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 
 	    SetFocus(((LPNMHDR) lParam)->hwndFrom);	/* ensure focus stays */
 	    return 0;
-	}
+	}else if (LOWORD(wParam) == IDCX_SESSIONTREEVIEW &&
+	    ((LPNMHDR) lParam)->code == TVN_SELCHANGED) {
+        HTREEITEM i =
+		TreeView_GetSelection(((LPNMHDR) lParam)->hwndFrom);
+	    TVITEM item;
+	    char buffer[64];
+		static char pre_sission[64] = {0};
+		int isdef;
+ 
+	    item.hItem = i;
+	    item.pszText = buffer;
+	    item.cchTextMax = sizeof(buffer);
+	    item.mask = TVIF_TEXT | TVIF_PARAM;
+	    TreeView_GetItem(((LPNMHDR) lParam)->hwndFrom, &item); 
+        if (item.pszText[0] == '\0')
+            return 0;
+        isdef = !strcmp(pre_sission, "Default Settings");
+		if (pre_sission[0] != 0 && !isdef)
+		{
+            char *errmsg = save_settings(pre_sission, dp.data);
+            if (errmsg) {
+                dlg_error_msg(&dp, errmsg);
+                sfree(errmsg);
+            }
+		}
+		strncpy(pre_sission, item.pszText, 64);
+        load_settings(item.pszText, &cfg);
+		dlg_refresh(NULL, &dp);
+		return 0;
+    }
 	break;
       case WM_COMMAND:
       case WM_DRAWITEM:
