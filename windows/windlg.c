@@ -397,6 +397,90 @@ static void change_selected_session(WPARAM wParam, LPARAM lParam)
 }
 
 /*
+ * Create the session tree view.
+ */
+static HWND create_session_treeview(HWND hwnd, struct treeview_faff* tvfaff)
+{
+    RECT r;
+    WPARAM font;
+    HWND tvstatic;
+	HWND sessionview;
+
+    r.left = 3;
+    r.right = r.left + 94;
+    r.top = 3;
+    r.bottom = r.top + 10;
+    MapDialogRect(hwnd, &r);
+    tvstatic = CreateWindowEx(0, "STATIC", "&Sessions:",
+			      WS_CHILD | WS_VISIBLE,
+			      r.left, r.top,
+			      r.right - r.left, r.bottom - r.top,
+			      hwnd, (HMENU) IDCX_TVSTATIC, hinst,
+			      NULL);
+    font = SendMessage(hwnd, WM_GETFONT, 0, 0);
+    SendMessage(tvstatic, WM_SETFONT, font, MAKELPARAM(TRUE, 0));
+
+    r.left = 3;
+    r.right = r.left + 94;
+    r.top = 13;
+    r.bottom = r.top + 219;
+    MapDialogRect(hwnd, &r);
+    sessionview = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, "",
+			      WS_CHILD | WS_VISIBLE |
+			      WS_TABSTOP | TVS_HASLINES |
+			      TVS_DISABLEDRAGDROP | TVS_HASBUTTONS
+			      | TVS_LINESATROOT |
+			      TVS_SHOWSELALWAYS, r.left, r.top,
+			      r.right - r.left, r.bottom - r.top,
+			      hwnd, (HMENU) IDCX_SESSIONTREEVIEW, hinst,
+			      NULL);
+    font = SendMessage(hwnd, WM_GETFONT, 0, 0);
+    SendMessage(sessionview, WM_SETFONT, font, MAKELPARAM(TRUE, 0));
+    tvfaff->treeview = sessionview;
+    memset(tvfaff->lastat, 0, sizeof(tvfaff->lastat));
+	return sessionview;
+}
+
+/*
+ * Set up the session view contents.
+ */
+static void refresh_session_treeview(HWND sessionview, struct treeview_faff* tvfaff)
+{
+	HTREEITEM hfirst = NULL;
+	HTREEITEM item;
+    int i, j, level;
+	char* c;
+    struct sesslist sesslist;
+	
+    get_sesslist(&sesslist, TRUE);
+    for (i = 0; i < sesslist.nsessions; i++){
+		if (!sesslist.sessions[i])
+			continue;
+		level = 0;
+		/*	
+		for (j = 0; !sesslist.sessions[i][j] && level < 3; j++){
+			if (sesslist.sessions[i][j] == '#'){
+				sesslist.sessions[i][j] = '/';
+				level++;
+				
+				if (i == 0)
+					continue;
+				if (!strncmp(sesslist.sessions[i-1], sesslist.sessions[i], j))
+					treeview_insert(tvfaff, level-1, sesslist.sessions[i]+j+1, sesslist.sessions[i]);
+			}
+		}
+		
+        item = treeview_insert(tvfaff, level, sesslist.sessions[i]+j+1, sesslist.sessions[i]);
+*/
+        item = treeview_insert(tvfaff, level, sesslist.sessions[i], sesslist.sessions[i]);
+	    if (!hfirst)
+	        hfirst = item;
+	}
+    TreeView_SelectItem(sessionview, hfirst);
+}
+
+
+/*
  * This function is the configuration box.
  * (Being a dialog procedure, in general it returns 0 if the default
  * dialog processing should be performed, and 1 if it should not.)
@@ -438,65 +522,16 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 			   (rs.bottom + rs.top + rd.top - rd.bottom) / 2,
 			   rd.right - rd.left, rd.bottom - rd.top, TRUE);
 	}
-      /*
+    /*
 	 * Create the session tree view.
 	 */
-	{
-	    RECT r;
-	    WPARAM font;
-	    HWND tvstatic;
-
-	    r.left = 3;
-	    r.right = r.left + 94;
-	    r.top = 3;
-	    r.bottom = r.top + 10;
-	    MapDialogRect(hwnd, &r);
-	    tvstatic = CreateWindowEx(0, "STATIC", "&Sessions:",
-				      WS_CHILD | WS_VISIBLE,
-				      r.left, r.top,
-				      r.right - r.left, r.bottom - r.top,
-				      hwnd, (HMENU) IDCX_TVSTATIC, hinst,
-				      NULL);
-	    font = SendMessage(hwnd, WM_GETFONT, 0, 0);
-	    SendMessage(tvstatic, WM_SETFONT, font, MAKELPARAM(TRUE, 0));
-
-	    r.left = 3;
-	    r.right = r.left + 94;
-	    r.top = 13;
-	    r.bottom = r.top + 219;
-	    MapDialogRect(hwnd, &r);
-	    sessionview = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, "",
-				      WS_CHILD | WS_VISIBLE |
-				      WS_TABSTOP | TVS_HASLINES |
-				      TVS_DISABLEDRAGDROP | TVS_HASBUTTONS
-				      | TVS_LINESATROOT |
-				      TVS_SHOWSELALWAYS, r.left, r.top,
-				      r.right - r.left, r.bottom - r.top,
-				      hwnd, (HMENU) IDCX_SESSIONTREEVIEW, hinst,
-				      NULL);
-	    font = SendMessage(hwnd, WM_GETFONT, 0, 0);
-	    SendMessage(sessionview, WM_SETFONT, font, MAKELPARAM(TRUE, 0));
-	    tvfaff.treeview = sessionview;
-	    memset(tvfaff.lastat, 0, sizeof(tvfaff.lastat));
-
-	}
+	sessionview = create_session_treeview(hwnd, &tvfaff);
 
     /*
 	 * Set up the session view contents.
 	 */
-    {
-        HTREEITEM hfirst = NULL;
-		HTREEITEM item;
-	    int i;
-        struct sesslist sesslist;
-	    get_sesslist(&sesslist, TRUE);
-        for (i = 0; i < sesslist.nsessions; i++){
-            item = treeview_insert(&tvfaff, 0, sesslist.sessions[i], sesslist.sessions[i]);
-		    if (!hfirst)
-		        hfirst = item;
-		}
-	    TreeView_SelectItem(sessionview, hfirst);
-	} 
+    refresh_session_treeview(sessionview, &tvfaff);
+    
 	/*
 	 * Create the tree view.
 	 */
