@@ -364,6 +364,39 @@ static void create_controls(HWND hwnd, char *path)
 }
 
 /*
+ * Save previous session's configuration and load the current's configuration.
+ */
+static void change_selected_session(WPARAM wParam, LPARAM lParam)
+{
+	HTREEITEM i =
+	TreeView_GetSelection(((LPNMHDR) lParam)->hwndFrom);
+    TVITEM item;
+    char buffer[64];
+	int isdef;
+	static char pre_sission[64] = {0};
+	
+    item.hItem = i;
+    item.pszText = buffer;
+    item.cchTextMax = sizeof(buffer);
+    item.mask = TVIF_TEXT | TVIF_PARAM;
+    TreeView_GetItem(((LPNMHDR) lParam)->hwndFrom, &item); 
+    if (item.pszText[0] == '\0')
+        return;
+    isdef = !strcmp(pre_sission, "Default Settings");
+	if (pre_sission[0] != 0 && !isdef)
+	{
+        char *errmsg = save_settings(pre_sission, dp.data);
+        if (errmsg) {
+            dlg_error_msg(&dp, errmsg);
+            sfree(errmsg);
+        }
+	}
+	strncpy(pre_sission, item.pszText, 64);
+    load_settings(item.pszText, &cfg);
+	dlg_refresh(NULL, &dp);
+}
+
+/*
  * This function is the configuration box.
  * (Being a dialog procedure, in general it returns 0 if the default
  * dialog processing should be performed, and 1 if it should not.)
@@ -628,35 +661,15 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 
 	    SetFocus(((LPNMHDR) lParam)->hwndFrom);	/* ensure focus stays */
 	    return 0;
-	}else if (LOWORD(wParam) == IDCX_SESSIONTREEVIEW &&
-	    ((LPNMHDR) lParam)->code == TVN_SELCHANGED) {
-        HTREEITEM i =
-		TreeView_GetSelection(((LPNMHDR) lParam)->hwndFrom);
-	    TVITEM item;
-	    char buffer[64];
-		static char pre_sission[64] = {0};
-		int isdef;
- 
-	    item.hItem = i;
-	    item.pszText = buffer;
-	    item.cchTextMax = sizeof(buffer);
-	    item.mask = TVIF_TEXT | TVIF_PARAM;
-	    TreeView_GetItem(((LPNMHDR) lParam)->hwndFrom, &item); 
-        if (item.pszText[0] == '\0')
-            return 0;
-        isdef = !strcmp(pre_sission, "Default Settings");
-		if (pre_sission[0] != 0 && !isdef)
-		{
-            char *errmsg = save_settings(pre_sission, dp.data);
-            if (errmsg) {
-                dlg_error_msg(&dp, errmsg);
-                sfree(errmsg);
-            }
-		}
-		strncpy(pre_sission, item.pszText, 64);
-        load_settings(item.pszText, &cfg);
-		dlg_refresh(NULL, &dp);
-		return 0;
+	}else if (LOWORD(wParam) == IDCX_SESSIONTREEVIEW ){
+	    if (((LPNMHDR) lParam)->code == TVN_SELCHANGED) {
+        	change_selected_session(wParam, lParam);
+			return 0;
+	    }else if (((LPNMHDR) lParam)->code == NM_DBLCLK){
+			change_selected_session(wParam, lParam);
+			dlg_end(&dp, 1);
+			SaneEndDialog(hwnd, dp.endresult ? 1 : 0);
+	    }
     }
 	break;
       case WM_COMMAND:
