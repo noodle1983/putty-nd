@@ -298,10 +298,45 @@ enum {
     IDCX_PANELBASE = IDCX_STDBASE + 32
 };
 
+enum {
+    SESSION_GROUP,
+    SESSION_ITEM,
+	SESSION_NONE
+};
+
 struct treeview_faff {
     HWND treeview;
     HTREEITEM lastat[4];
 };
+
+static HTREEITEM session_treeview_insert(struct treeview_faff *faff,
+				 int level, char *text, LPARAM flags)
+{
+    TVINSERTSTRUCT ins;
+    int i;
+    HTREEITEM newitem;
+    ins.hParent = (level > 0 ? faff->lastat[level - 1] : TVI_ROOT);
+    ins.hInsertAfter = faff->lastat[level];
+#if _WIN32_IE >= 0x0400 && defined NONAMELESSUNION
+#define INSITEM DUMMYUNIONNAME.item
+#else
+#define INSITEM item
+#endif
+    ins.INSITEM.mask = TVIF_PARAM | TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE;
+    ins.INSITEM.pszText = text;
+    ins.INSITEM.cchTextMax = strlen(text)+1;
+    ins.INSITEM.lParam = flags;
+	ins.INSITEM.iImage = (flags == SESSION_GROUP) ? 1 : 0;
+	ins.INSITEM.iSelectedImage = (flags == SESSION_GROUP) ? 2 : 0;
+    newitem = TreeView_InsertItem(faff->treeview, &ins);
+    if (level > 0)
+	TreeView_Expand(faff->treeview, faff->lastat[level - 1],
+			(level > 1 ? TVE_COLLAPSE : TVE_EXPAND));
+    faff->lastat[level] = newitem;
+    for (i = level + 1; i < 4; i++)
+		faff->lastat[i] = NULL;
+    return newitem;
+}
 
 static HTREEITEM treeview_insert(struct treeview_faff *faff,
 				 int level, char *text, char *path)
@@ -362,26 +397,63 @@ static void create_controls(HWND hwnd, char *path)
 	winctrl_layout(&dp, wc, &cp, s, &base_id);
     }
 }
+/*
+ * get selected session name configuration.
+ */
+
+static LPARAM get_selected_session(WPARAM wParam, LPARAM lParam, char* const sess_name, const int name_len)
+{
+
+	HTREEITEM i =
+		TreeView_GetSelection(((LPNMHDR) lParam)->hwndFrom);
+    TVITEM item;
+    char buffer[64];
+	int item_len = 0;
+	int left = name_len - 1;
+	
+	memset(sess_name, '\0', name_len);
+	do{
+		item.hItem = i;
+		item.pszText = buffer;
+		item.cchTextMax = sizeof(buffer);
+		item.mask = TVIF_PARAM | TVIF_TEXT | TVIF_IMAGE;
+		TreeView_GetItem(((LPNMHDR) lParam)->hwndFrom, &item); 
+		if (left == (name_len - 1) 
+			&& item.lParam == SESSION_GROUP){
+			left--;
+			sess_name[left] = '#';
+		}
+
+		i = TreeView_GetParent(((LPNMHDR) lParam)->hwndFrom, i);
+		item_len = strlen(buffer);
+		//no enough space, return empty session name
+		if (item_len > left){
+			return SESSION_NONE;
+		}
+
+		memcpy(sess_name + left - item_len, buffer, item_len);
+		left = left - item_len - 1;
+		sess_name[left] = '#';
+	}while (i);
+	strcpy(sess_name, sess_name + left + 1);
+	return SESSION_ITEM;
+}
 
 /*
  * Save previous session's configuration and load the current's configuration.
  */
-static void change_selected_session(WPARAM wParam, LPARAM lParam)
+static LPARAM change_selected_session(WPARAM wParam, LPARAM lParam)
 {
-	HTREEITEM i =
-	TreeView_GetSelection(((LPNMHDR) lParam)->hwndFrom);
-    TVITEM item;
-    char buffer[64];
+    char sess_name[256];
 	int isdef;
 	static char pre_sission[64] = {0};
+	LPARAM selected_flags;
 	
-    item.hItem = i;
-    item.pszText = buffer;
-    item.cchTextMax = sizeof(buffer);
-    item.mask = TVIF_TEXT | TVIF_PARAM;
-    TreeView_GetItem(((LPNMHDR) lParam)->hwndFrom, &item); 
-    if (item.pszText[0] == '\0')
-        return;
+	selected_flags = get_selected_session(wParam, lParam, sess_name, 256);
+    if (sess_name[0] == '\0') {
+		strcpy(sess_name,"Default Settings"); 
+	}
+
     isdef = !strcmp(pre_sission, "Default Settings");
 	if (pre_sission[0] != 0 && !isdef)
 	{
@@ -391,9 +463,10 @@ static void change_selected_session(WPARAM wParam, LPARAM lParam)
             sfree(errmsg);
         }
 	}
-	strncpy(pre_sission, item.pszText, 64);
-    load_settings(item.pszText, &cfg);
+	strncpy(pre_sission, sess_name, 64);
+    load_settings(sess_name, &cfg);
 	dlg_refresh(NULL, &dp);
+	return selected_flags;
 }
 
 /*
@@ -438,6 +511,14 @@ static HWND create_session_treeview(HWND hwnd, struct treeview_faff* tvfaff)
     SendMessage(sessionview, WM_SETFONT, font, MAKELPARAM(TRUE, 0));
     tvfaff->treeview = sessionview;
     memset(tvfaff->lastat, 0, sizeof(tvfaff->lastat));
+
+	HIMAGELIST hImageList;
+	HBITMAP hBitMap;
+	hImageList = ImageList_Create(16,16,ILC_COLOR16,3,10);
+	hBitMap = LoadBitmap(hinst,MAKEINTRESOURCE(IDB_TREE));
+	ImageList_Add(hImageList,hBitMap,NULL);
+	DeleteObject(hBitMap);
+	SendDlgItemMessage(hwnd, IDCX_SESSIONTREEVIEW, TVM_SETIMAGELIST,0,(LPARAM)hImageList); 
 	return sessionview;
 }
 
@@ -448,31 +529,42 @@ static void refresh_session_treeview(HWND sessionview, struct treeview_faff* tvf
 {
 	HTREEITEM hfirst = NULL;
 	HTREEITEM item;
-    int i, j, level;
-	char* c;
+    int i, j, k;               //index to iterator all the characters of the sessions
+	int level;              //tree item's level
+	int b;                  //index of the tree item's first character
+	char item_str[64];
     struct sesslist sesslist;
 	
     get_sesslist(&sesslist, TRUE);
     for (i = 0; i < sesslist.nsessions; i++){
 		if (!sesslist.sessions[i])
 			continue;
+
 		level = 0;
-		/*	
-		for (j = 0; !sesslist.sessions[i][j] && level < 3; j++){
+		b = 0;
+		for (j = 0, k = 0; sesslist.sessions[i][j] && level < 3; j++, k++){
 			if (sesslist.sessions[i][j] == '#'){
-				sesslist.sessions[i][j] = '/';
-				level++;
-				
-				if (i == 0)
+				sesslist.sessions[i][k] = '/';
+				if (b == j){
+					b = j + 1;
 					continue;
-				if (!strncmp(sesslist.sessions[i-1], sesslist.sessions[i], j))
-					treeview_insert(tvfaff, level-1, sesslist.sessions[i]+j+1, sesslist.sessions[i]);
+				}
+
+				level++;
+				if (i == 0 || strncmp(sesslist.sessions[i-1], sesslist.sessions[i], j+1)){
+					int len = (j - b) > 63 ? 63 : (j-b);
+					strncpy(item_str, sesslist.sessions[i]+b, len);
+					item_str[len] = '\0';
+					session_treeview_insert(tvfaff, level-1, item_str, SESSION_GROUP);
+				}
+				b = j + 1;
 			}
 		}
 		
-        item = treeview_insert(tvfaff, level, sesslist.sessions[i]+j+1, sesslist.sessions[i]);
-*/
-        item = treeview_insert(tvfaff, level, sesslist.sessions[i], sesslist.sessions[i]);
+		if (b == j)
+			continue;
+        item = session_treeview_insert(tvfaff, level, sesslist.sessions[i]+b, SESSION_ITEM);
+
 	    if (!hfirst)
 	        hfirst = item;
 	}
@@ -701,9 +793,11 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
         	change_selected_session(wParam, lParam);
 			return 0;
 	    }else if (((LPNMHDR) lParam)->code == NM_DBLCLK){
-			change_selected_session(wParam, lParam);
-			dlg_end(&dp, 1);
-			SaneEndDialog(hwnd, dp.endresult ? 1 : 0);
+			if ((change_selected_session(wParam, lParam) == SESSION_ITEM)
+					&& cfg_launchable(&cfg)){
+				dlg_end(&dp, 1);
+				SaneEndDialog(hwnd, dp.endresult ? 1 : 0);
+			}
 	    }
     }
 	break;

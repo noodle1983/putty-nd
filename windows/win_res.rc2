@@ -11,6 +11,8 @@
 
 #include "win_res.h"
 
+IDB_TREE                BITMAP  DISCARDABLE     "LIST.BMP"
+
 IDI_MAINICON ICON "putty.ico"
 
 IDI_CFGICON ICON "puttycfg.ico"

@@ -31,4 +31,6 @@
 #define IDC_HELPBTN     1005
 #define IDC_ABOUT       1006
 
+#define IDB_TREE        2001 
+
 #endif
