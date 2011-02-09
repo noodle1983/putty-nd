@@ -864,6 +864,18 @@ void load_open_settings(void *sesskey, Config *cfg)
     gpps(sesskey, "WindowClass", "", cfg->winclass, sizeof(cfg->winclass));
 }
 
+void move_settings(char* fromsession, char* tosession)
+{
+	Config cfg;
+	
+	load_settings(fromsession, &cfg);
+	char *errmsg = save_settings(tosession, &cfg);
+	if (errmsg){
+		return;
+	}
+	del_settings(fromsession);
+}
+
 void do_defaults(char *session, Config * cfg)
 {
     load_settings(session, cfg);
