@@ -535,6 +535,9 @@ static void refresh_session_treeview(HWND sessionview, struct treeview_faff* tvf
 	char item_str[64];
     struct sesslist sesslist;
 	
+    memset(tvfaff->lastat, 0, sizeof(tvfaff->lastat));
+	TreeView_DeleteAllItems(tvfaff->treeview);
+
     get_sesslist(&sesslist, TRUE);
     for (i = 0; i < sesslist.nsessions; i++){
 		if (!sesslist.sessions[i])
