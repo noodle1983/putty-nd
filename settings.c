@@ -966,3 +966,20 @@ void get_sesslist(struct sesslist *list, int allocate)
 	list->sessions = NULL;
     }
 }
+
+int lower_bound_in_sesslist(struct sesslist *list, const char* session)
+{
+	int first = 0;
+	int last = list->nsessions;
+	int count = last;
+	int it, step;
+
+	while (count > 0)
+	{
+		it = first; step = count/2; it += step;
+		if (sessioncmp(&list->sessions[it], &session) == -1) 
+		{ first=++it; count-=step+1;  }
+		else count=step;
+	}
+	return first;
+}

@@ -821,6 +821,7 @@ void load_settings(char *section, Config * cfg);
 void load_open_settings(void *sesskey, Config *cfg);
 void move_settings(char* fromsession, char* tosession);
 void get_sesslist(struct sesslist *, int allocate);
+int lower_bound_in_sesslist(struct sesslist *list, const char* session);
 void do_defaults(char *, Config *);
 void registry_cleanup(void);
 
