@@ -724,24 +724,39 @@ static void refresh_session_treeview(HWND sessionview, struct treeview_faff* tvf
  */
 static void show_st_popup_menu(HWND  hwndSess)
 {
-	POINT cursorpos;
+	POINT screen_pos;
+	POINT client_pos;
 	TVHITTESTINFO tvht;
 	HTREEITEM hit_item;
+	int sess_flags;
 
-	GetCursorPos(&cursorpos);
-	tvht.pt.x = cursorpos.x; 
-    tvht.pt.y = cursorpos.y;
+	GetCursorPos(&screen_pos);
+	client_pos = screen_pos;
+	ScreenToClient(hwndSess,&client_pos);
+	tvht.pt.x = client_pos.x; 
+    tvht.pt.y = client_pos.y;
 	hit_item = TreeView_HitTest(hwndSess, (LPARAM)&tvht);
+	if (hit_item){
+		TreeView_Select(hwndSess, hit_item, TVGN_CARET);
+		sess_flags = get_selected_session(hwndSess, pre_session, sizeof pre_session);
+		if (!strcmp(pre_session, "Default Settings")){
+			sess_flags = SESSION_NONE;
+		}
+	}else{
+		sess_flags = SESSION_NONE;
+	}
 	
 
-	int menuid = TrackPopupMenu(st_popup_menus[SESSION_ITEM],
+	int menuid = TrackPopupMenu(st_popup_menus[sess_flags],
 			   TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD,
-			   cursorpos.x, cursorpos.y,
+			   screen_pos.x, screen_pos.y,
 			   0, hwndSess, NULL);	
-
+	if (!menuid)
+		return;
 	char buf[10];
 	sprintf(buf, "%d", menuid);
 	MessageBox(hwnd, buf, "Error",MB_OK|MB_ICONINFORMATION);
+	
 /*	*/
 }
 
