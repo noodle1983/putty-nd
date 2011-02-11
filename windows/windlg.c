@@ -45,6 +45,7 @@ static char **events = NULL;
 static int nevents = 0, negsize = 0;
 
 static char pre_session[256] = {0};
+static HMENU st_popup_menus[3];
 
 extern Config cfg;		       /* defined in window.c */
 
@@ -304,6 +305,15 @@ enum {
     SESSION_GROUP = 0 ,
     SESSION_ITEM  = 1,
 	SESSION_NONE  = 2
+};
+
+enum {
+    IDM_ST_NONE    = 0 ,
+    IDM_ST_NEWSESS = 1 ,
+    IDM_ST_NEWGRP  = 2 ,
+    IDM_ST_DUPSESS = 3 ,
+    IDM_ST_DUPGRP  = 4 ,
+    IDM_ST_DEL     = 5 ,
 };
 
 struct treeview_faff {
@@ -602,6 +612,17 @@ static HWND create_session_treeview(HWND hwnd, struct treeview_faff* tvfaff)
 	HWND sessionview;
 	HIMAGELIST hImageList;
 	HBITMAP hBitMap;
+	int i;
+
+	for (i = 0; i < sizeof(st_popup_menus); i++)
+		st_popup_menus[i] = CreatePopupMenu();
+	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_NEWSESS, "New &Session");
+	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_NEWGRP, "New &Group");
+	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_DUPSESS, "New &Session Base On");
+	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_DUPGRP, "Duplicate G&roup");
+	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_DEL, "&Delete");
+	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_DUPSESS, "Duplicate S&ession");
+	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_DEL, "&Delete");
 
     r.left = 3;
     r.right = r.left + 94;
@@ -641,6 +662,7 @@ static HWND create_session_treeview(HWND hwnd, struct treeview_faff* tvfaff)
 	ImageList_Add(hImageList,hBitMap,NULL);
 	DeleteObject(hBitMap);
 	SendDlgItemMessage(hwnd, IDCX_SESSIONTREEVIEW, TVM_SETIMAGELIST,0,(LPARAM)hImageList); 
+
 	return sessionview;
 }
 
@@ -697,6 +719,32 @@ static void refresh_session_treeview(HWND sessionview, struct treeview_faff* tvf
 	get_sesslist(&sesslist, FALSE);
 }
 
+/*
+ * show popup memu.
+ */
+static void show_st_popup_menu(WPARAM wParam, LPARAM lParam)
+{
+	POINT cursorpos;
+	HWND  hwndSess = ((LPNMHDR) lParam)->hwndFrom;
+	TVHITTESTINFO tvht;
+	HTREEITEM hit_item;
+
+	GetCursorPos(&cursorpos);
+	tvht.pt.x = cursorpos.x; 
+    tvht.pt.y = cursorpos.y;
+	hit_item=(HTREEITEM)SendMessage(hwndSess, TVM_HITTEST,NULL,(LPARAM)&tvht);
+	
+
+	int menuid = TrackPopupMenu(st_popup_menus[SESSION_ITEM],
+			   TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD,
+			   cursorpos.x, cursorpos.y,
+			   0, hwndSess, NULL);	
+
+	char buf[10];
+	sprintf(buf, "%d", menuid);
+	MessageBox(hwnd, buf, "Error",MB_OK|MB_ICONINFORMATION);
+/*	*/
+}
 
 /*
  * This function is the configuration box.
@@ -932,8 +980,13 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 		case TVN_ENDLABELEDIT:
 			edit_session_treeview(wParam, lParam);
 			break;
+
+		case NM_RCLICK:
+			show_st_popup_menu(wParam, lParam);
+			break;
 		default:
 			break;
+
 		};//switch
 		return 0;
     }
