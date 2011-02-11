@@ -413,11 +413,11 @@ static void create_controls(HWND hwnd, char *path)
  * get selected session name configuration.
  */
 
-static LPARAM get_selected_session(WPARAM wParam, LPARAM lParam, char* const sess_name, const int name_len)
+static LPARAM get_selected_session(HWND hwndSess, char* const sess_name, const int name_len)
 {
 
 	HTREEITEM i =
-		TreeView_GetSelection(((LPNMHDR) lParam)->hwndFrom);
+		TreeView_GetSelection(hwndSess);
     TVITEM item;
     char buffer[64];
 	int item_len = 0;
@@ -430,7 +430,7 @@ static LPARAM get_selected_session(WPARAM wParam, LPARAM lParam, char* const ses
 		item.pszText = buffer;
 		item.cchTextMax = sizeof(buffer);
 		item.mask = TVIF_PARAM | TVIF_TEXT | TVIF_IMAGE;
-		TreeView_GetItem(((LPNMHDR) lParam)->hwndFrom, &item); 
+		TreeView_GetItem(hwndSess, &item); 
 		if (left == (name_len - 1) 
 			&& item.lParam == SESSION_GROUP){
 			left--;
@@ -438,7 +438,7 @@ static LPARAM get_selected_session(WPARAM wParam, LPARAM lParam, char* const ses
 			sess_flags = SESSION_GROUP;
 		}
 
-		i = TreeView_GetParent(((LPNMHDR) lParam)->hwndFrom, i);
+		i = TreeView_GetParent(hwndSess, i);
 		item_len = strlen(buffer);
 		//no enough space, return empty session name
 		if (item_len > left){
@@ -456,12 +456,12 @@ static LPARAM get_selected_session(WPARAM wParam, LPARAM lParam, char* const ses
 /*
  * handle edit message for session treeview.
  */
-static void edit_session_treeview(WPARAM wParam, LPARAM lParam)
+static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 {
 	static HWND hEdit = NULL;
 
 	if(((LPNMHDR)lParam)->code == TVN_BEGINLABELEDIT) {
-		hEdit = TreeView_GetEditControl(((LPNMHDR) lParam)->hwndFrom);
+		hEdit = TreeView_GetEditControl(hwndSess);
 	}else if (((LPNMHDR)lParam)->code == TVN_ENDLABELEDIT)
 	{
 		char buffer[256] = {0};
@@ -489,19 +489,19 @@ static void edit_session_treeview(WPARAM wParam, LPARAM lParam)
 		buffer[i] = '\0';
 		
 		/* if no changed, return */
-		hi = TreeView_GetSelection(((LPNMHDR) lParam)->hwndFrom);
+		hi = TreeView_GetSelection(hwndSess);
 		item.hItem = hi;
 		item.pszText = itemstr;
 		item.cchTextMax = sizeof(itemstr);
 		item.mask = TVIF_TEXT | TVIF_PARAM;
-		TreeView_GetItem(((LPNMHDR) lParam)->hwndFrom, &item); 
+		TreeView_GetItem(hwndSess, &item); 
 		if (!strcmp(item.pszText, buffer)) {
 			hEdit = NULL; 
 			return;
 		}
 
 		/* get the pre_session */
-		sess_flags = get_selected_session(wParam, lParam, pre_session, sizeof pre_session);
+		sess_flags = get_selected_session(hwndSess, pre_session, sizeof pre_session);
 		if (!strcmp(pre_session, "Default Settings")
 			|| sess_flags == SESSION_NONE){
 			return;
@@ -561,7 +561,7 @@ static void edit_session_treeview(WPARAM wParam, LPARAM lParam)
 				
 		/* change the session treeview */
 		strncpy(itemstr, buffer, sizeof(itemstr));		
-		TreeView_SetItem(((LPNMHDR) lParam)->hwndFrom, &item); 
+		TreeView_SetItem(hwndSess, &item); 
 
 		/* clean */
 		get_sesslist(&sesslist, FALSE);
@@ -572,13 +572,13 @@ static void edit_session_treeview(WPARAM wParam, LPARAM lParam)
 /*
  * Save previous session's configuration and load the current's configuration.
  */
-static LPARAM change_selected_session(WPARAM wParam, LPARAM lParam)
+static LPARAM change_selected_session(HWND hwndSess)
 {
     char sess_name[256];
 	int isdef;
 	LPARAM selected_flags;
 	
-	selected_flags = get_selected_session(wParam, lParam, sess_name, 256);
+	selected_flags = get_selected_session(hwndSess, sess_name, 256);
     if (sess_name[0] == '\0') {
 		strcpy(sess_name,"Default Settings"); 
 	}
@@ -722,17 +722,16 @@ static void refresh_session_treeview(HWND sessionview, struct treeview_faff* tvf
 /*
  * show popup memu.
  */
-static void show_st_popup_menu(WPARAM wParam, LPARAM lParam)
+static void show_st_popup_menu(HWND  hwndSess)
 {
 	POINT cursorpos;
-	HWND  hwndSess = ((LPNMHDR) lParam)->hwndFrom;
 	TVHITTESTINFO tvht;
 	HTREEITEM hit_item;
 
 	GetCursorPos(&cursorpos);
 	tvht.pt.x = cursorpos.x; 
     tvht.pt.y = cursorpos.y;
-	hit_item=(HTREEITEM)SendMessage(hwndSess, TVM_HITTEST,NULL,(LPARAM)&tvht);
+	hit_item = TreeView_HitTest(hwndSess, (LPARAM)&tvht);
 	
 
 	int menuid = TrackPopupMenu(st_popup_menus[SESSION_ITEM],
@@ -965,11 +964,11 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 	}else if (LOWORD(wParam) == IDCX_SESSIONTREEVIEW ){
 		switch(((LPNMHDR) lParam)->code){
 		case TVN_SELCHANGED:
-        	change_selected_session(wParam, lParam);
+        	change_selected_session(((LPNMHDR) lParam)->hwndFrom);
 			break;
 
 		case NM_DBLCLK:
-			if ((change_selected_session(wParam, lParam) == SESSION_ITEM)
+			if ((change_selected_session(((LPNMHDR) lParam)->hwndFrom) == SESSION_ITEM)
 					&& cfg_launchable(&cfg)){
 				dlg_end(&dp, 1);
 				SaneEndDialog(hwnd, dp.endresult ? 1 : 0);
@@ -978,11 +977,11 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 	
 		case TVN_BEGINLABELEDIT:
 		case TVN_ENDLABELEDIT:
-			edit_session_treeview(wParam, lParam);
+			edit_session_treeview(((LPNMHDR) lParam)->hwndFrom, lParam);
 			break;
 
 		case NM_RCLICK:
-			show_st_popup_menu(wParam, lParam);
+			show_st_popup_menu(((LPNMHDR) lParam)->hwndFrom);
 			break;
 		default:
 			break;
