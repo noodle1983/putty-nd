@@ -273,7 +273,7 @@ static void wprefs(void *sesskey, char *name,
     write_setting_s(sesskey, name, buf);
 }
 
-char *save_settings(char *section, Config * cfg)
+char *save_settings(const char *section, Config * cfg)
 {
     void *sesskey;
     char *errmsg;
@@ -503,7 +503,7 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_s(sesskey, "WindowClass", cfg->winclass);
 }
 
-void load_settings(char *section, Config * cfg)
+void load_settings(const char *section, Config * cfg)
 {
     void *sesskey;
 
@@ -864,17 +864,23 @@ void load_open_settings(void *sesskey, Config *cfg)
     gpps(sesskey, "WindowClass", "", cfg->winclass, sizeof(cfg->winclass));
 }
 
-void move_settings(char* fromsession, char* tosession)
+void move_settings(const char* fromsession, const char* tosession)
 {
-	Config cfg;
+	copy_settings(fromsession, tosession);
+	del_settings(fromsession);
+}
+
+void copy_settings(const char* fromsession, const char* tosession)
+{
+    Config cfg;
 	
 	load_settings(fromsession, &cfg);
 	char *errmsg = save_settings(tosession, &cfg);
 	if (errmsg){
 		return;
 	}
-	del_settings(fromsession);
 }
+
 
 void do_defaults(char *session, Config * cfg)
 {

@@ -308,12 +308,18 @@ enum {
 };
 
 enum {
+    /* 
+     * please make sure the menu id is 
+     * in the range (IDM_ST_NONE, IDM_ST_ROOF) 
+     */
     IDM_ST_NONE    = 0 ,
     IDM_ST_NEWSESS = 1 ,
     IDM_ST_NEWGRP  = 2 ,
     IDM_ST_DUPSESS = 3 ,
     IDM_ST_DUPGRP  = 4 ,
-    IDM_ST_DEL     = 5 ,
+    IDM_ST_NEWSESSONGRP  = 5 ,
+    IDM_ST_DEL     = 6 ,
+    IDM_ST_ROOF    = 7
 };
 
 struct treeview_faff {
@@ -459,12 +465,17 @@ static LPARAM get_selected_session(HWND hwndSess, char* const sess_name, const i
 static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 {
 	static HWND hEdit = NULL;
+	char buffer[256] = {0};
 
 	if(((LPNMHDR)lParam)->code == TVN_BEGINLABELEDIT) {
 		hEdit = TreeView_GetEditControl(hwndSess);
+        GetWindowText(hEdit, buffer, sizeof(buffer));
+        if (!strcmp(buffer, DEFAULT_SESSION_NAME)){
+            TreeView_EndEditLabelNow(hwndSess, TRUE);
+            hEdit = NULL;
+    	}
 	}else if (((LPNMHDR)lParam)->code == TVN_ENDLABELEDIT)
 	{
-		char buffer[256] = {0};
 		char itemstr[64] = {0};
 		char to_session[256] = {0};
 		int i = 0;
@@ -529,9 +540,9 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 		int sessexist;
 		get_sesslist(&sesslist, TRUE);
 		first = lower_bound_in_sesslist(&sesslist, to_session);
-		sessexist = (sess_flags == SESSION_ITEM)  
-					? (!strcmp(sesslist.sessions[first], to_session)) 
-					: (!strncmp(sesslist.sessions[first], to_session, strlen(to_session)));
+		sessexist = first >= sesslist.nsessions ? FALSE 
+            :(sess_flags == SESSION_ITEM)? (!strcmp(sesslist.sessions[pos], to_session)) 
+    		:(!strncmp(sesslist.sessions[pos], to_session, strlen(to_session)));
 		if (sessexist) {
 			/* to_session exists */
 			MessageBox(hwnd, "session already exists", "Error",MB_OK|MB_ICONINFORMATION);
@@ -567,6 +578,39 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 		get_sesslist(&sesslist, FALSE);
 		hEdit = NULL;
 	}
+}
+
+/*
+ * delete session item/group
+ */
+static void del_session_treeview(HWND hwndSess, HTREEITEM selected_item, const char* session, int sess_flag)
+{
+    if (!strcmp(session, DEFAULT_SESSION_NAME)){
+        return;
+    }
+
+    if (sess_flag == SESSION_ITEM) {
+		del_settings(session);
+	}else if (sess_flag == SESSION_GROUP){
+    	struct sesslist sesslist;
+		int first;
+        int cmplen = strlen(session);
+
+		get_sesslist(&sesslist, TRUE);
+		first = lower_bound_in_sesslist(&sesslist, session);
+		for (first = first; first < sesslist.nsessions; first++) {
+			if (strncmp(sesslist.sessions[first], session, cmplen)) 
+				break;
+			del_settings(sesslist.sessions[first]);
+		}
+        get_sesslist(&sesslist, FALSE);
+	}
+    /* clear pre_session, don't change it before if sess_flag == SESSION_ITEM*/
+    pre_session[0] = '\0';
+    
+    /* delete in the tree view, the next item will be selected automatically*/
+    TreeView_DeleteItem(hwndSess, selected_item);
+    return;
 }
 
 /*
@@ -618,7 +662,7 @@ static HWND create_session_treeview(HWND hwnd, struct treeview_faff* tvfaff)
 		st_popup_menus[i] = CreatePopupMenu();
 	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_NEWSESS, "New &Session");
 	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_NEWGRP, "New &Group");
-	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_DUPSESS, "New &Session Base On");
+	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_NEWSESSONGRP, "New &Session Base On");
 	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_DUPGRP, "Duplicate G&roup");
 	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_DEL, "&Delete");
 	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_DUPSESS, "Duplicate S&ession");
@@ -669,24 +713,29 @@ static HWND create_session_treeview(HWND hwnd, struct treeview_faff* tvfaff)
 /*
  * Set up the session view contents.
  */
-static void refresh_session_treeview(HWND sessionview, struct treeview_faff* tvfaff)
+static void refresh_session_treeview(
+    HWND sessionview, 
+    struct treeview_faff* tvfaff, 
+    const char* select_session)
 {
 	HTREEITEM hfirst = NULL;
-	HTREEITEM item;
+	HTREEITEM item = NULL;
     int i, j, k;               //index to iterator all the characters of the sessions
 	int level;              //tree item's level
 	int b;                  //index of the tree item's first character
 	char itemstr[64];
     struct sesslist sesslist;
+    int is_select;
 	
     memset(tvfaff->lastat, 0, sizeof(tvfaff->lastat));
 	TreeView_DeleteAllItems(tvfaff->treeview);
 
     get_sesslist(&sesslist, TRUE);
     for (i = 0; i < sesslist.nsessions; i++){
-		if (!sesslist.sessions[i])
+		if (!sesslist.sessions[i][0])
 			continue;
-
+        is_select = !strcmp(sesslist.sessions[i], select_session);
+        
 		level = 0;
 		b = 0;
 		for (j = 0, k = 0; sesslist.sessions[i][j] && level < 3; j++, k++){
@@ -702,21 +751,81 @@ static void refresh_session_treeview(HWND sessionview, struct treeview_faff* tvf
 					int len = (j - b) > 63 ? 63 : (j-b);
 					strncpy(itemstr, sesslist.sessions[i]+b, len);
 					itemstr[len] = '\0';
-					session_treeview_insert(tvfaff, level-1, itemstr, SESSION_GROUP);
+					item = session_treeview_insert(tvfaff, level-1, itemstr, SESSION_GROUP);
 				}
 				b = j + 1;
 			}
 		}
 		
-		if (b == j)
+		if (b == j){
+            if (is_select) hfirst = item;
 			continue;
+		}
         item = session_treeview_insert(tvfaff, level, sesslist.sessions[i]+b, SESSION_ITEM);
-
+        if (is_select) hfirst = item;
+        
 	    if (!hfirst)
 	        hfirst = item;
 	}
     TreeView_SelectItem(sessionview, hfirst);
 	get_sesslist(&sesslist, FALSE);
+}
+
+/*
+ * duplicate session item with index
+ */
+static void dup_session_treeview(
+    HWND hwndSess,  
+    HTREEITEM selected_item,
+    const char* from_session, 
+    const char* to_session_pre, 
+    int to_sess_flag)
+{
+    struct sesslist sesslist;
+    char to_session[256] = {0};
+    int sess_len, pos, append_index;
+    int sessexist;
+    
+    get_sesslist(&sesslist, TRUE);
+    
+    append_index = sesslist.nsessions; 
+    snprintf(to_session, sizeof(to_session) - 2,
+             "%s %d", to_session_pre, append_index);
+    if (to_sess_flag == SESSION_GROUP){
+        strcat(to_session, "#");
+    }
+
+	pos = lower_bound_in_sesslist(&sesslist, to_session);
+	sessexist = pos >= sesslist.nsessions ? FALSE 
+        :(to_sess_flag == SESSION_ITEM)? (!strcmp(sesslist.sessions[pos], to_session)) 
+		: (!strncmp(sesslist.sessions[pos], to_session, strlen(to_session)));
+
+    while(sessexist) {
+        sess_len = strlen(to_session);
+        if (sess_len > (sizeof(to_session) - 10)){
+            MessageBox(hwndSess, "Session name is too long! \nAre you fucking me?", "Error",MB_OK|MB_ICONINFORMATION);
+            get_sesslist(&sesslist, FALSE);
+            return;
+        }
+        if (to_sess_flag == SESSION_GROUP)
+            to_session[sess_len - 1] = '\0';
+        strcat(to_session, " ");
+        if (to_sess_flag == SESSION_GROUP)
+            strcat(to_session, "#");
+	    pos = lower_bound_in_sesslist(&sesslist, to_session);
+    	sessexist = (to_sess_flag == SESSION_ITEM)  
+    				? (!strcmp(sesslist.sessions[pos], to_session)) 
+    				: (!strncmp(sesslist.sessions[pos], to_session, strlen(to_session)));
+    }
+    
+    copy_settings(from_session, to_session);
+    get_sesslist(&sesslist, FALSE);
+
+    struct treeview_faff tvfaff;
+    tvfaff.treeview = hwndSess;
+    memset(tvfaff.lastat, 0, sizeof(tvfaff.lastat));
+    refresh_session_treeview(hwndSess, &tvfaff, to_session);
+    TreeView_EditLabel(hwndSess, TreeView_GetSelection(hwndSess));
 }
 
 /*
@@ -751,13 +860,62 @@ static void show_st_popup_menu(HWND  hwndSess)
 			   TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD,
 			   screen_pos.x, screen_pos.y,
 			   0, hwndSess, NULL);	
-	if (!menuid)
+	if (menuid <= IDM_ST_NONE || menuid >= IDM_ST_ROOF)
 		return;
+
+    /* now we handle the message */
+    if (menuid == IDM_ST_DEL){
+        del_session_treeview(hwndSess, hit_item, pre_session, sess_flags);
+        return;
+    }
+
+    /* we need to new a session */
+    char base_session[256] = {0};
+    char to_session[256] = {0};
+    int  to_sess_flag = SESSION_NONE;
+    switch (menuid){
+        case IDM_ST_NEWSESS:
+            strncpy(base_session, DEFAULT_SESSION_NAME, sizeof base_session);
+            strncpy(to_session, "Session", sizeof to_session);
+            to_sess_flag = SESSION_ITEM;
+            break;
+        case IDM_ST_NEWGRP:
+            strncpy(base_session, DEFAULT_SESSION_NAME, sizeof base_session);
+            strncpy(to_session, "Group", sizeof to_session);
+            to_sess_flag = SESSION_GROUP;
+            break;
+        case IDM_ST_DUPSESS:
+            save_settings(base_session, dp.data);
+            strncpy(base_session, pre_session, sizeof base_session);
+            strncpy(to_session, pre_session, sizeof to_session);
+            strncat(to_session, " Session", sizeof(to_session) - strlen(pre_session));
+            to_sess_flag = SESSION_ITEM;
+            break;
+        case IDM_ST_DUPGRP:
+            save_settings(base_session, dp.data);
+            strncpy(base_session, pre_session, sizeof base_session);
+            strncpy(to_session, pre_session, sizeof to_session);
+            to_session[strlen(to_session)-1] = '\0';
+            strncat(to_session, " Group", sizeof(to_session) - strlen(pre_session));
+            to_sess_flag = SESSION_GROUP;
+            break;
+        case IDM_ST_NEWSESSONGRP:
+            save_settings(base_session, dp.data);
+            strncpy(base_session, pre_session, sizeof base_session);
+            strncpy(to_session, pre_session, sizeof to_session);
+            strncat(to_session, "Session", sizeof(to_session)-strlen(pre_session));
+            to_sess_flag = SESSION_ITEM;
+            break;
+    };
+    dup_session_treeview(hwndSess, hit_item, base_session, 
+                        to_session, to_sess_flag);
+    
+/*    
 	char buf[10];
 	sprintf(buf, "%d", menuid);
 	MessageBox(hwnd, buf, "Error",MB_OK|MB_ICONINFORMATION);
 	
-/*	*/
+	*/
 }
 
 /*
@@ -810,7 +968,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
     /*
 	 * Set up the session view contents.
 	 */
-    refresh_session_treeview(sessionview, &tvfaff);
+    refresh_session_treeview(sessionview, &tvfaff, DEFAULT_SESSION_NAME);
     
 	/*
 	 * Create the tree view.
