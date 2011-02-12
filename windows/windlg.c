@@ -502,7 +502,7 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 
 		/* get the pre_session */
 		sess_flags = get_selected_session(hwndSess, pre_session, sizeof pre_session);
-		if (!strcmp(pre_session, "Default Settings")
+		if (!strcmp(pre_session, DEFAULT_SESSION_NAME)
 			|| sess_flags == SESSION_NONE){
 			return;
 		}
@@ -580,13 +580,13 @@ static LPARAM change_selected_session(HWND hwndSess)
 	
 	selected_flags = get_selected_session(hwndSess, sess_name, 256);
     if (sess_name[0] == '\0') {
-		strcpy(sess_name,"Default Settings"); 
+		strcpy(sess_name,DEFAULT_SESSION_NAME); 
 	}
 	if (!strcmp(sess_name, pre_session)) {
 		return selected_flags;
 	}
 
-    isdef = !strcmp(pre_session, "Default Settings");
+    isdef = !strcmp(pre_session, DEFAULT_SESSION_NAME);
 	if (pre_session[0] != 0 && !isdef)
 	{
         char *errmsg = save_settings(pre_session, dp.data);
@@ -739,7 +739,7 @@ static void show_st_popup_menu(HWND  hwndSess)
 	if (hit_item){
 		TreeView_Select(hwndSess, hit_item, TVGN_CARET);
 		sess_flags = get_selected_session(hwndSess, pre_session, sizeof pre_session);
-		if (!strcmp(pre_session, "Default Settings")){
+		if (!strcmp(pre_session, DEFAULT_SESSION_NAME)){
 			sess_flags = SESSION_NONE;
 		}
 	}else{

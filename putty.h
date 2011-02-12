@@ -27,6 +27,11 @@ typedef struct terminal_tag Terminal;
 #include "network.h"
 #include "misc.h"
 
+/* 
+ * take the "Defalut setting" as the default session name
+ */
+#define DEFAULT_SESSION_NAME "Default Settings"
+
 /*
  * Fingerprints of the PGP master keys that can be used to establish a trust
  * path between an executable and other files.

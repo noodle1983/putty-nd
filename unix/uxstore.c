@@ -38,7 +38,7 @@ static char *mungestr(const char *in)
     char *out, *ret;
 
     if (!in || !*in)
-        in = "Default Settings";
+        in = DEFAULT_SESSION_NAME;
 
     ret = out = snewn(3*strlen(in)+1, char);
 

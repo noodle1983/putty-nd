@@ -82,7 +82,7 @@ void *open_settings_w(const char *sessionname, char **errmsg)
     *errmsg = NULL;
 
     if (!sessionname || !*sessionname)
-	sessionname = "Default Settings";
+	sessionname = DEFAULT_SESSION_NAME;
 
     p = snewn(3 * strlen(sessionname) + 1, char);
     mungestr(sessionname, p);
@@ -131,7 +131,7 @@ void *open_settings_r(const char *sessionname)
     char *p;
 
     if (!sessionname || !*sessionname)
-	sessionname = "Default Settings";
+        sessionname = DEFAULT_SESSION_NAME;
 
     p = snewn(3 * strlen(sessionname) + 1, char);
     mungestr(sessionname, p);
