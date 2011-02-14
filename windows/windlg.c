@@ -421,17 +421,16 @@ static void create_controls(HWND hwnd, char *path)
 	winctrl_layout(&dp, wc, &cp, s, &base_id);
     }
 }
+
 /*
- * get selected session name configuration.
+ * convert treeview to session
  */
-
-static LPARAM get_selected_session(HWND hwndSess, char* const sess_name, const int name_len)
+static LPARAM conv_tv_to_sess(
+    HWND hwndSess, HTREEITEM item, 
+    char* const sess_name, const int name_len)
 {
-
-	HTREEITEM i =
-		TreeView_GetSelection(hwndSess);
     TVITEM item;
-    char buffer[64];
+    char buffer[256];
 	int item_len = 0;
 	int left = name_len - 1;
 	int sess_flags = SESSION_ITEM;
@@ -463,6 +462,16 @@ static LPARAM get_selected_session(HWND hwndSess, char* const sess_name, const i
 	}while (i);
 	strcpy(sess_name, sess_name + left + 1);
 	return sess_flags;
+}
+/*
+ * get selected session name configuration.
+ */
+static LPARAM get_selected_session(HWND hwndSess, char* const sess_name, const int name_len)
+{
+
+	HTREEITEM i =
+		TreeView_GetSelection(hwndSess);
+    return conv_tv_to_sess(hwndSess, i,sess_name, name_len);
 }
 
 /*
@@ -777,6 +786,27 @@ static void refresh_session_treeview(
 }
 
 /*
+ * copy session, return FALSE if to_session exist
+ */
+static int copy_session(
+    struct sesslist* sesslist, 
+    const char* from_session, 
+    const char* to_session, 
+    int to_sess_flag)
+{
+    int pos, sessexist;
+    
+    pos = lower_bound_in_sesslist(&sesslist, to_session);
+	sessexist = pos >= sesslist.nsessions ? FALSE 
+        :(to_sess_flag == SESSION_ITEM)? (!strcmp(sesslist.sessions[pos], to_session)) 
+		: (!strncmp(sesslist.sessions[pos], to_session, strlen(to_session)));
+    if (sessexist) return FALSE;
+
+    copy_settings(from_session, to_session);
+    return TRUE;
+}
+
+/*
  * duplicate session item with index
  */
 static void dup_session_treeview(
@@ -789,7 +819,7 @@ static void dup_session_treeview(
     struct sesslist sesslist;
     char to_session[256] = {0};
     int sess_len, pos, append_index;
-    int sessexist;
+    int success;
     
     get_sesslist(&sesslist, TRUE);
     
@@ -801,11 +831,9 @@ static void dup_session_treeview(
     }
 
 	pos = lower_bound_in_sesslist(&sesslist, to_session);
-	sessexist = pos >= sesslist.nsessions ? FALSE 
-        :(to_sess_flag == SESSION_ITEM)? (!strcmp(sesslist.sessions[pos], to_session)) 
-		: (!strncmp(sesslist.sessions[pos], to_session, strlen(to_session)));
+	success = copy_session(sesslist, from_session, to_session, to_sess_flag);
 
-    while(sessexist) {
+    while(!success) {
         sess_len = strlen(to_session);
         if (sess_len > (sizeof(to_session) - 10)){
             MessageBox(hwndSess, "Session name is too long! \nAre you fucking me?", "Error",MB_OK|MB_ICONINFORMATION);
@@ -817,13 +845,8 @@ static void dup_session_treeview(
         strcat(to_session, " ");
         if (to_sess_flag == SESSION_GROUP)
             strcat(to_session, "#");
-	    pos = lower_bound_in_sesslist(&sesslist, to_session);
-    	sessexist = (to_sess_flag == SESSION_ITEM)  
-    				? (!strcmp(sesslist.sessions[pos], to_session)) 
-    				: (!strncmp(sesslist.sessions[pos], to_session, strlen(to_session)));
+	    success = copy_session(sesslist, from_session, to_session, to_sess_flag);
     }
-    
-    copy_settings(from_session, to_session);
     get_sesslist(&sesslist, FALSE);
 
     struct treeview_faff tvfaff;
@@ -924,19 +947,25 @@ static void show_st_popup_menu(HWND  hwndSess)
 }
 /*
  * drag session treeview.
+ * return if the msg is handled
  */
 static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM lParam)
 {
 	static int dragging = FALSE;
-	TVHITTESTINFO tvht; 
-	HTREEITEM hit;
-	POINTS pos;
+    static char[256] old_item_name; 
+	HTREEITEM htiTarget;
 	
 	if (flags == DRAG_BEGIN){
 		HIMAGELIST himl;
 		RECT rcItem;
-
 		LPNMTREEVIEW lpnmtv = (LPNMTREEVIEW) lParam;
+
+        /* select the session. End dragging if it is not item.*/
+        TreeView_SelectItem(hwndSess, lpnmtv->itemNew.hItem);
+        if (lpnmtv->itemNew.lParam != SESSION_ITEM) 
+            return TRUE;
+        strncpy(old_item_name, lpnmtv->itemNew.pszText, sizeof old_item_name);
+        
 		/*
 		 * Tell the tree-view control to create an image to use 
     	 * for dragging. 
@@ -958,8 +987,8 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 	} else if (flags == DRAG_MOVE){
 		if (!dragging) return FALSE;
 
-		HTREEITEM htiTarget;
 		TVHITTESTINFO tvht;
+        POINTS pos;
 		/* 
 		 * Drag the item to the current position of the mouse pointer. 
          * First convert the dialog coordinates to control coordinates. 
@@ -983,19 +1012,38 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 		} 
 		ImageList_DragShowNolock(TRUE);
 
-
 		return TRUE;
 	} else if (flags == DRAG_END){
 		if (!dragging) return FALSE;
+
+        ImageList_DragLeave(hwndSess);
 		ImageList_EndDrag(); 
+
+        if ((htiTarget = TreeView_GetDropHilight(hwndSess))== NULL){
+            return TRUE;
+        }
+        char session[256] = {0};
+        int sess_flag;
+        char* c;
+        int index = 0;
+        sess_flag = conv_tv_to_sess(hwndSess, htiTarget, session, sizeof session);
+        if (sess_flag == SESSION_NONE) return TRUE;
+        if (sess_flag == SESSION_ITEM) {
+            c = strrchr(session, '#');
+		    if (!c) return TRUE;
+            *(c + 1) = '\0';
+            index = c - session + 1;
+        }
+        strncpy(session + index, old_item_name, sizeof(session) - index);
+        
         TreeView_SelectDropTarget(hwndSess, NULL);
         ReleaseCapture(); 
         ShowCursor(TRUE); 
 		dragging = FALSE;
+
+        
 		return TRUE;
-
 	}
-
 	return FALSE;
 }
 
