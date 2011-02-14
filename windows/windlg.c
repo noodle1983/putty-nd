@@ -308,6 +308,12 @@ enum {
 };
 
 enum {
+    DRAG_BEGIN = 0 ,
+    DRAG_MOVE  = 1,
+	DRAG_END   = 2
+};
+
+enum {
     /* 
      * please make sure the menu id is 
      * in the range (IDM_ST_NONE, IDM_ST_ROOF) 
@@ -690,8 +696,7 @@ static HWND create_session_treeview(HWND hwnd, struct treeview_faff* tvfaff)
     sessionview = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, "",
 			      WS_CHILD | WS_VISIBLE |
 			      WS_TABSTOP | TVS_HASLINES |
-			      TVS_DISABLEDRAGDROP | TVS_HASBUTTONS
-			      | TVS_LINESATROOT | TVS_EDITLABELS |
+			      TVS_HASBUTTONS | TVS_LINESATROOT | TVS_EDITLABELS |
 			      TVS_SHOWSELALWAYS, r.left, r.top,
 			      r.right - r.left, r.bottom - r.top,
 			      hwnd, (HMENU) IDCX_SESSIONTREEVIEW, hinst,
@@ -917,6 +922,82 @@ static void show_st_popup_menu(HWND  hwndSess)
 	
 	*/
 }
+/*
+ * drag session treeview.
+ */
+static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM lParam)
+{
+	static int dragging = FALSE;
+	TVHITTESTINFO tvht; 
+	HTREEITEM hit;
+	POINTS pos;
+	
+	if (flags == DRAG_BEGIN){
+		HIMAGELIST himl;
+		RECT rcItem;
+
+		LPNMTREEVIEW lpnmtv = (LPNMTREEVIEW) lParam;
+		/*
+		 * Tell the tree-view control to create an image to use 
+    	 * for dragging. 
+		 */
+		himl = TreeView_CreateDragImage(hwndSess, lpnmtv->itemNew.hItem); 
+
+		/* Get the bounding rectangle of the item being dragged. */
+		TreeView_GetItemRect(hwndSess, lpnmtv->itemNew.hItem, &rcItem, TRUE); 
+
+		/* Start the drag operation.*/ 
+		ImageList_BeginDrag(himl, 0, 0, 0);
+		ImageList_DragEnter(hwndSess, lpnmtv->ptDrag.x, lpnmtv->ptDrag.x); 
+
+		ShowCursor(FALSE); 
+		SetCapture(GetParent(hwndSess)); 
+		dragging = TRUE;
+		return TRUE;
+
+	} else if (flags == DRAG_MOVE){
+		if (!dragging) return FALSE;
+
+		HTREEITEM htiTarget;
+		TVHITTESTINFO tvht;
+		/* 
+		 * Drag the item to the current position of the mouse pointer. 
+         * First convert the dialog coordinates to control coordinates. 
+		 */
+		pos = MAKEPOINTS(lParam);
+		POINT point;
+		point.x = pos.x;
+		point.y = pos.y;
+		ClientToScreen(GetParent(hwndSess), &point);
+		ScreenToClient(hwndSess, &point);
+		ImageList_DragMove(point.x, point.y);
+		/* Turn off the dragged image so the background can be refreshed. */
+		ImageList_DragShowNolock(FALSE); 
+			
+		// Find out if the pointer is on the item. If it is, 
+		// highlight the item as a drop target. 
+		tvht.pt.x = point.x; 
+		tvht.pt.y = point.y; 
+		if ((htiTarget = TreeView_HitTest(hwndSess, &tvht)) != NULL) { 
+			TreeView_SelectDropTarget(hwndSess, htiTarget); 
+		} 
+		ImageList_DragShowNolock(TRUE);
+
+
+		return TRUE;
+	} else if (flags == DRAG_END){
+		if (!dragging) return FALSE;
+		ImageList_EndDrag(); 
+        TreeView_SelectDropTarget(hwndSess, NULL);
+        ReleaseCapture(); 
+        ShowCursor(TRUE); 
+		dragging = FALSE;
+		return TRUE;
+
+	}
+
+	return FALSE;
+}
 
 /*
  * This function is the configuration box.
@@ -1083,7 +1164,14 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 
 	SetWindowLongPtr(hwnd, GWLP_USERDATA, 1);
 	return 0;
+	  case WM_MOUSEMOVE:
+			drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW)
+				, DRAG_MOVE, wParam, lParam);
+			break;
       case WM_LBUTTONUP:
+			if(drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW)
+				, DRAG_END, wParam, lParam))
+				break;
 	/*
 	 * Button release should trigger WM_OK if there was a
 	 * previous double click on the session list.
@@ -1155,6 +1243,11 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 
 		case NM_RCLICK:
 			show_st_popup_menu(((LPNMHDR) lParam)->hwndFrom);
+			break;
+
+		case TVN_BEGINDRAG:
+			drag_session_treeview(((LPNMHDR) lParam)->hwndFrom
+				, DRAG_BEGIN, wParam, lParam);
 			break;
 		default:
 			break;
