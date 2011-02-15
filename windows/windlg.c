@@ -310,7 +310,9 @@ enum {
 enum {
     DRAG_BEGIN = 0 ,
     DRAG_MOVE  = 1,
-	DRAG_END   = 2
+	DRAG_CTRL_DOWN = 2,
+	DRAG_CTRL_UP   = 3,
+	DRAG_END   = 4 
 };
 
 enum {
@@ -993,8 +995,30 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 {
 	static int dragging = FALSE;
 	HTREEITEM htiTarget;
+	BYTE ANDmaskCursor[] = { 0xFF,0xFF, 0xFF,0xFF, 0xFF,0xFF, 0xFF,0xFF, //line 0 - 3
+							 0xFF,0x7F, 0xFF,0x7F, 0xFF,0x7F, 0xFF,0x7F, //line 4 - 7 
+
+							 0xF0,0x07, 0xFF,0x7F, 0xFF,0x7F, 0xFF,0x7F, //line 8 - 11 
+							 0xFF,0x7F, 0xFF,0xFF, 0xFF,0xFF, 0xFF,0xFF, //line 12 - 16 
+							 }; 
+	BYTE XORmaskCursor[] = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+							 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+							 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+							 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+	HCURSOR hCurs =  CreateCursor( hwnd,   // app. instance 
+             8,                // horizontal position of hot spot 
+             8,                 // vertical position of hot spot 
+             16,                // cursor width 
+             16,                // cursor height 
+             ANDmaskCursor,     // AND mask 
+             XORmaskCursor );   // XOR mask 
 	
-	if (flags == DRAG_BEGIN){
+	if (flags == DRAG_CTRL_DOWN){
+		if (!dragging) return FALSE;
+		//SetCursor(hCurs);
+		//ShowCursor(TRUE); 
+	}else if (flags == DRAG_CTRL_UP){
+	}else if (flags == DRAG_BEGIN){
 		HIMAGELIST himl;
 		RECT rcItem;
 		LPNMTREEVIEW lpnmtv = (LPNMTREEVIEW) lParam;
@@ -1038,7 +1062,7 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 		point.y = pos.y;
 		ClientToScreen(GetParent(hwndSess), &point);
 		ScreenToClient(hwndSess, &point);
-		ImageList_DragMove(point.x, point.y);
+		ImageList_DragMove(point.x + 2, point.y + 2);
 		/* Turn off the dragged image so the background can be refreshed. */
 		ImageList_DragShowNolock(FALSE); 
 			
@@ -1050,6 +1074,14 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 			TreeView_SelectDropTarget(hwndSess, htiTarget); 
 		} 
 		ImageList_DragShowNolock(TRUE);
+
+		if (wParam | MK_CONTROL){
+			SetCursor(hCurs);
+			ShowCursor(TRUE); 
+		}else {
+			SetCursor(LoadCursor(NULL, IDC_ARROW));
+			ShowCursor(FALSE); 
+		}
 
 		return TRUE;
 	} else if (flags == DRAG_END){
@@ -1276,6 +1308,16 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 
 	SetWindowLongPtr(hwnd, GWLP_USERDATA, 1);
 	return 0;
+	  case WM_KEYDOWN:
+	  		if (wParam == VK_CONTROL)	
+				drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW)
+				, DRAG_CTRL_DOWN, wParam, lParam);
+			break;
+	  case WM_KEYUP:
+	  		if (wParam == VK_CONTROL)	
+				drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW)
+				, DRAG_CTRL_UP, wParam, lParam);
+			break;
 	  case WM_MOUSEMOVE:
 			drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW)
 				, DRAG_MOVE, wParam, lParam);
