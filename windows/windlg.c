@@ -421,16 +421,47 @@ static void create_controls(HWND hwnd, char *path)
 	winctrl_layout(&dp, wc, &cp, s, &base_id);
     }
 }
+/*
+ * extract item from session
+ */
+static const char* extract_item(const char* session)
+{
+	char* c = NULL;
 
+	c = strrchr(session, '#');
+	if (c){
+		return (c+1);
+	}else{
+		return session;
+	}
+}
+/*
+ * extract group from session
+ */
+static void extract_group(const char* session, 
+	char* group, const int glen)
+{
+	char* c = NULL;
+
+	c = strrchr(session, '#');
+	if (c){
+		memcpy(group, session, c - session + 1);
+		group[c- session + 1] = '\0';
+	}else{
+		group[0] = '\0';
+	}
+	
+}
 /*
  * convert treeview to session
  */
 static LPARAM conv_tv_to_sess(
-    HWND hwndSess, HTREEITEM item, 
+    HWND hwndSess, HTREEITEM hitem, 
     char* const sess_name, const int name_len)
 {
     TVITEM item;
-    char buffer[256];
+    HTREEITEM i = hitem; 
+	char buffer[256];
 	int item_len = 0;
 	int left = name_len - 1;
 	int sess_flags = SESSION_ITEM;
@@ -469,9 +500,9 @@ static LPARAM conv_tv_to_sess(
 static LPARAM get_selected_session(HWND hwndSess, char* const sess_name, const int name_len)
 {
 
-	HTREEITEM i =
+	HTREEITEM hitem =
 		TreeView_GetSelection(hwndSess);
-    return conv_tv_to_sess(hwndSess, i,sess_name, name_len);
+    return conv_tv_to_sess(hwndSess, hitem,sess_name, name_len);
 }
 
 /*
@@ -482,23 +513,33 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 	static HWND hEdit = NULL;
 	char buffer[256] = {0};
 
-	if(((LPNMHDR)lParam)->code == TVN_BEGINLABELEDIT) {
+	//LPNMTVKEYDOWN ptvkd; 
+	LPNMLVKEYDOWN ptvkd; 
+
+	char itemstr[64] = {0};
+	char to_session[256] = {0};
+	int i = 0;
+	int pos = 0;
+	char* c = NULL;
+	TVITEM item;
+	HTREEITEM hi;
+	int sess_flags = SESSION_NONE;
+
+	switch(((LPNMHDR)lParam)->code){
+	case TVN_BEGINLABELEDIT:
 		hEdit = TreeView_GetEditControl(hwndSess);
         GetWindowText(hEdit, buffer, sizeof(buffer));
         if (!strcmp(buffer, DEFAULT_SESSION_NAME)){
             TreeView_EndEditLabelNow(hwndSess, TRUE);
             hEdit = NULL;
-    	}
-	}else if (((LPNMHDR)lParam)->code == TVN_ENDLABELEDIT)
-	{
-		char itemstr[64] = {0};
-		char to_session[256] = {0};
-		int i = 0;
-		int pos = 0;
-		char* c = NULL;
-		TVITEM item;
-		HTREEITEM hi;
-		int sess_flags = SESSION_NONE;
+		}
+		break;
+	case TVN_KEYDOWN:
+		//ptvkd = (LPNMTVKEYDOWN) lParam;
+		ptvkd = (LPNMLVKEYDOWN) lParam;
+		if (ptvkd->wVKey != VK_RETURN && ptvkd->wVKey != VK_ESCAPE)
+			return;
+	case TVN_ENDLABELEDIT:
 
 		if (hEdit == NULL || pre_session[0] == '\0')
 			return;
@@ -592,7 +633,8 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 		/* clean */
 		get_sesslist(&sesslist, FALSE);
 		hEdit = NULL;
-	}
+		break;
+	}	
 }
 
 /*
@@ -796,10 +838,10 @@ static int copy_session(
 {
     int pos, sessexist;
     
-    pos = lower_bound_in_sesslist(&sesslist, to_session);
-	sessexist = pos >= sesslist.nsessions ? FALSE 
-        :(to_sess_flag == SESSION_ITEM)? (!strcmp(sesslist.sessions[pos], to_session)) 
-		: (!strncmp(sesslist.sessions[pos], to_session, strlen(to_session)));
+    pos = lower_bound_in_sesslist(sesslist, to_session);
+	sessexist = pos >= sesslist->nsessions ? FALSE 
+        :(to_sess_flag == SESSION_ITEM)? (!strcmp(sesslist->sessions[pos], to_session)) 
+		: (!strncmp(sesslist->sessions[pos], to_session, strlen(to_session)));
     if (sessexist) return FALSE;
 
     copy_settings(from_session, to_session);
@@ -818,7 +860,7 @@ static void dup_session_treeview(
 {
     struct sesslist sesslist;
     char to_session[256] = {0};
-    int sess_len, pos, append_index;
+    int sess_len, append_index;
     int success;
     
     get_sesslist(&sesslist, TRUE);
@@ -830,9 +872,7 @@ static void dup_session_treeview(
         strcat(to_session, "#");
     }
 
-	pos = lower_bound_in_sesslist(&sesslist, to_session);
-	success = copy_session(sesslist, from_session, to_session, to_sess_flag);
-
+	success = copy_session(&sesslist, from_session, to_session, to_sess_flag);
     while(!success) {
         sess_len = strlen(to_session);
         if (sess_len > (sizeof(to_session) - 10)){
@@ -845,7 +885,7 @@ static void dup_session_treeview(
         strcat(to_session, " ");
         if (to_sess_flag == SESSION_GROUP)
             strcat(to_session, "#");
-	    success = copy_session(sesslist, from_session, to_session, to_sess_flag);
+	    success = copy_session(&sesslist, from_session, to_session, to_sess_flag);
     }
     get_sesslist(&sesslist, FALSE);
 
@@ -952,7 +992,6 @@ static void show_st_popup_menu(HWND  hwndSess)
 static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM lParam)
 {
 	static int dragging = FALSE;
-    static char[256] old_item_name; 
 	HTREEITEM htiTarget;
 	
 	if (flags == DRAG_BEGIN){
@@ -960,11 +999,11 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 		RECT rcItem;
 		LPNMTREEVIEW lpnmtv = (LPNMTREEVIEW) lParam;
 
-        /* select the session. End dragging if it is not item.*/
+        save_settings(pre_session, dp.data); 
+	    /* select the session. End dragging if it is not item.*/
         TreeView_SelectItem(hwndSess, lpnmtv->itemNew.hItem);
         if (lpnmtv->itemNew.lParam != SESSION_ITEM) 
             return TRUE;
-        strncpy(old_item_name, lpnmtv->itemNew.pszText, sizeof old_item_name);
         
 		/*
 		 * Tell the tree-view control to create an image to use 
@@ -1020,28 +1059,53 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 		ImageList_EndDrag(); 
 
         if ((htiTarget = TreeView_GetDropHilight(hwndSess))== NULL){
+			TreeView_SelectDropTarget(hwndSess, NULL);
+			ReleaseCapture(); ShowCursor(TRUE); dragging = FALSE;
             return TRUE;
         }
-        char session[256] = {0};
-        int sess_flag;
-        char* c;
-        int index = 0;
-        sess_flag = conv_tv_to_sess(hwndSess, htiTarget, session, sizeof session);
-        if (sess_flag == SESSION_NONE) return TRUE;
-        if (sess_flag == SESSION_ITEM) {
-            c = strrchr(session, '#');
-		    if (!c) return TRUE;
-            *(c + 1) = '\0';
-            index = c - session + 1;
-        }
-        strncpy(session + index, old_item_name, sizeof(session) - index);
-        
-        TreeView_SelectDropTarget(hwndSess, NULL);
-        ReleaseCapture(); 
-        ShowCursor(TRUE); 
-		dragging = FALSE;
 
-        
+		/* calc to_session */
+        char to_session[256] = {0};
+        int sess_flag;
+		struct sesslist sesslist;
+
+        sess_flag = conv_tv_to_sess(hwndSess, htiTarget, 
+			to_session, sizeof to_session);
+        if (sess_flag == SESSION_NONE) {
+			TreeView_SelectDropTarget(hwndSess, NULL);
+			ReleaseCapture(); ShowCursor(TRUE); dragging = FALSE;
+			return TRUE;
+		}
+		extract_group(to_session, to_session, sizeof to_session);
+        strncat(to_session, extract_item(pre_session), sizeof(to_session));
+
+		if (!strcmp(pre_session, to_session)){
+			TreeView_SelectDropTarget(hwndSess, NULL);
+			ReleaseCapture(); ShowCursor(TRUE); dragging = FALSE;
+			return TRUE;
+		}
+
+		get_sesslist(&sesslist, TRUE);
+		if (!copy_session(&sesslist, pre_session, to_session, SESSION_ITEM)){
+			get_sesslist(&sesslist, TRUE);
+			TreeView_SelectDropTarget(hwndSess, NULL);
+			ReleaseCapture(); ShowCursor(TRUE); dragging = FALSE;
+			MessageBox(hwnd, "Destination session already exists."
+					, "Error",MB_OK|MB_ICONINFORMATION);
+			return TRUE;
+		} 
+		get_sesslist(&sesslist, TRUE);
+		del_settings(pre_session);
+		strncpy(pre_session, to_session, sizeof pre_session);
+
+        TreeView_SelectDropTarget(hwndSess, NULL);
+		ReleaseCapture(); ShowCursor(TRUE); dragging = FALSE;
+
+		struct treeview_faff tvfaff;
+		tvfaff.treeview = hwndSess;
+		memset(tvfaff.lastat, 0, sizeof(tvfaff.lastat));
+		refresh_session_treeview(hwndSess, &tvfaff, to_session);
+
 		return TRUE;
 	}
 	return FALSE;
@@ -1283,9 +1347,10 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 				SaneEndDialog(hwnd, dp.endresult ? 1 : 0);
 			}
 			break;
-	
+		
 		case TVN_BEGINLABELEDIT:
 		case TVN_ENDLABELEDIT:
+		case TVN_KEYDOWN:
 			edit_session_treeview(((LPNMHDR) lParam)->hwndFrom, lParam);
 			break;
 
