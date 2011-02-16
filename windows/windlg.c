@@ -59,7 +59,18 @@ enum {
 	DRAG_CTRL_UP   = 3,
 	DRAG_END   = 4 
 };
+const BYTE ANDmaskCursor[] = { 0xFF,0xFF, 0xFF,0xFF, 0xFF,0xFF, 0xFE,0x7F, //line 0 - 3
+							 0xFE,0x7F, 0xFE,0x7F, 0xFE,0x7F, 0xE0,0x07, //line 4 - 7 
 
+							 0xE0,0x07, 0xFE,0x7F, 0xFE,0x7F, 0xFE,0x7F, //line 8 - 11 
+							 0xFE,0x7F, 0xFF,0xFF, 0xFF,0xFF, 0xFF,0xFF, //line 12 - 16 
+							 }; 
+const BYTE XORmaskCursor[] = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+							 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+							 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+							 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+
+HCURSOR hCopyCurs = NULL; 
 
 extern Config cfg;		       /* defined in window.c */
 
@@ -277,7 +288,6 @@ static int SaneDialogBox(HINSTANCE hinst,
     SetWindowLongPtr(hwnd, BOXRESULT, 0); /* result from SaneEndDialog */
 
     while ((gm=GetMessage(&msg, NULL, 0, 0)) > 0) {
-	TranslateMessage(&msg);
 	if(msg.message == WM_KEYUP){
 		if (msg.wParam&VK_CONTROL)
 			drag_session_treeview(NULL
@@ -1005,17 +1015,8 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 	static int dragging = FALSE;
 	int curnum = 0;
 	HTREEITEM htiTarget;
-	BYTE ANDmaskCursor[] = { 0xFF,0xFF, 0xFF,0xFF, 0xFF,0xFF, 0xFE,0x7F, //line 0 - 3
-							 0xFE,0x7F, 0xFE,0x7F, 0xFE,0x7F, 0xE0,0x07, //line 4 - 7 
-
-							 0xE0,0x07, 0xFE,0x7F, 0xFE,0x7F, 0xFE,0x7F, //line 8 - 11 
-							 0xFE,0x7F, 0xFF,0xFF, 0xFF,0xFF, 0xFF,0xFF, //line 12 - 16 
-							 }; 
-	BYTE XORmaskCursor[] = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-							 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-							 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-							 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	HCURSOR hCurs =  CreateCursor( hwnd,   // app. instance 
+	if (hCopyCurs == NULL)
+		hCopyCurs =  CreateCursor( hwnd,   // app. instance 
              8,                // horizontal position of hot spot 
              8,                 // vertical position of hot spot 
              16,                // cursor width 
@@ -1026,7 +1027,7 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 	if (flags == DRAG_CTRL_DOWN 
 		&& ((lParam & (1<<29)) == 0)){
 		if (!dragging) return FALSE;
-		SetCursor(hCurs);
+		SetCursor(hCopyCurs);
 		do{ curnum = ShowCursor(TRUE); } while (curnum < 0); 
 		while(curnum > 0) curnum = ShowCursor(FALSE); 
 	}else if (flags == DRAG_CTRL_UP){
@@ -1392,7 +1393,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
                 || (wParam&VK_RCONTROL))
 				drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW)
 				, DRAG_CTRL_DOWN, wParam, lParam);
-				return -1;
+			
             break;
 			
 		case TVN_BEGINLABELEDIT:
