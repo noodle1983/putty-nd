@@ -46,6 +46,20 @@ static int nevents = 0, negsize = 0;
 
 static char pre_session[256] = {0};
 static HMENU st_popup_menus[3];
+enum {
+    SESSION_GROUP = 0 ,
+    SESSION_ITEM  = 1,
+	SESSION_NONE  = 2
+};
+
+enum {
+    DRAG_BEGIN = 0 ,
+    DRAG_MOVE  = 1,
+	DRAG_CTRL_DOWN = 2,
+	DRAG_CTRL_UP   = 3,
+	DRAG_END   = 4 
+};
+
 
 extern Config cfg;		       /* defined in window.c */
 
@@ -232,6 +246,7 @@ static int CALLBACK AboutProc(HWND hwnd, UINT msg,
     return 0;
 }
 
+extern int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM lParam);
 static int SaneDialogBox(HINSTANCE hinst,
 			 LPCTSTR tmpl,
 			 HWND hwndparent,
@@ -262,6 +277,13 @@ static int SaneDialogBox(HINSTANCE hinst,
     SetWindowLongPtr(hwnd, BOXRESULT, 0); /* result from SaneEndDialog */
 
     while ((gm=GetMessage(&msg, NULL, 0, 0)) > 0) {
+	TranslateMessage(&msg);
+	if(msg.message == WM_KEYUP){
+		if (msg.wParam&VK_CONTROL)
+			drag_session_treeview(NULL
+				, DRAG_CTRL_UP, msg.wParam, msg.lParam);
+	}
+		
 	flags=GetWindowLongPtr(hwnd, BOXFLAGS);
 	if (!(flags & DF_END) && !IsDialogMessage(hwnd, &msg))
 	    DispatchMessage(&msg);
@@ -299,20 +321,6 @@ enum {
     IDCX_TREEVIEW,
     IDCX_STDBASE,
     IDCX_PANELBASE = IDCX_STDBASE + 32
-};
-
-enum {
-    SESSION_GROUP = 0 ,
-    SESSION_ITEM  = 1,
-	SESSION_NONE  = 2
-};
-
-enum {
-    DRAG_BEGIN = 0 ,
-    DRAG_MOVE  = 1,
-	DRAG_CTRL_DOWN = 2,
-	DRAG_CTRL_UP   = 3,
-	DRAG_END   = 4 
 };
 
 enum {
@@ -995,6 +1003,7 @@ static void show_st_popup_menu(HWND  hwndSess)
 static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM lParam)
 {
 	static int dragging = FALSE;
+	int curnum = 0;
 	HTREEITEM htiTarget;
 	BYTE ANDmaskCursor[] = { 0xFF,0xFF, 0xFF,0xFF, 0xFF,0xFF, 0xFE,0x7F, //line 0 - 3
 							 0xFE,0x7F, 0xFE,0x7F, 0xFE,0x7F, 0xE0,0x07, //line 4 - 7 
@@ -1014,11 +1023,15 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
              ANDmaskCursor,     // AND mask 
              XORmaskCursor );   // XOR mask 
 	
-	if (flags == DRAG_CTRL_DOWN){
+	if (flags == DRAG_CTRL_DOWN 
+		&& ((lParam & (1<<29)) == 0)){
 		if (!dragging) return FALSE;
 		SetCursor(hCurs);
-		ShowCursor(TRUE); 
+		do{ curnum = ShowCursor(TRUE); } while (curnum < 0); 
+		while(curnum > 0) curnum = ShowCursor(FALSE); 
 	}else if (flags == DRAG_CTRL_UP){
+		if (!dragging) return FALSE;
+		while(ShowCursor(FALSE)>=0); 
 	}else if (flags == DRAG_BEGIN){
 		HIMAGELIST himl;
 		RECT rcItem;
@@ -1043,7 +1056,7 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 		ImageList_BeginDrag(himl, 0, 0, 0);
 		ImageList_DragEnter(hwndSess, lpnmtv->ptDrag.x, lpnmtv->ptDrag.x); 
 
-		ShowCursor(FALSE); 
+		while(ShowCursor(FALSE)>=0); 
 		SetCapture(GetParent(hwndSess)); 
 		dragging = TRUE;
 		return TRUE;
@@ -1075,10 +1088,6 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 			TreeView_SelectDropTarget(hwndSess, htiTarget); 
 		} 
 		ImageList_DragShowNolock(TRUE);
-
-		if (wParam & MK_CONTROL){
-			SetCursor(hCurs);
-		}
 
 		return TRUE;
 	} else if (flags == DRAG_END){
@@ -1123,8 +1132,10 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 					, "Error",MB_OK|MB_ICONINFORMATION);
 			return TRUE;
 		} 
-		get_sesslist(&sesslist, TRUE);
-		del_settings(pre_session);
+		get_sesslist(&sesslist, FALSE);
+		
+		if ((wParam & MK_CONTROL) == 0)
+			del_settings(pre_session);
 		strncpy(pre_session, to_session, sizeof pre_session);
 
         TreeView_SelectDropTarget(hwndSess, NULL);
@@ -1305,18 +1316,6 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 
 	SetWindowLongPtr(hwnd, GWLP_USERDATA, 1);
 	return 0;
-	  case WM_KEYDOWN :
-            MessageBox(hwnd, "WM_KEYDOWN", "Error",MB_OK|MB_ICONINFORMATION);
-	  		if (wParam & VK_CONTROL)	
-				drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW)
-				, DRAG_CTRL_DOWN, wParam, lParam);
-			break;
-	  case WM_KEYUP:
-            MessageBox(hwnd, "WM_KEYUP", "Error",MB_OK|MB_ICONINFORMATION);
-	  		if (wParam & VK_CONTROL)	
-				drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW)
-				, DRAG_CTRL_UP, wParam, lParam);
-			break;
 	  case WM_MOUSEMOVE:
 			drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW)
 				, DRAG_MOVE, wParam, lParam);
@@ -1389,20 +1388,13 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 			}
 			break;
 		case TVN_KEYDOWN:
-            MessageBox(hwnd, "WM_KEYUP", "Error",MB_OK|MB_ICONINFORMATION);
             if ((wParam&VK_CONTROL) || (wParam&VK_LCONTROL)
                 || (wParam&VK_RCONTROL))
 				drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW)
 				, DRAG_CTRL_DOWN, wParam, lParam);
 				return -1;
             break;
-        case WM_KEYUP:
-            MessageBox(hwnd, "WM_KEYUP", "Error",MB_OK|MB_ICONINFORMATION);
-	  		if ((wParam&VK_CONTROL) || (wParam&VK_LCONTROL)
-                || (wParam&VK_RCONTROL))
-				drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW)
-				, DRAG_CTRL_UP, wParam, lParam);
-			break;
+			
 		case TVN_BEGINLABELEDIT:
 		case TVN_ENDLABELEDIT:
 		
