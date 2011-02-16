@@ -71,6 +71,7 @@ const BYTE XORmaskCursor[] = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 							 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
 HCURSOR hCopyCurs = NULL; 
+int showSessionTreeview = 0;
 
 extern Config cfg;		       /* defined in window.c */
 
@@ -431,7 +432,7 @@ static void create_controls(HWND hwnd, char *path)
 	 * Otherwise, we're creating the controls for a particular
 	 * panel.
 	 */
-	ctlposinit(&cp, hwnd, 200, 3, 13);
+	ctlposinit(&cp, hwnd, showSessionTreeview? 200 : 100, 3, 13);
 	wc = &ctrls_panel;
 	base_id = IDCX_PANELBASE;
     }
@@ -1162,6 +1163,23 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
     switch (msg) {
       case WM_INITDIALOG:
 	dp.hwnd = hwnd;
+
+    /*
+	 * Centre the window.
+	 */
+	{			       /* centre the window */
+	    RECT rs, rd;
+
+	    hw = GetDesktopWindow();
+	    if (GetWindowRect(hw, &rs) && GetWindowRect(hwnd, &rd)){
+            if (showSessionTreeview) 
+                rd.right += 100;
+    		MoveWindow(hwnd,
+			   (rs.right + rs.left + rd.left - rd.right) / 2,
+			   (rs.bottom + rs.top + rd.top - rd.bottom) / 2,
+			   rd.right - rd.left, rd.bottom - rd.top, TRUE);
+	    }
+	}
 	create_controls(hwnd, "");     /* Open and Cancel buttons etc */
 	SetWindowText(hwnd, dp.wintitle);
 	SetWindowLongPtr(hwnd, GWLP_USERDATA, 0);
@@ -1176,28 +1194,18 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
         }
 	SendMessage(hwnd, WM_SETICON, (WPARAM) ICON_BIG,
 		    (LPARAM) LoadIcon(hinst, MAKEINTRESOURCE(IDI_CFGICON)));
-	/*
-	 * Centre the window.
-	 */
-	{			       /* centre the window */
-	    RECT rs, rd;
 
-	    hw = GetDesktopWindow();
-	    if (GetWindowRect(hw, &rs) && GetWindowRect(hwnd, &rd))
-		MoveWindow(hwnd,
-			   (rs.right + rs.left + rd.left - rd.right) / 2,
-			   (rs.bottom + rs.top + rd.top - rd.bottom) / 2,
-			   rd.right - rd.left, rd.bottom - rd.top, TRUE);
-	}
-    /*
-	 * Create the session tree view.
-	 */
-	sessionview = create_session_treeview(hwnd, &tvfaff);
+    if (showSessionTreeview){
+        /*
+    	 * Create the session tree view.
+    	 */
+    	sessionview = create_session_treeview(hwnd, &tvfaff);
 
-    /*
-	 * Set up the session view contents.
-	 */
-    refresh_session_treeview(sessionview, &tvfaff, DEFAULT_SESSION_NAME);
+        /*
+    	 * Set up the session view contents.
+    	 */
+        refresh_session_treeview(sessionview, &tvfaff, DEFAULT_SESSION_NAME);
+    }
     
 	/*
 	 * Create the tree view.
@@ -1207,7 +1215,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 	    WPARAM font;
 	    HWND tvstatic;
 
-	    r.left = 103;
+	    r.left = showSessionTreeview?103:3;
 	    r.right = r.left + 95;
 	    r.top = 3;
 	    r.bottom = r.top + 10;
@@ -1221,7 +1229,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 	    font = SendMessage(hwnd, WM_GETFONT, 0, 0);
 	    SendMessage(tvstatic, WM_SETFONT, font, MAKELPARAM(TRUE, 0));
 
-	    r.left = 103;
+	    r.left = showSessionTreeview?103:3;
 	    r.right = r.left + 95;
 	    r.top = 13;
 	    r.bottom = r.top + 219;
@@ -1479,6 +1487,7 @@ int do_config(void)
 {
     int ret;
 
+    showSessionTreeview = 1;
     ctrlbox = ctrl_new_box();
     setup_config_box(ctrlbox, FALSE, 0, 0);
     win_setup_config_box(ctrlbox, &dp.hwnd, has_help(), FALSE, 0);
@@ -1501,6 +1510,7 @@ int do_config(void)
     winctrl_cleanup(&ctrls_panel);
     winctrl_cleanup(&ctrls_base);
     dp_cleanup(&dp);
+    showSessionTreeview = 0;
 
     return ret;
 }
