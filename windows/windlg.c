@@ -491,7 +491,7 @@ static LPARAM conv_tv_to_sess(
 		item.hItem = i;
 		item.pszText = buffer;
 		item.cchTextMax = sizeof(buffer);
-		item.mask = TVIF_PARAM | TVIF_TEXT | TVIF_IMAGE;
+		item.mask = TVIF_PARAM | TVIF_TEXT;
 		TreeView_GetItem(hwndSess, &item); 
 		if (left == (name_len - 1) 
 			&& item.lParam == SESSION_GROUP){
@@ -548,10 +548,11 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 	switch(((LPNMHDR)lParam)->code){
 	case TVN_BEGINLABELEDIT:
 		hEdit = TreeView_GetEditControl(hwndSess);
-        GetWindowText(hEdit, buffer, sizeof(buffer));
-        if (!strcmp(buffer, DEFAULT_SESSION_NAME)){
-            TreeView_EndEditLabelNow(hwndSess, TRUE);
-            hEdit = NULL;
+        /* get the pre_session */
+		sess_flags = get_selected_session(hwndSess, pre_session, sizeof pre_session);
+		if (!strcmp(pre_session, DEFAULT_SESSION_NAME)
+			|| sess_flags == SESSION_NONE){
+			return;
 		}
 		break;
 	case TVN_KEYDOWN:
@@ -586,13 +587,7 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 			hEdit = NULL; 
 			return;
 		}
-
-		/* get the pre_session */
-		sess_flags = get_selected_session(hwndSess, pre_session, sizeof pre_session);
-		if (!strcmp(pre_session, DEFAULT_SESSION_NAME)
-			|| sess_flags == SESSION_NONE){
-			return;
-		}
+        sess_flags = item.lParam;
 
 		/* calc the to_session */
 		strncpy(to_session, pre_session, sizeof to_session); 
