@@ -294,6 +294,7 @@ static int SaneDialogBox(HINSTANCE hinst,
 			drag_session_treeview(NULL
 				, DRAG_CTRL_UP, msg.wParam, msg.lParam);
 	}else if (msg.message == WM_KEYDOWN){
+	    if (msg.wParam&VK_CONTROL)
             drag_session_treeview(NULL
             	, DRAG_CTRL_DOWN, msg.wParam, msg.lParam);
 	}
