@@ -293,6 +293,9 @@ static int SaneDialogBox(HINSTANCE hinst,
 		if (msg.wParam&VK_CONTROL)
 			drag_session_treeview(NULL
 				, DRAG_CTRL_UP, msg.wParam, msg.lParam);
+	}else if (msg.message == WM_KEYDOWN){
+            drag_session_treeview(NULL
+            	, DRAG_CTRL_DOWN, msg.wParam, msg.lParam);
 	}
 		
 	flags=GetWindowLongPtr(hwnd, BOXFLAGS);
@@ -1028,7 +1031,8 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 		while(curnum > 0) curnum = ShowCursor(FALSE); 
 	}else if (flags == DRAG_CTRL_UP){
 		if (!dragging) return FALSE;
-		while(ShowCursor(FALSE)>=0); 
+        do{ curnum = ShowCursor(FALSE); } while (curnum >= 0); 
+		while(curnum < -1) curnum = ShowCursor(TRUE); 
 	}else if (flags == DRAG_BEGIN){
 		HIMAGELIST himl;
 		RECT rcItem;
@@ -1401,8 +1405,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
             break;
 			
 		case TVN_BEGINLABELEDIT:
-		case TVN_ENDLABELEDIT:
-		
+		case TVN_ENDLABELEDIT:		
 			edit_session_treeview(((LPNMHDR) lParam)->hwndFrom, lParam);
 			break;
 
