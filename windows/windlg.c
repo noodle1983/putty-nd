@@ -617,8 +617,8 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 		get_sesslist(&sesslist, TRUE);
 		first = lower_bound_in_sesslist(&sesslist, to_session);
 		sessexist = first >= sesslist.nsessions ? FALSE 
-            :(sess_flags == SESSION_ITEM)? (!strcmp(sesslist.sessions[pos], to_session)) 
-    		:(!strncmp(sesslist.sessions[pos], to_session, strlen(to_session)));
+            :(sess_flags == SESSION_ITEM)? (!strcmp(sesslist.sessions[first], to_session)) 
+    		:(!strncmp(sesslist.sessions[first], to_session, strlen(to_session)));
 		if (sessexist) {
 			/* to_session exists */
 			MessageBox(hwnd, "session already exists", "Error",MB_OK|MB_ICONINFORMATION);
