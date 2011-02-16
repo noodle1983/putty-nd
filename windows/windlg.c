@@ -617,7 +617,7 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
     		:(!strncmp(sesslist.sessions[first], to_session, strlen(to_session)));
 		if (sessexist) {
 			/* to_session exists */
-			MessageBox(hwnd, "session already exists", "Error",MB_OK|MB_ICONINFORMATION);
+			MessageBox(hwnd, "Destination session already exists.", "Error",MB_OK|MB_ICONINFORMATION);
 			get_sesslist(&sesslist, FALSE);
 			hEdit = NULL; 
 			return ;
@@ -1040,6 +1040,7 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
         if (lpnmtv->itemNew.lParam != SESSION_ITEM) 
             return TRUE;
         
+        SetFocus(hwndSess);
 		/*
 		 * Tell the tree-view control to create an image to use 
     	 * for dragging. 
