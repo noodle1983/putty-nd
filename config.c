@@ -435,6 +435,37 @@ static int load_selected_session(struct sessionsaver_data *ssd,
     return 1;
 }
 
+/*
+ * ok and cancel button handler. keep the previous sessionsaver_handler for unix
+ */
+static void okcancelbutton_handler(union control *ctrl, void *dlg,
+				 void *data, int event)
+{
+    Config *cfg = (Config *)data;
+    struct sessionsaver_data *ssd =
+		(struct sessionsaver_data *)ctrl->generic.context.p;
+    char *savedsession = cfg->session_name;
+
+	if (ctrl == ssd->okbutton) {
+		save_settings(savedsession, cfg);
+		if (ssd->midsession) {
+			/* In a mid-session Change Settings, Apply is always OK. */
+			dlg_end(dlg, 1);
+			return;
+		}
+		/*
+		 * Otherwise, do the normal thing: if we have a valid
+		 * session, get going.
+		 */
+		if (cfg_launchable(cfg)) {
+			dlg_end(dlg, 1);
+		} else
+			dlg_beep(dlg);
+	} else if (ctrl == ssd->cancelbutton) {
+	    dlg_end(dlg, 0);
+	}
+}
+
 static void sessionsaver_handler(union control *ctrl, void *dlg,
 				 void *data, int event)
 {
