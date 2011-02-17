@@ -434,6 +434,7 @@ extern const char *const appname;
  * and we can't run the risk of porting to some system on which the
  * enum comes out as a different size from int.
  */
+#define AUTOCMD_COUNT 6
 struct config_tag {
     /* Basic options */
 	char session_name[256];
@@ -504,6 +505,12 @@ struct config_tag {
     int serdatabits, serstopbits;
     int serparity;
     int serflow;
+    /* Automate Logon options */
+    char expect[AUTOCMD_COUNT][32];
+    char autocmd[AUTOCMD_COUNT][128];
+    int autocmd_hide[AUTOCMD_COUNT];
+    int autologon_enable;
+    int autocmd_index;
     /* Keyboard options */
     int bksp_is_delete;
     int rxvt_homeend;
