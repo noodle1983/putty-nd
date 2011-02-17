@@ -446,6 +446,8 @@ static void okcancelbutton_handler(union control *ctrl, void *dlg,
 		(struct sessionsaver_data *)ctrl->generic.context.p;
     char *savedsession = cfg->session_name;
 
+	if (event != EVENT_ACTION) 
+		 return;
 	if (ctrl == ssd->okbutton) {
 		save_settings(savedsession, cfg);
 		if (ssd->midsession) {
@@ -1188,7 +1190,7 @@ void setup_config_box(struct controlbox *b, int midsession,
 	ctrl_alloc(b, sizeof(struct sessionsaver_data));
     memset(ssd, 0, sizeof(*ssd));
     ssd->midsession = midsession;
-
+#ifndef WIN32
     /*
      * The standard panel that appears at the bottom of all panels:
      * Open, Cancel, Apply etc.
@@ -1208,7 +1210,23 @@ void setup_config_box(struct controlbox *b, int midsession,
     ssd->cancelbutton->generic.column = 4;
     /* We carefully don't close the 5-column part, so that platform-
      * specific add-ons can put extra buttons alongside Open and Cancel. */
+#else
+    s = ctrl_getset(b, "", "", "");
+    ctrl_columns(s, 5, 20, 20, 20, 20, 20);
+    ssd->okbutton = ctrl_pushbutton(s,
+				    (midsession ? "Apply" : "Open"),
+				    (char)(midsession ? 'a' : 'o'),
+				    HELPCTX(no_help),
+				    okcancelbutton_handler, P(ssd));
+    ssd->okbutton->button.isdefault = TRUE;
+    ssd->okbutton->generic.column = 3;
+    ssd->cancelbutton = ctrl_pushbutton(s, "Cancel", 'c', HELPCTX(no_help),
+					okcancelbutton_handler, P(ssd));
+    ssd->cancelbutton->button.iscancel = TRUE;
+    ssd->cancelbutton->generic.column = 4;
 
+
+#endif
     /*
      * The Session panel.
      */
