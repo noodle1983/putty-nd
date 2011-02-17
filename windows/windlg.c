@@ -1179,7 +1179,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 	    hw = GetDesktopWindow();
 	    if (GetWindowRect(hw, &rs) && GetWindowRect(hwnd, &rd)){
             if (showSessionTreeview) 
-                rd.right += 100;
+                rd.right += 200;
     		MoveWindow(hwnd,
 			   (rs.right + rs.left + rd.left - rd.right) / 2,
 			   (rs.bottom + rs.top + rd.top - rd.bottom) / 2,
