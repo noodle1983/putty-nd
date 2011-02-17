@@ -640,6 +640,10 @@ void debug_memdump(void *buf, int len, int L)
  */
 int cfg_launchable(const Config *cfg)
 {
+	/* return false if it is a group */
+	const char* session = cfg->session_name; 
+	if (*session && session[strlen(session) - 1] == '#')
+		return 0;
     if (cfg->protocol == PROT_SERIAL)
 	return cfg->serline[0] != 0;
     else

@@ -510,9 +510,15 @@ void load_settings(const char *section, Config * cfg)
     sesskey = open_settings_r(section);
     load_open_settings(sesskey, cfg);
     close_settings_r(sesskey);
+	
+    if (!section || !*section)
+		strncpy(cfg->session_name, DEFAULT_SESSION_NAME, sizeof cfg->session_name);
+	else 
+		strncpy(cfg->session_name, section, sizeof cfg->session_name);
 
     if (cfg_launchable(cfg))
         add_session_to_jumplist(section);
+
 }
 
 void load_open_settings(void *sesskey, Config *cfg)

@@ -436,6 +436,7 @@ extern const char *const appname;
  */
 struct config_tag {
     /* Basic options */
+	char session_name[256];
     char host[512];
     int port;
     int protocol;
