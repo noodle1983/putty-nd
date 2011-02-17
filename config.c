@@ -1273,6 +1273,7 @@ void setup_config_box(struct controlbox *b, int midsession,
 	}
     }
 
+#ifndef WIN32
     /*
      * The Load/Save panel is available even in mid-session.
      */
@@ -1321,6 +1322,9 @@ void setup_config_box(struct controlbox *b, int midsession,
 	ssd->delbutton = NULL;
     }
     ctrl_columns(s, 1, 100);
+#else
+
+#endif
 
     s = ctrl_getset(b, "Session", "otheropts", NULL);
     c = ctrl_radiobuttons(s, "Close window on exit:", 'x', 4,
