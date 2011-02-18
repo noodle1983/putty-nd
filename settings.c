@@ -278,6 +278,7 @@ char *save_settings(const char *section, Config * cfg)
     void *sesskey;
     char *errmsg;
 
+    if (!strcmp(section, DEFAULT_SESSION_NAME)) return NULL;
     sesskey = open_settings_w(section, &errmsg);
     if (!sesskey)
 	return errmsg;
