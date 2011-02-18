@@ -509,7 +509,7 @@ struct config_tag {
     char expect[AUTOCMD_COUNT][32];
     char autocmd[AUTOCMD_COUNT][128];
     int autocmd_hide[AUTOCMD_COUNT];
-    int autologon_enable;
+    int autocmd_enable[AUTOCMD_COUNT];
     int autocmd_index;
     /* Keyboard options */
     int bksp_is_delete;

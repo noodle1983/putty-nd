@@ -1326,35 +1326,36 @@ void setup_config_box(struct controlbox *b, int midsession,
 #else
     s = ctrl_getset(b, "Session", "autocmd",
 		    "Automate logon");
-    ctrl_columns(s, 3, 25, 65, 10);
-
-    c = ctrl_text(s, "Expect", HELPCTX(no_help));
-    c->generic.column = 0;
-    c = ctrl_text(s, "Send", HELPCTX(no_help));
-    c->generic.column = 1;
-    c = ctrl_text(s, "Hide", HELPCTX(no_help));
-    c->generic.column = 2;
+    c = ctrl_text(s, "Apply  Expect                                 Send                                  Hide", HELPCTX(no_help));
+    ctrl_columns(s, 4, 5, 20, 70, 5);
 
     for (i = 0; i < AUTOCMD_COUNT; i++){
+        c = ctrl_checkbox(s, "", 0,
+    		 HELPCTX(no_help), 
+    		 dlg_stdcheckbox_handler,
+             I(offsetof(Config,autocmd_enable[i])));
+    	c->generic.column = 0;
+		c->checkbox.aligntoedit = 1;
+        
         c = ctrl_editbox(s, 0, 0, 100,
     			 HELPCTX(no_help),
     			 dlg_stdeditbox_handler,
     			 I(offsetof(Config,expect[i])),
     		     I(sizeof(((Config *)0)->expect[i])));
-    	c->generic.column = 0;
+    	c->generic.column = 1;
 
     	c = ctrl_editbox(s, 0, 0, 100,
     			 HELPCTX(no_help),
     			 dlg_stdeditbox_handler, 
     			 I(offsetof(Config,autocmd[i])),
     		     I(sizeof(((Config *)0)->autocmd[i])));
-    	c->generic.column = 1;
+    	c->generic.column = 2;
         
         c = ctrl_checkbox(s, "", 0,
     		 HELPCTX(no_help), 
     		 dlg_stdcheckbox_handler,
              I(offsetof(Config,autocmd_hide[i])));
-    	c->generic.column = 2;
+    	c->generic.column = 3;
 		c->checkbox.aligntoedit = 1;
     }
 	ctrl_columns(s, 1, 100);

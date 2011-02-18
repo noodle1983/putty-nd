@@ -504,14 +504,15 @@ void save_open_settings(void *sesskey, Config *cfg)
 
     for (i = 0; i < AUTOCMD_COUNT; i++){
         char buf[20];
-	    sprintf(buf, "Expect%d", i);
+	    sprintf(buf, "AutocmdExpect%d", i);
         write_setting_s(sesskey, buf, cfg->expect[i]);
         sprintf(buf, "Autocmd%d", i);
         write_setting_s(sesskey, buf, cfg->autocmd[i]);
-        sprintf(buf, "Hide%d", i);
+        sprintf(buf, "AutocmdHide%d", i);
         write_setting_i(sesskey, buf, cfg->autocmd_hide[i]);
+        sprintf(buf, "AutocmdEnable%d", i);
+        write_setting_i(sesskey, buf, cfg->autocmd_enable[i]);
     }
-    write_setting_i(sesskey, "EnableAutoLogon", cfg->autologon_enable);
 }
 
 void load_settings(const char *section, Config * cfg)
@@ -882,7 +883,7 @@ void load_open_settings(void *sesskey, Config *cfg)
 
     for (i = 0; i < AUTOCMD_COUNT; i++){
         char buf[20];
-	    sprintf(buf, "Expect%d", i);
+	    sprintf(buf, "AutocmdExpect%d", i);
         gpps(sesskey, buf, i==0?"ogin:"
                            :i==1?"assword:"
                            :"", 
@@ -890,10 +891,12 @@ void load_open_settings(void *sesskey, Config *cfg)
                            
         sprintf(buf, "Autocmd%d", i);
         gpps(sesskey, buf, "", cfg->autocmd[i], sizeof(cfg->autocmd[i]));
-        sprintf(buf, "Hide%d", i);
+        sprintf(buf, "AutocmdHide%d", i);
         gppi(sesskey, buf, i==1?1:0, &cfg->autocmd_hide[i]);
+        sprintf(buf, "AutocmdEnable%d", i);
+        gppi(sesskey, buf, 0, &cfg->autocmd_enable[i]);
+        
     }
-    gppi(sesskey, "EnableAutoLogon", 0, &cfg->autologon_enable);
 }
 
 void move_settings(const char* fromsession, const char* tosession)
