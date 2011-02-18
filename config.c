@@ -1183,7 +1183,7 @@ void setup_config_box(struct controlbox *b, int midsession,
     struct ttymodes_data *td;
     struct environ_data *ed;
     struct portfwd_data *pfd;
-    union control *c;
+    union control *c, *bc;
     char *str;
     int i;
 
@@ -1350,13 +1350,15 @@ void setup_config_box(struct controlbox *b, int midsession,
     			 I(offsetof(Config,autocmd[i])),
     		     I(sizeof(((Config *)0)->autocmd[i])));
     	c->generic.column = 2;
+        bc = c;
         
         c = ctrl_checkbox(s, "", 0,
     		 HELPCTX(no_help), 
-    		 dlg_stdcheckbox_handler,
+    		 dlg_pwdcheckbox_handler,
              I(offsetof(Config,autocmd_hide[i])));
     	c->generic.column = 3;
 		c->checkbox.aligntoedit = 1;
+        c->checkbox.relctrl = bc;
     }
 	ctrl_columns(s, 1, 100);
 	

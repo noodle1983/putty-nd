@@ -277,6 +277,7 @@ union control {
 	STANDARD_PREFIX;
 	char shortcut;
 	char aligntoedit;
+    union config* relctrl;
     } checkbox;
     struct {
 	STANDARD_PREFIX;
@@ -561,6 +562,8 @@ void dlg_stdcheckbox_handler(union control *ctrl, void *dlg,
  */
 void dlg_stdeditbox_handler(union control *ctrl, void *dlg,
 			    void *data, int event);
+void dlg_pwdcheckbox_handler(union control *ctrl, void *dlg,
+				void *data, int event);
 /*
  * The standard file-selector handler expects the main `context'
  * field to contain the `offsetof' a Filename field in the
@@ -585,6 +588,7 @@ int dlg_radiobutton_get(union control *ctrl, void *dlg);
 void dlg_checkbox_set(union control *ctrl, void *dlg, int checked);
 int dlg_checkbox_get(union control *ctrl, void *dlg);
 void dlg_editbox_set(union control *ctrl, void *dlg, char const *text);
+void dlg_editbox_set_hide(union control *ctrl, void *dlg, const int hide);
 void dlg_editbox_get(union control *ctrl, void *dlg, char *buffer, int length);
 /* The `listbox' functions can also apply to combo boxes. */
 void dlg_listbox_clear(union control *ctrl, void *dlg);

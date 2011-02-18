@@ -2100,6 +2100,14 @@ void dlg_editbox_set(union control *ctrl, void *dlg, char const *text)
     SetDlgItemText(dp->hwnd, c->base_id+1, text);
 }
 
+void dlg_editbox_set_hide(union control *ctrl, void *dlg, const int hide)
+{
+    struct dlgparam *dp = (struct dlgparam *)dlg;
+    struct winctrl *c = dlg_findbyctrl(dp, ctrl);
+    assert(c && c->ctrl->generic.type == CTRL_EDITBOX);
+    SendDlgItemMessage(dp->hwnd, c->base_id+1, EM_SETPASSWORDCHAR, hide?'*':0, 0);
+}
+
 void dlg_editbox_get(union control *ctrl, void *dlg, char *buffer, int length)
 {
     struct dlgparam *dp = (struct dlgparam *)dlg;

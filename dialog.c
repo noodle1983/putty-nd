@@ -429,6 +429,7 @@ union control *ctrl_checkbox(struct controlset *s, char *label, char shortcut,
     c->checkbox.label = label ? dupstr(label) : NULL;
     c->checkbox.shortcut = shortcut;
 	c->checkbox.aligntoedit = 0;
+    c->checkbox.relctrl = NULL;
     return c;
 }
 
@@ -592,5 +593,16 @@ void dlg_stdfontsel_handler(union control *ctrl, void *dlg,
 	dlg_fontsel_set(ctrl, dlg, *(FontSpec *)ATOFFSET(data, offset));
     } else if (event == EVENT_VALCHANGE) {
 	dlg_fontsel_get(ctrl, dlg, (FontSpec *)ATOFFSET(data, offset));
+    }
+}
+
+void dlg_pwdcheckbox_handler(union control *ctrl, void *dlg,
+				void *data, int event)
+{
+    dlg_stdcheckbox_handler(ctrl, dlg, data, event);
+    if (ctrl->checkbox.relctrl){
+        dlg_editbox_set_hide(ctrl->checkbox.relctrl, dlg, 
+            dlg_checkbox_get(ctrl, dlg));
+        dlg_set_focus(ctrl->checkbox.relctrl, dlg);
     }
 }
