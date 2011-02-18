@@ -350,15 +350,15 @@ void radiobig(struct ctlpos *cp, char *text, int id, ...)
 /*
  * A single standalone checkbox.
  */
-void checkbox(struct ctlpos *cp, char *text, int id)
+void checkbox(struct ctlpos *cp, char *text, int id, char aligntoedit)
 {
     RECT r;
 
     r.left = GAPBETWEEN;
-    r.top = cp->ypos;
+    r.top = cp->ypos + (aligntoedit?2:0);
     r.right = cp->width;
     r.bottom = CHECKBOXHEIGHT;
-    cp->ypos += r.bottom + GAPBETWEEN;
+    cp->ypos += r.bottom + GAPBETWEEN + (aligntoedit?4:0);;
     doctl(cp, r, "BUTTON",
 	  BS_NOTIFY | BS_AUTOCHECKBOX | WS_CHILD | WS_VISIBLE | WS_TABSTOP, 0,
 	  text, id);
@@ -1559,7 +1559,7 @@ void winctrl_layout(struct dlgparam *dp, struct winctrls *wc,
 	    escaped = shortcut_escape(ctrl->checkbox.label,
 				      ctrl->checkbox.shortcut);
 	    shortcuts[nshortcuts++] = ctrl->checkbox.shortcut;
-	    checkbox(&pos, escaped, base_id);
+	    checkbox(&pos, escaped, base_id, ctrl->checkbox.aligntoedit);
 	    sfree(escaped);
 	    break;
 	  case CTRL_BUTTON:

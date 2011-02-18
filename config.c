@@ -1355,6 +1355,7 @@ void setup_config_box(struct controlbox *b, int midsession,
     		 dlg_stdcheckbox_handler,
              I(offsetof(Config,autocmd_hide[i])));
     	c->generic.column = 2;
+		c->checkbox.aligntoedit = 1;
     }
 	ctrl_columns(s, 1, 100);
 	
