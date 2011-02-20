@@ -5524,9 +5524,11 @@ int from_backend_untrusted(void *frontend, const char *data, int len)
 int get_userpass_input(prompts_t *p, unsigned char *in, int inlen)
 {
     int ret;
-    ret = cmdline_get_passwd_input(p, in, inlen);
+    ret = autocmd_get_passwd_input(p, &cfg);
     if (ret == -1)
-	ret = term_get_userpass_input(term, p, in, inlen);
+        ret = cmdline_get_passwd_input(p, in, inlen);
+    if (ret == -1)
+    	ret = term_get_userpass_input(term, p, in, inlen);
     return ret;
 }
 

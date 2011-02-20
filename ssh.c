@@ -1158,16 +1158,20 @@ static void c_write(Ssh ssh, const char *buf, int len)
 {
     if (flags & FLAG_STDERR)
 	c_write_stderr(1, buf, len);
-    else
+    else{
 	from_backend(ssh->frontend, 1, buf, len);
+    exec_autocmd(ssh, &ssh->cfg, buf, len, ssh_backend.send);
+    }
 }
 
 static void c_write_untrusted(Ssh ssh, const char *buf, int len)
 {
     if (flags & FLAG_STDERR)
 	c_write_stderr(0, buf, len);
-    else
+    else{
 	from_backend_untrusted(ssh->frontend, buf, len);
+    exec_autocmd(ssh, &ssh->cfg, buf, len, ssh_backend.send);
+    }
 }
 
 static void c_write_str(Ssh ssh, const char *buf)
@@ -7486,7 +7490,7 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 	    s->cur_prompt = new_prompts(ssh->frontend);
 	    s->cur_prompt->to_server = TRUE;
 	    s->cur_prompt->name = dupstr("SSH login name");
-	    add_prompt(s->cur_prompt, dupstr("login as: "), TRUE,
+	    add_prompt(s->cur_prompt, dupstr("login: "), TRUE,
 		       lenof(s->username)); 
 	    ret = get_userpass_input(s->cur_prompt, NULL, 0);
 	    while (ret < 0) {

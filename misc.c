@@ -690,6 +690,21 @@ void exec_autocmd(void *handle, Config *cfg,
     char *recv_buf, int len, 
     int (*send) (void *handle, char *buf, int len))
 {
+    const char* autocmd = get_autocmd(cfg, recv_buf, len);
+    if (autocmd == NULL)
+        return;
+    if (strlen(autocmd) > 0)
+        send(handle, autocmd,strlen(autocmd));
+    send(handle, "\n", 1);
+}
+
+/*
+ * return the autocmd in cfg if matched
+ * NULL if unmatched
+ */
+const char* get_autocmd(Config *cfg,
+    char *recv_buf, int len)
+{
     /* in case the packet is coming partially */
     static char last_print[32] = {0};
     static int  llen = 0;
@@ -699,7 +714,7 @@ void exec_autocmd(void *handle, Config *cfg,
     /* autocmd is completed or it reach retry times */
     if (cfg->autocmd_try < 0 || cfg->autocmd_try >= AUTOCMD_COUNT*3
         || cfg->autocmd_index < 0 || cfg->autocmd_index >= AUTOCMD_COUNT)
-        return;
+        return NULL;
 
     /* recombine the package */
     lempty = LSIZE - llen;
@@ -720,10 +735,7 @@ void exec_autocmd(void *handle, Config *cfg,
         if (!*(cfg->expect[cfg->autocmd_index])) continue;
         if (!autocmd_cmp(last_print, llen, cfg->expect[cfg->autocmd_index], 
                 strlen(cfg->expect[cfg->autocmd_index]))){
-            if (strlen(cfg->autocmd[cfg->autocmd_index]) > 0)
-                send(handle, cfg->autocmd[cfg->autocmd_index], 
-                    strlen(cfg->autocmd[cfg->autocmd_index]));
-            send(handle, "\n", 1);
+            return cfg->autocmd[cfg->autocmd_index++];
             /*
             from_backend(NULL, 1, "send[", 6);
             from_backend(NULL, 1,  cfg->autocmd[cfg->autocmd_index], 
@@ -732,7 +744,28 @@ void exec_autocmd(void *handle, Config *cfg,
             */
         }else{
             cfg->autocmd_try++;
-            return;
+            return NULL;
         }
     }
+    return NULL;
+}
+
+int autocmd_get_passwd_input(prompts_t *p, Config *cfg)
+{
+    prompt_t *pr = p->prompts[p->n_prompts-1];
+    if (!pr)
+        return -1;
+    
+    char* recv_buf = pr->prompt;
+    int recv_len = strlen(recv_buf);
+
+    if (!recv_buf || recv_len == 0)
+        return -1;
+    
+    const char* autocmd = get_autocmd(cfg, recv_buf, recv_len);
+    if (autocmd == NULL)
+        return -1;
+    strncpy(pr->result, autocmd, pr->result_len);
+    
+    return 1;
 }

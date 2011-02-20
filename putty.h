@@ -898,6 +898,9 @@ void autocmd_init(Config *cfg);
 void exec_autocmd(void *handle, Config *cfg,
     char *recv_buf, int len, 
     int (*send) (void *handle, char *buf, int len));
+const char* get_autocmd(Config *cfg,
+    char *recv_buf, int len);
+int autocmd_get_passwd_input(prompts_t *p, Config *cfg);
 
 int format_arrow_key(char *buf, Terminal *term, int xkey, int ctrl);
 
