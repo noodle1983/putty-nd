@@ -3490,7 +3490,7 @@ static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
 	    s->cur_prompt = new_prompts(ssh->frontend);
 	    s->cur_prompt->to_server = TRUE;
 	    s->cur_prompt->name = dupstr("SSH login name");
-	    add_prompt(s->cur_prompt, dupstr("login as: "), TRUE,
+	    add_prompt(s->cur_prompt, dupstr("login: "), TRUE,
 		       lenof(s->username)); 
 	    ret = get_userpass_input(&ssh->cfg, s->cur_prompt, NULL, 0);
 	    while (ret < 0) {
