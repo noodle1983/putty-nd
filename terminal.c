@@ -1247,6 +1247,7 @@ static void power_on(Terminal *term, int clear)
     term->curs.x = 0;
     term_schedule_tblink(term);
     term_schedule_cblink(term);
+    autocmd_init(&term->cfg);
 }
 
 /*

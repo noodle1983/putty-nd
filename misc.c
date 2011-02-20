@@ -657,3 +657,82 @@ char const *cfg_dest(const Config *cfg)
     else
 	return cfg->host;
 }
+
+/*
+ * Test if string s ends in string sub
+ * return 0 if match
+ */
+static int autocmd_cmp(const char *recv, const int rlen, const char *expect, const int elen)
+{
+    if (!recv || !expect)
+        return 1;
+    if (rlen < elen)
+        return 1;
+    return memcmp(recv + rlen - elen, expect, elen);
+}
+
+/*
+ * set autocmd_index to 0
+ * 
+ */
+void autocmd_init(Config *cfg)
+{
+    cfg->autocmd_index = 0;
+    cfg->autocmd_try = 0;
+}
+
+/*
+ * reverse compare the expect and the receive buffer
+ * and send the auto command
+ */
+
+void exec_autocmd(void *handle, Config *cfg,
+    char *recv_buf, int len, 
+    int (*send) (void *handle, char *buf, int len))
+{
+    /* in case the packet is coming partially */
+    static char last_print[32] = {0};
+    static int  llen = 0;
+    const int  LSIZE = sizeof(last_print);
+    int  lempty;
+
+    /* autocmd is completed or it reach retry times */
+    if (cfg->autocmd_try < 0 || cfg->autocmd_try >= AUTOCMD_COUNT*3
+        || cfg->autocmd_index < 0 || cfg->autocmd_index >= AUTOCMD_COUNT)
+        return;
+
+    /* recombine the package */
+    lempty = LSIZE - llen;
+    if (len >= LSIZE){
+        memcpy(last_print, recv_buf + len - LSIZE, LSIZE);
+        llen = LSIZE;
+    } else if (len > lempty){
+        memcpy(last_print, last_print + len - lempty, LSIZE - len);
+        memcpy(last_print + LSIZE - len, recv_buf, len);
+        llen = LSIZE;
+    } else {
+        memcpy(last_print + llen, recv_buf, len);
+        llen += len;
+    }
+    
+    for (; cfg->autocmd_index < AUTOCMD_COUNT; cfg->autocmd_index++){
+        if (!cfg->autocmd_enable[cfg->autocmd_index]) continue;
+        if (!*(cfg->expect[cfg->autocmd_index])) continue;
+        if (!autocmd_cmp(last_print, llen, cfg->expect[cfg->autocmd_index], 
+                strlen(cfg->expect[cfg->autocmd_index]))){
+            if (strlen(cfg->autocmd[cfg->autocmd_index]) > 0)
+                send(handle, cfg->autocmd[cfg->autocmd_index], 
+                    strlen(cfg->autocmd[cfg->autocmd_index]));
+            send(handle, "\n", 1);
+            /*
+            from_backend(NULL, 1, "send[", 6);
+            from_backend(NULL, 1,  cfg->autocmd[cfg->autocmd_index], 
+                strlen(cfg->autocmd[cfg->autocmd_index]));
+            from_backend(NULL, 1, "]", 2);
+            */
+        }else{
+            cfg->autocmd_try++;
+            return;
+        }
+    }
+}

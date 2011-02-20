@@ -511,6 +511,7 @@ struct config_tag {
     int autocmd_hide[AUTOCMD_COUNT];
     int autocmd_enable[AUTOCMD_COUNT];
     int autocmd_index;
+    int autocmd_try;
     /* Keyboard options */
     int bksp_is_delete;
     int rxvt_homeend;
@@ -893,6 +894,10 @@ void term_set_focus(Terminal *term, int has_focus);
 char *term_get_ttymode(Terminal *term, const char *mode);
 int term_get_userpass_input(Terminal *term, prompts_t *p,
 			    unsigned char *in, int inlen);
+void autocmd_init(Config *cfg);
+void exec_autocmd(void *handle, Config *cfg,
+    char *recv_buf, int len, 
+    int (*send) (void *handle, char *buf, int len));
 
 int format_arrow_key(char *buf, Terminal *term, int xkey, int ctrl);
 

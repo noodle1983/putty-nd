@@ -885,8 +885,8 @@ void load_open_settings(void *sesskey, Config *cfg)
     for (i = 0; i < AUTOCMD_COUNT; i++){
         char buf[20];
 	    sprintf(buf, "AutocmdExpect%d", i);
-        gpps(sesskey, buf, i==0?"ogin:"
-                           :i==1?"assword:"
+        gpps(sesskey, buf, i==0?"ogin: "
+                           :i==1?"assword: "
                            :"", 
                            cfg->expect[i], sizeof(cfg->expect[i]));
                            

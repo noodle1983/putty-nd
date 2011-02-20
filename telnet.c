@@ -210,11 +210,13 @@ typedef struct telnet_tag {
 
 #define SB_DELTA 1024
 
+static int telnet_send(void *handle, char *buf, int len);
 static void c_write(Telnet telnet, char *buf, int len)
 {
     int backlog;
     backlog = from_backend(telnet->frontend, 0, buf, len);
     sk_set_frozen(telnet->s, backlog > TELNET_MAX_BACKLOG);
+    exec_autocmd(telnet, &telnet->cfg, buf, len, telnet_send);
 }
 
 static void log_option(Telnet telnet, char *sender, int cmd, int option)
