@@ -751,7 +751,7 @@ void load_open_settings(void *sesskey, Config *cfg)
 		    / 1000
 #endif
 	;
-    gppi(sesskey, "ScrollbackLines", 200, &cfg->savelines);
+    gppi(sesskey, "ScrollbackLines", 20000, &cfg->savelines);
     gppi(sesskey, "LinesAtAScroll", 3, &cfg->scrolllines);
     gppi(sesskey, "DECOriginMode", 0, &cfg->dec_om);
     gppi(sesskey, "AutoWrapMode", 1, &cfg->wrap_mode);
