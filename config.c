@@ -1325,7 +1325,7 @@ void setup_config_box(struct controlbox *b, int midsession,
     ctrl_columns(s, 1, 100);
 #else
     s = ctrl_getset(b, "Session", "autocmd",
-		    "Automate logon");
+		    "Automate logon for Telnet and SSH");
     c = ctrl_text(s, "Apply  Expect                                 Send                                  Hide", HELPCTX(no_help));
     ctrl_columns(s, 4, 5, 20, 70, 5);
 
