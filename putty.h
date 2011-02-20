@@ -788,7 +788,7 @@ char *get_ttymode(void *frontend, const char *mode);
  * 0  = `user cancelled' (FIXME distinguish "give up entirely" and "next auth"?)
  * <0 = `please call back later with more in/inlen'
  */
-int get_userpass_input(prompts_t *p, unsigned char *in, int inlen);
+int get_userpass_input(Config *cfg, prompts_t *p, unsigned char *in, int inlen);
 #define OPTIMISE_IS_SCROLL 1
 
 void set_iconic(void *frontend, int iconic);

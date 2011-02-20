@@ -711,6 +711,12 @@ const char* get_autocmd(Config *cfg,
     const int  LSIZE = sizeof(last_print);
     int  lempty;
 
+    /*
+    from_backend(NULL, 1, "recv[", 5);
+    from_backend(NULL, 1,  recv_buf, len);
+    from_backend(NULL, 1, "]", 1);
+    */
+
     /* autocmd is completed or it reach retry times */
     if (cfg->autocmd_try < 0 || cfg->autocmd_try >= AUTOCMD_COUNT*3
         || cfg->autocmd_index < 0 || cfg->autocmd_index >= AUTOCMD_COUNT)
@@ -733,15 +739,23 @@ const char* get_autocmd(Config *cfg,
     for (; cfg->autocmd_index < AUTOCMD_COUNT; cfg->autocmd_index++){
         if (!cfg->autocmd_enable[cfg->autocmd_index]) continue;
         if (!*(cfg->expect[cfg->autocmd_index])) continue;
+        /*
+        from_backend(NULL, 1, "expect[", 7);
+        from_backend(NULL, 1,  cfg->expect[cfg->autocmd_index], 
+            strlen(cfg->expect[cfg->autocmd_index]));
+        from_backend(NULL, 1, "]", 1);
+        */
+        
         if (!autocmd_cmp(last_print, llen, cfg->expect[cfg->autocmd_index], 
                 strlen(cfg->expect[cfg->autocmd_index]))){
-            return cfg->autocmd[cfg->autocmd_index++];
-            /*
-            from_backend(NULL, 1, "send[", 6);
+            /*     
+            from_backend(NULL, 1, "send[", 5);
             from_backend(NULL, 1,  cfg->autocmd[cfg->autocmd_index], 
                 strlen(cfg->autocmd[cfg->autocmd_index]));
-            from_backend(NULL, 1, "]", 2);
+            from_backend(NULL, 1, "]", 1);
             */
+            
+            return cfg->autocmd[cfg->autocmd_index++];
         }else{
             cfg->autocmd_try++;
             return NULL;
