@@ -57,8 +57,47 @@ enum {
     DRAG_MOVE  = 1,
 	DRAG_CTRL_DOWN = 2,
 	DRAG_CTRL_UP   = 3,
-	DRAG_END   = 4 
+	DRAG_END   = 4,
+	DRAG_CANCEL = 5
 };
+
+enum {
+    EDIT_BEGIN = 0 ,
+    EDIT_END  = 1,
+	EDIT_OK = 2,
+	EDIT_CANCEL   = 3
+};
+
+
+enum {
+    IDCX_ABOUT = IDC_ABOUT,
+    IDCX_TVSTATIC,
+    IDCX_SESSIONTREEVIEW,
+    IDCX_TREEVIEW,
+    IDCX_STDBASE,
+    IDCX_PANELBASE = IDCX_STDBASE + 32
+};
+
+enum {
+    /* 
+     * please make sure the menu id is 
+     * in the range (IDM_ST_NONE, IDM_ST_ROOF) 
+     */
+    IDM_ST_NONE    = 0 ,
+    IDM_ST_NEWSESS = 1 ,
+    IDM_ST_NEWGRP  = 2 ,
+    IDM_ST_DUPSESS = 3 ,
+    IDM_ST_DUPGRP  = 4 ,
+    IDM_ST_NEWSESSONGRP  = 5 ,
+    IDM_ST_DEL     = 6 ,
+    IDM_ST_ROOF    = 7
+};
+
+struct treeview_faff {
+    HWND treeview;
+    HTREEITEM lastat[4];
+};
+
 const BYTE ANDmaskCursor[] = { 0xFF,0xFF, 0xFF,0xFF, 0xFF,0xFF, 0xFE,0x7F, //line 0 - 3
 							 0xFE,0x7F, 0xFE,0x7F, 0xFE,0x7F, 0xE0,0x07, //line 4 - 7 
 
@@ -78,14 +117,12 @@ extern Config cfg;		       /* defined in window.c */
 #define PRINTER_DISABLED_STRING "None (printing disabled)"
 
 static void refresh_session_treeview(
-    HWND sessionview, 
-    struct treeview_faff* tvfaff, 
+    HWND sessionview, struct treeview_faff* tvfaff, 
     const char* select_session);
 static int drag_session_treeview(
-	HWND hwndSess, 
-	int flags, 
-	WPARAM wParam, 
-	LPARAM lParam);
+	HWND hwndSess, int flags, 
+	WPARAM wParam, LPARAM lParam);
+static int edit_session_treeview(HWND hwndSess, int eflag);
 
 void force_normal(HWND hwnd)
 {
@@ -298,21 +335,31 @@ static int SaneDialogBox(HINSTANCE hinst,
     SetWindowLongPtr(hwnd, BOXRESULT, 0); /* result from SaneEndDialog */
 
     while ((gm=GetMessage(&msg, NULL, 0, 0)) > 0) {
-	if(msg.message == WM_KEYUP){
-		if (msg.wParam&VK_CONTROL)
-			drag_session_treeview(NULL
-				, DRAG_CTRL_UP, msg.wParam, msg.lParam);
-	}else if (msg.message == WM_KEYDOWN){
-	    if (msg.wParam&VK_CONTROL)
-            drag_session_treeview(NULL
-            	, DRAG_CTRL_DOWN, msg.wParam, msg.lParam);
-	}
-		
-	flags=GetWindowLongPtr(hwnd, BOXFLAGS);
-	if (!(flags & DF_END) && !IsDialogMessage(hwnd, &msg))
-	    DispatchMessage(&msg);
-	if (flags & DF_END)
-	    break;
+    	if(msg.message == WM_KEYUP){
+    		if (msg.wParam == VK_CONTROL)
+    			drag_session_treeview(NULL
+    				, DRAG_CTRL_UP, msg.wParam, msg.lParam);
+    	}else if (msg.message == WM_KEYDOWN){
+    	    if (msg.wParam == VK_CONTROL)
+                drag_session_treeview(NULL
+                	, DRAG_CTRL_DOWN, msg.wParam, msg.lParam);
+            if (msg.wParam == VK_RETURN
+                && edit_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW), EDIT_OK)){
+                continue;
+            }
+            if (msg.wParam == VK_ESCAPE
+                && (edit_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW), EDIT_CANCEL)
+                    || drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW), 
+                                                DRAG_CANCEL, msg.wParam, msg.lParam))){
+                continue;
+            }
+    	}
+    		
+    	flags=GetWindowLongPtr(hwnd, BOXFLAGS);
+    	if (!(flags & DF_END) && !IsDialogMessage(hwnd, &msg))
+    	    DispatchMessage(&msg);
+    	if (flags & DF_END)
+    	    break;
     }
 
     if (gm == 0)
@@ -337,35 +384,6 @@ static int CALLBACK NullDlgProc(HWND hwnd, UINT msg,
 {
     return 0;
 }
-
-enum {
-    IDCX_ABOUT = IDC_ABOUT,
-    IDCX_TVSTATIC,
-    IDCX_SESSIONTREEVIEW,
-    IDCX_TREEVIEW,
-    IDCX_STDBASE,
-    IDCX_PANELBASE = IDCX_STDBASE + 32
-};
-
-enum {
-    /* 
-     * please make sure the menu id is 
-     * in the range (IDM_ST_NONE, IDM_ST_ROOF) 
-     */
-    IDM_ST_NONE    = 0 ,
-    IDM_ST_NEWSESS = 1 ,
-    IDM_ST_NEWGRP  = 2 ,
-    IDM_ST_DUPSESS = 3 ,
-    IDM_ST_DUPGRP  = 4 ,
-    IDM_ST_NEWSESSONGRP  = 5 ,
-    IDM_ST_DEL     = 6 ,
-    IDM_ST_ROOF    = 7
-};
-
-struct treeview_faff {
-    HWND treeview;
-    HTREEITEM lastat[4];
-};
 
 static HTREEITEM session_treeview_insert(struct treeview_faff *faff,
 				 int level, char *text, LPARAM flags)
@@ -541,15 +559,13 @@ static LPARAM get_selected_session(HWND hwndSess, char* const sess_name, const i
 
 /*
  * handle edit message for session treeview.
+ * return if the message belongs to the session treeview edit control
  */
-static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
+static int edit_session_treeview(HWND hwndSess, int eflag)
 {
 	static HWND hEdit = NULL;
 	char buffer[256] = {0};
-
-	//LPNMTVKEYDOWN ptvkd; 
-	LPNMLVKEYDOWN ptvkd; 
-
+    
 	char itemstr[64] = {0};
 	char to_session[256] = {0};
 	int i = 0;
@@ -559,31 +575,47 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 	HTREEITEM hi;
 	int sess_flags = SESSION_NONE;
 
-	switch(((LPNMHDR)lParam)->code){
-	case TVN_BEGINLABELEDIT:
-		hEdit = TreeView_GetEditControl(hwndSess);
+    if (!hwndSess)
+        return FALSE;
+
+	switch(eflag){
+	case EDIT_BEGIN:
         /* get the pre_session */
 		sess_flags = get_selected_session(hwndSess, pre_session, sizeof pre_session);
 		if (!strcmp(pre_session, DEFAULT_SESSION_NAME)
 			|| sess_flags == SESSION_NONE){
-			return;
+			hEdit = NULL;
+            TreeView_EndEditLabelNow(hwndSess, TRUE);
+			return TRUE;
 		}
+		hEdit = TreeView_GetEditControl(hwndSess);
+        return TRUE;
 		break;
-	case TVN_KEYDOWN:
-		//ptvkd = (LPNMTVKEYDOWN) lParam;
-		ptvkd = (LPNMLVKEYDOWN) lParam;
-		if (ptvkd->wVKey != VK_RETURN && ptvkd->wVKey != VK_ESCAPE)
-			return;
-	case TVN_ENDLABELEDIT:
 
+    case EDIT_CANCEL:
+        if (hEdit == NULL || pre_session[0] == '\0')
+			return FALSE;
+        hEdit = NULL;
+        TreeView_EndEditLabelNow(hwndSess, TRUE);
+        return TRUE;
+        break;
+        
+    case EDIT_OK:
+        if (hEdit == NULL || pre_session[0] == '\0')
+			return FALSE;
+        TreeView_EndEditLabelNow(hwndSess, FALSE);
+        return TRUE;
+        break;
+        
+	case EDIT_END:
 		if (hEdit == NULL || pre_session[0] == '\0')
-			return;
+			return FALSE;
 
 		GetWindowText(hEdit, buffer, sizeof(buffer));
 
 		/*validate the buffer*/ 
 		if (buffer[0] == '\0')
-			return;
+			return TRUE;
 		for (i = 0; i < strlen(buffer); i++){
 			if (buffer[i] == '#' || buffer[i] == '/' || buffer[i] == '\\')
 				buffer[i] = '%';
@@ -599,7 +631,7 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 		TreeView_GetItem(hwndSess, &item); 
 		if (!strcmp(item.pszText, buffer)) {
 			hEdit = NULL; 
-			return;
+			return TRUE;
 		}
         sess_flags = item.lParam;
 
@@ -633,7 +665,7 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 			MessageBox(hwnd, "Destination session already exists.", "Error",MB_OK|MB_ICONINFORMATION);
 			get_sesslist(&sesslist, FALSE);
 			hEdit = NULL; 
-			return ;
+			return TRUE;
 		}
 
 		/* now rename sessions */
@@ -668,7 +700,9 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 		refresh_session_treeview(hwndSess, &tvfaff, to_session);
 
 		break;
+        return TRUE;
 	}	
+    return FALSE;
 }
 
 /*
@@ -1030,7 +1064,7 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 	int curnum = 0;
 	HTREEITEM htiTarget;
 	if (hCopyCurs == NULL)
-		hCopyCurs =  CreateCursor( hwnd,   // app. instance 
+		hCopyCurs =  CreateCursor( NULL,   // app. instance 
              8,                // horizontal position of hot spot 
              8,                 // vertical position of hot spot 
              16,                // cursor width 
@@ -1048,6 +1082,13 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 		if (!dragging) return FALSE;
         do{ curnum = ShowCursor(FALSE); } while (curnum >= 0); 
 		while(curnum < -1) curnum = ShowCursor(TRUE); 
+	}else if (flags == DRAG_CANCEL){
+		if (!dragging) return FALSE;
+        ImageList_DragLeave(hwndSess);
+		ImageList_EndDrag(); 
+        TreeView_SelectDropTarget(hwndSess, NULL);
+		ReleaseCapture(); ShowCursor(TRUE); dragging = FALSE;
+        return TRUE;
 	}else if (flags == DRAG_BEGIN){
 		HIMAGELIST himl;
 		RECT rcItem;
@@ -1419,9 +1460,12 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 			
             break;
 			
-		case TVN_BEGINLABELEDIT:
+		case TVN_BEGINLABELEDIT:		
+			edit_session_treeview(((LPNMHDR) lParam)->hwndFrom, EDIT_BEGIN);
+			break;
+            
 		case TVN_ENDLABELEDIT:		
-			edit_session_treeview(((LPNMHDR) lParam)->hwndFrom, lParam);
+			edit_session_treeview(((LPNMHDR) lParam)->hwndFrom, EDIT_END);
 			break;
 
 		case NM_RCLICK:
