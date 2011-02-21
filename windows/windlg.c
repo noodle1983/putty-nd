@@ -77,6 +77,16 @@ extern Config cfg;		       /* defined in window.c */
 
 #define PRINTER_DISABLED_STRING "None (printing disabled)"
 
+static void refresh_session_treeview(
+    HWND sessionview, 
+    struct treeview_faff* tvfaff, 
+    const char* select_session);
+static int drag_session_treeview(
+	HWND hwndSess, 
+	int flags, 
+	WPARAM wParam, 
+	LPARAM lParam);
+
 void force_normal(HWND hwnd)
 {
     static int recurse = 0;
@@ -258,7 +268,6 @@ static int CALLBACK AboutProc(HWND hwnd, UINT msg,
     return 0;
 }
 
-extern int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM lParam);
 static int SaneDialogBox(HINSTANCE hinst,
 			 LPCTSTR tmpl,
 			 HWND hwndparent,
@@ -645,14 +654,19 @@ static void edit_session_treeview(HWND hwndSess, LPARAM lParam)
 			}
 		}
 		strncpy(pre_session, to_session, 256);
-				
-		/* change the session treeview */
-		strncpy(itemstr, buffer, sizeof(itemstr));		
-		TreeView_SetItem(hwndSess, &item); 
 
 		/* clean */
 		get_sesslist(&sesslist, FALSE);
 		hEdit = NULL;
+				
+		/* change the session treeview */
+		//strncpy(itemstr, buffer, sizeof(itemstr));		
+		//TreeView_SetItem(hwndSess, &item); 
+		struct treeview_faff tvfaff;
+		tvfaff.treeview = hwndSess;
+		memset(tvfaff.lastat, 0, sizeof(tvfaff.lastat));
+		refresh_session_treeview(hwndSess, &tvfaff, to_session);
+
 		break;
 	}	
 }
