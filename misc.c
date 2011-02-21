@@ -766,6 +766,9 @@ const char* get_autocmd(Config *cfg,
 
 int autocmd_get_passwd_input(prompts_t *p, Config *cfg)
 {
+	if (p->n_prompts < 1)
+		return -1;
+
     prompt_t *pr = p->prompts[p->n_prompts-1];
     if (!pr)
         return -1;
