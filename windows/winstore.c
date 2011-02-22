@@ -81,8 +81,11 @@ void *open_settings_w(const char *sessionname, char **errmsg)
 
     *errmsg = NULL;
 
-    if (!sessionname || !*sessionname)
-	sessionname = DEFAULT_SESSION_NAME;
+    if (!sessionname || !*sessionname){
+        *errmsg = dupprintf("sessionname is empty\n");
+		return NULL;
+//	sessionname = DEFAULT_SESSION_NAME;
+	}
 
     p = snewn(3 * strlen(sessionname) + 1, char);
     mungestr(sessionname, p);

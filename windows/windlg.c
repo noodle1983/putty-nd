@@ -1022,14 +1022,14 @@ static void show_st_popup_menu(HWND  hwndSess)
             to_sess_flag = SESSION_GROUP;
             break;
         case IDM_ST_DUPSESS:
-            save_settings(base_session, dp.data);
+            save_settings(pre_session, dp.data);
             strncpy(base_session, pre_session, sizeof base_session);
             strncpy(to_session, pre_session, sizeof to_session);
             strncat(to_session, " Session", sizeof(to_session) - strlen(pre_session));
             to_sess_flag = SESSION_ITEM;
             break;
         case IDM_ST_DUPGRP:
-            save_settings(base_session, dp.data);
+            save_settings(pre_session, dp.data);
             strncpy(base_session, pre_session, sizeof base_session);
             strncpy(to_session, pre_session, sizeof to_session);
             to_session[strlen(to_session)-1] = '\0';
@@ -1037,7 +1037,7 @@ static void show_st_popup_menu(HWND  hwndSess)
             to_sess_flag = SESSION_GROUP;
             break;
         case IDM_ST_NEWSESSONGRP:
-            save_settings(base_session, dp.data);
+            save_settings(pre_session, dp.data);
             strncpy(base_session, pre_session, sizeof base_session);
             strncpy(to_session, pre_session, sizeof to_session);
             strncat(to_session, "Session", sizeof(to_session)-strlen(pre_session));
