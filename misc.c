@@ -664,11 +664,19 @@ char const *cfg_dest(const Config *cfg)
  */
 static int autocmd_cmp(const char *recv, const int rlen, const char *expect, const int elen)
 {
+	int cmpelen = elen;
+	int cmprlen = rlen;
+	/* trim recv and expect */
+	while(cmpelen > 0 && expect[cmpelen-1] == ' ')
+		cmpelen--;
+	while(cmprlen > 0 && recv[cmprlen-1] == ' ')
+		cmprlen--;
+
     if (!recv || !expect)
         return 1;
-    if (rlen < elen)
+    if (cmprlen < cmpelen)
         return 1;
-    return memcmp(recv + rlen - elen, expect, elen);
+    return memcmp(recv + cmprlen - cmpelen, expect, cmpelen);
 }
 
 /*
