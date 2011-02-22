@@ -170,6 +170,7 @@ typedef void *Ssh_gss_name;
  * PuTTY session.
  */
 GLOBAL HWND hwnd;	/* the main terminal window */
+GLOBAL HWND hwndTab;
 GLOBAL HWND logbox;
 
 /*

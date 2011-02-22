@@ -313,6 +313,31 @@ static void close_session(void)
     }
 }
 
+HWND CreateTabControl(HWND hwndParent) 
+{ 
+    RECT rc; 
+    HWND hwndTab; 
+    TCITEM tie; 
+ 
+    GetClientRect(hwndParent, &rc); 
+    hwndTab = CreateWindow(WC_TABCONTROL, L"", 
+        WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE, 
+        0, 0, rc.right, rc.bottom, 
+        hwndParent, NULL, hinst, NULL); 
+    if (hwndTab == NULL)
+        return NULL; 
+ 
+    tie.mask = TCIF_TEXT | TCIF_IMAGE; 
+    tie.iImage = -1; 
+    tie.pszText = "test"; 
+    if (TabCtrl_InsertItem(hwndTab, 0, &tie) == -1) { 
+        DestroyWindow(hwndTab); 
+        return NULL; 
+    } 
+    
+    return hwndTab; 
+} 
+
 int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 {
     WNDCLASS wndclass;
@@ -677,6 +702,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 			      winmode, CW_USEDEFAULT, CW_USEDEFAULT,
 			      guess_width, guess_height,
 			      NULL, NULL, inst, NULL);
+    hwndTab = CreateTabControl(hwnd);
     }
 
     /*
