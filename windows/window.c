@@ -19,6 +19,7 @@
 #include "terminal.h"
 #include "storage.h"
 #include "win_res.h"
+#include "wintab.h"
 
 #ifndef NO_MULTIMON
 #include <multimon.h>
@@ -141,6 +142,8 @@ enum { SYSMENU, CTXMENU };
 static HMENU savedsess_menu;
 
 Config cfg;			       /* exported to windlg.c */
+wintab tab;
+#define HWNDDC tab.hwndPage
 
 static struct sesslist sesslist;       /* for saved-session menu */
 
@@ -312,31 +315,6 @@ static void close_session(void)
 		   IDM_RESTART, "&Restart Session");
     }
 }
-
-HWND CreateTabControl(HWND hwndParent) 
-{ 
-    RECT rc; 
-    HWND hwndTab; 
-    TCITEM tie; 
- 
-    GetClientRect(hwndParent, &rc); 
-    hwndTab = CreateWindow(WC_TABCONTROL, L"", 
-        WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE, 
-        0, 0, rc.right, rc.bottom, 
-        hwndParent, NULL, hinst, NULL); 
-    if (hwndTab == NULL)
-        return NULL; 
- 
-    tie.mask = TCIF_TEXT | TCIF_IMAGE; 
-    tie.iImage = -1; 
-    tie.pszText = "test"; 
-    if (TabCtrl_InsertItem(hwndTab, 0, &tie) == -1) { 
-        DestroyWindow(hwndTab); 
-        return NULL; 
-    } 
-    
-    return hwndTab; 
-} 
 
 int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 {
@@ -702,7 +680,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 			      winmode, CW_USEDEFAULT, CW_USEDEFAULT,
 			      guess_width, guess_height,
 			      NULL, NULL, inst, NULL);
-    hwndTab = CreateTabControl(hwnd);
+    wintab_init(&tab, hwnd);
     }
 
     /*
@@ -768,7 +746,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 	si.nMax = term->rows - 1;
 	si.nPage = term->rows;
 	si.nPos = 0;
-	SetScrollInfo(hwnd, SB_VERT, &si, FALSE);
+	SetScrollInfo(HWNDDC, SB_VERT, &si, FALSE);
     }
 
     /*
@@ -1217,7 +1195,7 @@ static void systopalette(void)
 static void init_palette(void)
 {
     int i;
-    HDC hdc = GetDC(hwnd);
+    HDC hdc = GetDC(HWNDDC);
     if (hdc) {
 	if (cfg.try_palette && GetDeviceCaps(hdc, RASTERCAPS) & RC_PALETTE) {
 	    /*
@@ -1242,7 +1220,7 @@ static void init_palette(void)
 		SelectPalette(hdc, GetStockObject(DEFAULT_PALETTE), FALSE);
 	    }
 	}
-	ReleaseDC(hwnd, hdc);
+	ReleaseDC(HWNDDC, hdc);
     }
     if (pal)
 	for (i = 0; i < NALLCOLOURS; i++)
@@ -1421,7 +1399,7 @@ static void init_fonts(int pick_width, int pick_height)
 	fw_bold = FW_BOLD;
     }
 
-    hdc = GetDC(hwnd);
+    hdc = GetDC(HWNDDC);
 
     if (pick_height)
 	font_height = pick_height;
@@ -1552,7 +1530,7 @@ static void init_fonts(int pick_width, int pick_height)
 	    fontsize[i] = -i;
     }
 
-    ReleaseDC(hwnd, hdc);
+    ReleaseDC(HWNDDC, hdc);
 
     if (fontsize[FONT_UNDERLINE] != fontsize[FONT_NORMAL]) {
 	und_mode = UND_LINE;
@@ -2788,6 +2766,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		"...",
 	    LOWORD(lParam), HIWORD(lParam)));
 #endif
+    wintab_onsize(&tab, hwnd, lParam);
 	if (wParam == SIZE_MINIMIZED)
 	    SetWindowText(hwnd,
 			  cfg.win_name_always ? window_name : icon_name);
@@ -4578,7 +4557,7 @@ Context get_ctx(void *frontend)
 {
     HDC hdc;
     if (hwnd) {
-	hdc = GetDC(hwnd);
+	hdc = GetDC(HWNDDC);
 	if (hdc && pal)
 	    SelectPalette(hdc, pal, FALSE);
 	return hdc;
@@ -4589,7 +4568,7 @@ Context get_ctx(void *frontend)
 void free_ctx(Context ctx)
 {
     SelectPalette(ctx, GetStockObject(DEFAULT_PALETTE), FALSE);
-    ReleaseDC(hwnd, ctx);
+    ReleaseDC(HWNDDC, ctx);
 }
 
 static void real_palette_set(int n, int r, int g, int b)
