@@ -68,14 +68,14 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     
     TabCtrl_AdjustRect(wintab->hwndTab, FALSE, &rcPage);
     MoveWindow(wintab->hwndPage, rcPage.left, rcPage.top, rcPage.right, rcPage.bottom, TRUE);
-    InvalidateRect(wintab->hwndPage, NULL, TRUE);
-    UpdateWindow(wintab->hwndPage);
+    //InvalidateRect(wintab->hwndPage, NULL, TRUE);
+    //UpdateWindow(wintab->hwndPage);
     
     hdwp = BeginDeferWindowPos(2);  
-    DeferWindowPos(hdwp, wintab->hwndTab, NULL, 0, 0, rc->right, 
-        rc->bottom, SWP_NOMOVE | SWP_NOZORDER);     
+    DeferWindowPos(hdwp, wintab->hwndTab, NULL, rc->left, rc->top, rc->right, 
+        rc->bottom, SWP_NOZORDER);     
     DeferWindowPos(hdwp, wintab->hwndPage, HWND_TOPMOST, rcPage.left, rcPage.top, 
-        rcPage.right - rcPage.left, rcPage.bottom - rcPage.top, 0); 
+        rcPage.right - rcPage.left, rcPage.bottom - rcPage.top, SWP_NOMOVE); 
     EndDeferWindowPos(hdwp); 
     return 0;
 }
