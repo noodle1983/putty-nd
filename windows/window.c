@@ -117,7 +117,7 @@ static int caret_x = -1, caret_y = -1;
 
 static int kbd_codepage;
 
-static void *ldisc;
+void *ldisc;
 static Backend *back;
 static void *backhandle;
 
@@ -143,7 +143,7 @@ static HMENU savedsess_menu;
 
 Config cfg;			       /* exported to windlg.c */
 wintab tab;
-#define HWNDDC tab.hwndPage
+#define HWNDDC tab.items[0].page.hwndCtrl
 
 static struct sesslist sesslist;       /* for saved-session menu */
 
@@ -172,19 +172,15 @@ struct agent_callback {
 static HFONT fonts[FONT_MAXNO];
 static LOGFONT lfont;
 static int fontflag[FONT_MAXNO];
-static enum {
-    BOLD_COLOURS, BOLD_SHADOW, BOLD_FONT
-} bold_mode;
-static enum {
-    UND_LINE, UND_FONT
-} und_mode;
+static bold_mode_t bold_mode;
+static und_mode_t und_mode;
 static int descent;
 
 #define NCFGCOLOURS 22
 #define NEXTCOLOURS 240
 #define NALLCOLOURS (NCFGCOLOURS + NEXTCOLOURS)
-static COLORREF colours[NALLCOLOURS];
-static HPALETTE pal;
+COLORREF colours[NALLCOLOURS];
+HPALETTE pal;
 static LPLOGPALETTE logpal;
 static RGBTRIPLE defpal[NALLCOLOURS];
 
@@ -212,9 +208,12 @@ void ldisc_update(void *frontend, int echo, int edit)
 
 char *get_ttymode(void *frontend, const char *mode)
 {
+    if (!frontend){
     return term_get_ttymode(term, mode);
+    }
+    wintabitem *tabitem = (wintabitem *)frontend;
+    return term_get_ttymode(tabitem->term, mode);
 }
-
 static void start_backend(void)
 {
     const char *error;
@@ -283,6 +282,7 @@ static void start_backend(void)
     session_closed = FALSE;
 }
 
+#if 0
 static void close_session(void)
 {
     char morestuff[100];
@@ -315,65 +315,29 @@ static void close_session(void)
 		   IDM_RESTART, "&Restart Session");
     }
 }
-
-int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
+#endif
+/*
+ * Initialize COM.
+ */
+int init_com()
 {
-    WNDCLASS wndclass;
-    MSG msg;
     HRESULT hr;
-    int guess_width, guess_height;
-
-    hinst = inst;
-    hwnd = NULL;
-    flags = FLAG_VERBOSE | FLAG_INTERACTIVE;
-
-    sk_init();
-
-    InitCommonControls();
-
-    /* Ensure a Maximize setting in Explorer doesn't maximise the
-     * config box. */
-    defuse_showwindow();
-
-    if (!init_winver())
-    {
-	char *str = dupprintf("%s Fatal Error", appname);
-	MessageBox(NULL, "Windows refuses to report a version",
-		   str, MB_OK | MB_ICONEXCLAMATION);
-	sfree(str);
-	return 1;
-    }
-
-    /*
-     * If we're running a version of Windows that doesn't support
-     * WM_MOUSEWHEEL, find out what message number we should be
-     * using instead.
-     */
-    if (osVersion.dwMajorVersion < 4 ||
-	(osVersion.dwMajorVersion == 4 && 
-	 osVersion.dwPlatformId != VER_PLATFORM_WIN32_NT))
-	wm_mousewheel = RegisterWindowMessage("MSWHEEL_ROLLMSG");
-
-    init_help();
-
-    init_flashwindow();
-
-    /*
-     * Initialize COM.
-     */
     hr = CoInitialize(NULL);
     if (hr != S_OK && hr != S_FALSE) {
-        char *str = dupprintf("%s Fatal Error", appname);
-	MessageBox(NULL, "Failed to initialize COM subsystem",
-		   str, MB_OK | MB_ICONEXCLAMATION);
-	sfree(str);
-	return 1;
+            char *str = dupprintf("%s Fatal Error", appname);
+    	MessageBox(NULL, "Failed to initialize COM subsystem",
+    		   str, MB_OK | MB_ICONEXCLAMATION);
+    	sfree(str);
+    	return 1;
     }
+    return 0;
+}
 
-    /*
-     * Process the command line.
-     */
-    {
+/*
+ * Process the command line.
+ */
+void process_cmdline(LPSTR cmdline)
+{
 	char *p;
 	int got_host = 0;
 	/* By default, we bring up the config dialog, rather than launching
@@ -571,60 +535,13 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 	    cleanup_exit(0);
 	}
 
-	/*
-	 * Trim leading whitespace off the hostname if it's there.
-	 */
-	{
-	    int space = strspn(cfg.host, " \t");
-	    memmove(cfg.host, cfg.host+space, 1+strlen(cfg.host)-space);
-	}
+	adjust_host(&cfg);
+}
 
-	/* See if host is of the form user@host */
-	if (cfg.host[0] != '\0') {
-	    char *atsign = strrchr(cfg.host, '@');
-	    /* Make sure we're not overflowing the user field */
-	    if (atsign) {
-		if (atsign - cfg.host < sizeof cfg.username) {
-		    strncpy(cfg.username, cfg.host, atsign - cfg.host);
-		    cfg.username[atsign - cfg.host] = '\0';
-		}
-		memmove(cfg.host, atsign + 1, 1 + strlen(atsign + 1));
-	    }
-	}
 
-	/*
-	 * Trim a colon suffix off the hostname if it's there. In
-	 * order to protect IPv6 address literals against this
-	 * treatment, we do not do this if there's _more_ than one
-	 * colon.
-	 */
-	{
-	    char *c = strchr(cfg.host, ':');
-
-	    if (c) {
-		char *d = strchr(c+1, ':');
-		if (!d)
-		    *c = '\0';
-	    }
-	}
-
-	/*
-	 * Remove any remaining whitespace from the hostname.
-	 */
-	{
-	    int p1 = 0, p2 = 0;
-	    while (cfg.host[p2] != '\0') {
-		if (cfg.host[p2] != ' ' && cfg.host[p2] != '\t') {
-		    cfg.host[p1] = cfg.host[p2];
-		    p1++;
-		}
-		p2++;
-	    }
-	    cfg.host[p1] = '\0';
-	}
-    }
-
-    if (!prev) {
+int registerClass(HINSTANCE inst)
+{
+    WNDCLASS wndclass;
 	wndclass.style = 0;
 	wndclass.lpfnWndProc = WndProc;
 	wndclass.cbClsExtra = 0;
@@ -636,13 +553,12 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 	wndclass.lpszMenuName = NULL;
 	wndclass.lpszClassName = appname;
 
-	RegisterClass(&wndclass);
-    }
+	return RegisterClass(&wndclass);
+}
 
-    memset(&ucsdata, 0, sizeof(ucsdata));
-
-    cfgtopalette();
-
+void guessSize(int *width, int *height)
+{
+    int guess_width, guess_height;
     /*
      * Guess some defaults for the window size. This all gets
      * updated later, so we don't really care too much. However, we
@@ -656,20 +572,20 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     extra_height = 28;
     guess_width = extra_width + font_width * cfg.width;
     guess_height = extra_height + font_height * cfg.height;
-    {
 	RECT r;
 	get_fullscreen_rect(&r);
 	if (guess_width > r.right - r.left)
 	    guess_width = r.right - r.left;
 	if (guess_height > r.bottom - r.top)
 	    guess_height = r.bottom - r.top;
-    }
+    *width = guess_width;
+    *height = guess_height;
+}
 
-    {
-	int winmode = WS_OVERLAPPEDWINDOW | WS_VSCROLL;
+void creatMainWindow(HINSTANCE inst, int width, int height)
+{ 
+	int winmode = WS_OVERLAPPEDWINDOW;
 	int exwinmode = 0;
-	if (!cfg.scrollbar)
-	    winmode &= ~(WS_VSCROLL);
 	if (cfg.resize_action == RESIZE_DISABLED)
 	    winmode &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
 	if (cfg.alwaysontop)
@@ -678,39 +594,22 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 	    exwinmode |= WS_EX_CLIENTEDGE;
 	hwnd = CreateWindowEx(exwinmode, appname, appname,
 			      winmode, CW_USEDEFAULT, CW_USEDEFAULT,
-			      guess_width, guess_height,
+			      width, height,
 			      NULL, NULL, inst, NULL);
-    wintab_init(&tab, hwnd);
-    }
+}
 
-    /*
-     * Initialise the terminal. (We have to do this _after_
-     * creating the window, since the terminal is the first thing
-     * which will call schedule_timer(), which will in turn call
-     * timer_change_notify() which will expect hwnd to exist.)
-     */
-    term = term_init(&cfg, &ucsdata, NULL);
-    logctx = log_init(NULL, &cfg);
-    term_provide_logctx(term, logctx);
-    term_size(term, cfg.height, cfg.width, cfg.savelines);
-
-    /*
-     * Initialise the fonts, simultaneously correcting the guesses
-     * for font_{width,height}.
-     */
-    init_fonts(0,0);
-
-    /*
+void resizeWindows()
+{
+    int guess_width, guess_height;
+     /*
      * Correct the guesses for extra_{width,height}.
      */
-    {
 	RECT cr, wr;
 	GetWindowRect(hwnd, &wr);
 	GetClientRect(hwnd, &cr);
 	offset_width = offset_height = cfg.window_border;
 	extra_width = wr.right - wr.left - cr.right + cr.left + offset_width*2;
 	extra_height = wr.bottom - wr.top - cr.bottom + cr.top +offset_height*2;
-    }
 
     /*
      * Resize the window, now we know what size we _really_ want it
@@ -720,41 +619,121 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     guess_height = extra_height + font_height * term->rows;
     SetWindowPos(hwnd, NULL, 0, 0, guess_width, guess_height,
 		 SWP_NOMOVE | SWP_NOREDRAW | SWP_NOZORDER);
+}
 
-    /*
-     * Set up a caret bitmap, with no content.
-     */
+int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
+{
+    MSG msg;   
+    int guess_width, guess_height;
+    hinst = inst;
+    hwnd = NULL;
+    flags = FLAG_VERBOSE | FLAG_INTERACTIVE;
+
+    sk_init();
+
+    InitCommonControls();
+
+    /* Ensure a Maximize setting in Explorer doesn't maximise the
+     * config box. */
+    defuse_showwindow();
+
+    if (!init_winver())
     {
-	char *bits;
-	int size = (font_width + 15) / 16 * 2 * font_height;
-	bits = snewn(size, char);
-	memset(bits, 0, size);
-	caretbm = CreateBitmap(font_width, font_height, 1, 1, bits);
-	sfree(bits);
-    }
-    CreateCaret(hwnd, caretbm, font_width, font_height);
-
-    /*
-     * Initialise the scroll bar.
-     */
-    {
-	SCROLLINFO si;
-
-	si.cbSize = sizeof(si);
-	si.fMask = SIF_ALL | SIF_DISABLENOSCROLL;
-	si.nMin = 0;
-	si.nMax = term->rows - 1;
-	si.nPage = term->rows;
-	si.nPos = 0;
-	SetScrollInfo(HWNDDC, SB_VERT, &si, FALSE);
+	char *str = dupprintf("%s Fatal Error", appname);
+	MessageBox(NULL, "Windows refuses to report a version",
+		   str, MB_OK | MB_ICONEXCLAMATION);
+	sfree(str);
+	return 1;
     }
 
     /*
-     * Prepare the mouse handler.
+     * If we're running a version of Windows that doesn't support
+     * WM_MOUSEWHEEL, find out what message number we should be
+     * using instead.
      */
-    lastact = MA_NOTHING;
-    lastbtn = MBT_NOTHING;
-    dbltime = GetDoubleClickTime();
+    if (osVersion.dwMajorVersion < 4 ||
+	(osVersion.dwMajorVersion == 4 && 
+	 osVersion.dwPlatformId != VER_PLATFORM_WIN32_NT))
+	wm_mousewheel = RegisterWindowMessage("MSWHEEL_ROLLMSG");
+
+    init_help();
+
+    init_flashwindow();
+
+    if (init_com() != 0)
+        return 1;
+
+    process_cmdline(cmdline);
+    
+    if (!prev) {
+        registerClass(inst);
+    }
+
+    guessSize(&guess_width, &guess_height);
+    creatMainWindow(inst, guess_width, guess_height);
+
+
+    //todo remove after tab is done
+    {
+        memset(&ucsdata, 0, sizeof(ucsdata));
+        cfgtopalette();
+        /*
+         * Initialise the terminal. (We have to do this _after_
+         * creating the window, since the terminal is the first thing
+         * which will call schedule_timer(), which will in turn call
+         * timer_change_notify() which will expect hwnd to exist.)
+         */
+        term = term_init(&cfg, &ucsdata, NULL);
+        logctx = log_init(NULL, &cfg);
+        term_provide_logctx(term, logctx);
+        term_size(term, cfg.height, cfg.width, cfg.savelines);
+
+        /*
+         * Initialise the fonts, simultaneously correcting the guesses
+         * for font_{width,height}.
+         */
+        init_fonts(0,0);
+    }
+ 
+    wintab_init(&tab, hwnd);
+
+    resizeWindows();
+
+            /*
+             * Set up a caret bitmap, with no content.
+             */
+            {
+        	char *bits;
+        	int size = (font_width + 15) / 16 * 2 * font_height;
+        	bits = snewn(size, char);
+        	memset(bits, 0, size);
+        	caretbm = CreateBitmap(font_width, font_height, 1, 1, bits);
+        	sfree(bits);
+            }
+            CreateCaret(hwnd, caretbm, font_width, font_height);
+
+#if 0
+            /*
+             * Initialise the scroll bar.
+             */
+            {
+        	SCROLLINFO si;
+
+        	si.cbSize = sizeof(si);
+        	si.fMask = SIF_ALL | SIF_DISABLENOSCROLL;
+        	si.nMin = 0;
+        	si.nMax = term->rows - 1;
+        	si.nPage = term->rows;
+        	si.nPos = 0;
+        	SetScrollInfo(HWNDDC, SB_VERT, &si, FALSE);
+            }
+#endif
+            /*
+             * Prepare the mouse handler.
+             */
+            lastact = MA_NOTHING;
+            lastbtn = MBT_NOTHING;
+            dbltime = GetDoubleClickTime();
 
     /*
      * Set up the session-control options on the system menu.
@@ -799,7 +778,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 	}
     }
 
-    start_backend();
+    //    start_backend();
 
     /*
      * Set up the initial input locale.
@@ -812,56 +791,54 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     ShowWindow(hwnd, show);
     SetForegroundWindow(hwnd);
 
-    /*
-     * Set the palette up.
-     */
-    pal = NULL;
-    logpal = NULL;
-    init_palette();
+            /*
+             * Set the palette up.
+             */
+            pal = NULL;
+            logpal = NULL;
+            init_palette();
 
-    term_set_focus(term, GetForegroundWindow() == hwnd);
+            //term_set_focus(term, GetForegroundWindow() == hwnd);
     UpdateWindow(hwnd);
 
     while (1) {
-	HANDLE *handles;
-	int nhandles, n;
+    	HANDLE *handles;
+    	int nhandles, n;
 
-	handles = handle_get_events(&nhandles);
+    	handles = handle_get_events(&nhandles);
 
-	n = MsgWaitForMultipleObjects(nhandles, handles, FALSE, INFINITE,
-				      QS_ALLINPUT);
+    	n = MsgWaitForMultipleObjects(nhandles, handles, FALSE, INFINITE,
+    				      QS_ALLINPUT);
 
-	if ((unsigned)(n - WAIT_OBJECT_0) < (unsigned)nhandles) {
-	    handle_got_event(handles[n - WAIT_OBJECT_0]);
-	    sfree(handles);
-	    if (must_close_session)
-		close_session();
-	} else
-	    sfree(handles);
+    	if ((unsigned)(n - WAIT_OBJECT_0) < (unsigned)nhandles) {
+    	    handle_got_event(handles[n - WAIT_OBJECT_0]);
+    	    sfree(handles);
+    	    wintab_check_closed_session(&tab);
+    	} else
+    	    sfree(handles);
 
-	while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-	    if (msg.message == WM_QUIT)
-		goto finished;	       /* two-level break */
+    	while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+    	    if (msg.message == WM_QUIT)
+    		goto finished;	       /* two-level break */
 
-	    if (!(IsWindow(logbox) && IsDialogMessage(logbox, &msg)))
-		DispatchMessage(&msg);
-	    /* Send the paste buffer if there's anything to send */
-	    term_paste(term);
-	    /* If there's nothing new in the queue then we can do everything
-	     * we've delayed, reading the socket, writing, and repainting
-	     * the window.
-	     */
-	    if (must_close_session)
-		close_session();
-	}
+    	    if (!(IsWindow(logbox) && IsDialogMessage(logbox, &msg)))
+    		DispatchMessage(&msg);
+    	    /* Send the paste buffer if there's anything to send */
+    	    wintab_term_paste(&tab);
+    	    /* If there's nothing new in the queue then we can do everything
+    	     * we've delayed, reading the socket, writing, and repainting
+    	     * the window.
+    	     */
+    	    wintab_check_closed_session(&tab);
+    	}
 
-	/* The messages seem unreliable; especially if we're being tricky */
-	term_set_focus(term, GetForegroundWindow() == hwnd);
+    	/* The messages seem unreliable; especially if we're being tricky */
+    	wintab_term_set_focus(&tab, GetForegroundWindow() == hwnd);
 
-	if (pending_netevent)
-	    enact_pending_netevent();
+    	if (pending_netevent)
+    	    enact_pending_netevent();
 
-	net_pending_errors();
+    	net_pending_errors();
     }
 
     finished:
@@ -1012,14 +989,18 @@ void update_specials_menu(void *frontend)
     specials_menu = new_menu;
 }
 
-static void update_mouse_pointer(void)
+static void update_mouse_pointer(void *frontend)
 {
+    if (!frontend)
+        return;
+    wintabitem *tabitem = (wintabitem *)frontend;
+    
     LPTSTR curstype;
     int force_visible = FALSE;
     static int forced_visible = FALSE;
-    switch (busy_status) {
+    switch (tabitem->busy_status) {
       case BUSY_NOT:
-	if (send_raw_mouse)
+	if (tabitem->send_raw_mouse)
 	    curstype = IDC_ARROW;
 	else
 	    curstype = IDC_IBEAM;
@@ -1037,7 +1018,7 @@ static void update_mouse_pointer(void)
     }
     {
 	HCURSOR cursor = LoadCursor(NULL, curstype);
-	SetClassLongPtr(hwnd, GCLP_HCURSOR, (LONG_PTR)cursor);
+	SetClassLongPtr(tabitem->page.hwndCtrl, GCLP_HCURSOR, (LONG_PTR)cursor);
 	SetCursor(cursor); /* force redraw of cursor at current posn */
     }
     if (force_visible != forced_visible) {
@@ -1052,8 +1033,11 @@ static void update_mouse_pointer(void)
 
 void set_busy_status(void *frontend, int status)
 {
-    busy_status = status;
-    update_mouse_pointer();
+    if (!frontend)
+        return;
+    wintabitem *tabitem = (wintabitem *)frontend;
+    tabitem->busy_status = status;
+    update_mouse_pointer(frontend);
 }
 
 /*
@@ -1061,9 +1045,12 @@ void set_busy_status(void *frontend, int status)
  */
 void set_raw_mouse_mode(void *frontend, int activate)
 {
-    activate = activate && !cfg.no_mouse_rep;
-    send_raw_mouse = activate;
-    update_mouse_pointer();
+    if (!frontend)
+        return;
+    wintabitem *tabitem = (wintabitem *)frontend;
+    activate = activate && !tabitem->cfg.no_mouse_rep;
+    tabitem->send_raw_mouse = activate;
+    update_mouse_pointer(frontend);
 }
 
 /*
@@ -1071,6 +1058,10 @@ void set_raw_mouse_mode(void *frontend, int activate)
  */
 void connection_fatal(void *frontend, char *fmt, ...)
 {
+    if (!frontend)
+        return;
+    wintabitem *tabitem = (wintabitem *)frontend;
+    
     va_list ap;
     char *stuff, morestuff[100];
 
@@ -1078,14 +1069,14 @@ void connection_fatal(void *frontend, char *fmt, ...)
     stuff = dupvprintf(fmt, ap);
     va_end(ap);
     sprintf(morestuff, "%.70s Fatal Error", appname);
-    MessageBox(hwnd, stuff, morestuff, MB_ICONERROR | MB_OK);
+    MessageBox(tabitem->page.hwndCtrl, stuff, morestuff, MB_ICONERROR | MB_OK);
     sfree(stuff);
 
-    if (cfg.close_on_exit == FORCE_ON)
-	PostQuitMessage(1);
-    else {
-	must_close_session = TRUE;
-    }
+    //if (tabitem->cfg.close_on_exit == FORCE_ON)
+	//    PostQuitMessage(1);
+    //else {
+    tabitem->must_close_session = TRUE;
+    //}
 }
 
 /*
@@ -1607,19 +1598,23 @@ static void deinit_fonts(void)
 	fontflag[i] = 0;
     }
 }
-
+//------------------------------------------------------------------------------
 void request_resize(void *frontend, int w, int h)
 {
+    if (!frontend)
+        return;
+    wintabitem *tabitem = (wintabitem *)frontend;
+    
     int width, height;
 
     /* If the window is maximized supress resizing attempts */
     if (IsZoomed(hwnd)) {
-	if (cfg.resize_action == RESIZE_TERM)
+	if (tabitem->cfg.resize_action == RESIZE_TERM)
 	    return;
     }
 
-    if (cfg.resize_action == RESIZE_DISABLED) return;
-    if (h == term->rows && w == term->cols) return;
+    if (tabitem->cfg.resize_action == RESIZE_DISABLED) return;
+    if (h == tabitem->term->rows && w == tabitem->term->cols) return;
 
     /* Sanity checks ... */
     {
@@ -1649,19 +1644,19 @@ void request_resize(void *frontend, int w, int h)
 	}
     }
 
-    term_size(term, h, w, cfg.savelines);
+    term_size(tabitem->term, h, w, tabitem->cfg.savelines);
 
-    if (cfg.resize_action != RESIZE_FONT && !IsZoomed(hwnd)) {
-	width = extra_width + font_width * w;
-	height = extra_height + font_height * h;
+    if (tabitem->cfg.resize_action != RESIZE_FONT && !IsZoomed(hwnd)) {
+	width = extra_width + tabitem->font_width * w;
+	height = extra_height + tabitem->font_height * h;
 
-	SetWindowPos(hwnd, NULL, 0, 0, width, height,
+	SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, width, height,
 	    SWP_NOACTIVATE | SWP_NOCOPYBITS |
 	    SWP_NOMOVE | SWP_NOZORDER);
     } else
 	reset_window(0);
 
-    InvalidateRect(hwnd, NULL, TRUE);
+    InvalidateRect(tabitem->page.hwndCtrl, NULL, TRUE);
 }
 
 static void reset_window(int reinit) {
@@ -2899,7 +2894,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	    if (hdc) {
 		if (RealizePalette(hdc) > 0)
 		    UpdateColors(hdc);
-		free_ctx(hdc);
+		free_ctx(NULL, hdc);
 	    }
 	}
 	break;
@@ -2909,7 +2904,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	    if (hdc) {
 		if (RealizePalette(hdc) > 0)
 		    UpdateColors(hdc);
-		free_ctx(hdc);
+		free_ctx(NULL, hdc);
 		return TRUE;
 	    }
 	}
@@ -4556,19 +4551,37 @@ void set_sbar(void *frontend, int total, int start, int page)
 Context get_ctx(void *frontend)
 {
     HDC hdc;
-    if (hwnd) {
-	hdc = GetDC(HWNDDC);
-	if (hdc && pal)
-	    SelectPalette(hdc, pal, FALSE);
-	return hdc;
-    } else
-	return NULL;
+    if (!frontend){
+        if (hwnd) {
+    	hdc = GetDC(HWNDDC);
+    	if (hdc && pal)
+    	    SelectPalette(hdc, pal, FALSE);
+    	return hdc;
+        } else
+    	return NULL;
+    }
+    wintabitem *tabitem = (wintabitem *)frontend;
+    if (tabitem->page.hwndCtrl){
+    	hdc = GetDC(tabitem->page.hwndCtrl);
+    	if (hdc && tabitem->pal){
+    	    SelectPalette(hdc, tabitem->pal, FALSE);
+        	return hdc;
+        } else
+        	return NULL;
+    }
+    return NULL;
 }
 
-void free_ctx(Context ctx)
+void free_ctx(void *frontend, Context ctx)
 {
+    if (!frontend){
+        SelectPalette(ctx, GetStockObject(DEFAULT_PALETTE), FALSE);
+        ReleaseDC(HWNDDC, ctx);
+        return;
+    }
+    wintabitem *tabitem = (wintabitem *)frontend;
     SelectPalette(ctx, GetStockObject(DEFAULT_PALETTE), FALSE);
-    ReleaseDC(HWNDDC, ctx);
+    ReleaseDC(tabitem->page.hwndCtrl, ctx);
 }
 
 static void real_palette_set(int n, int r, int g, int b)
@@ -4595,7 +4608,7 @@ void palette_set(void *frontend, int n, int r, int g, int b)
 	HDC hdc = get_ctx(frontend);
 	UnrealizeObject(pal);
 	RealizePalette(hdc);
-	free_ctx(hdc);
+	free_ctx(NULL, hdc);
     } else {
 	if (n == (ATTR_DEFBG>>ATTR_BGSHIFT))
 	    /* If Default Background changes, we need to ensure any
@@ -4629,7 +4642,7 @@ void palette_reset(void *frontend)
 	SetPaletteEntries(pal, 0, NALLCOLOURS, logpal->palPalEntry);
 	hdc = get_ctx(frontend);
 	RealizePalette(hdc);
-	free_ctx(hdc);
+	free_ctx(NULL, hdc);
     } else {
 	/* Default Background may have changed. Ensure any space between
 	 * text area and window border is redrawn. */

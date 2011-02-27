@@ -1272,7 +1272,7 @@ void term_update(Terminal *term)
 	    update_sbar(term);
 	do_paint(term, ctx, TRUE);
 	sys_cursor(term->frontend, term->curs.x, term->curs.y - term->disptop);
-	free_ctx(ctx);
+	free_ctx(term->frontend, ctx);
     }
 }
 

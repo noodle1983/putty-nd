@@ -1991,7 +1991,7 @@ Context get_ctx(void *frontend)
     return dctx;
 }
 
-void free_ctx(Context ctx)
+void free_ctx(void *frontend, Context ctx)
 {
     struct draw_ctx *dctx = (struct draw_ctx *)ctx;
     /* struct gui_data *inst = dctx->inst; */

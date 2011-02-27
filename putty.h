@@ -751,7 +751,7 @@ void set_title(void *frontend, char *);
 void set_icon(void *frontend, char *);
 void set_sbar(void *frontend, int, int, int);
 Context get_ctx(void *frontend);
-void free_ctx(Context);
+void free_ctx(void *frontend, Context);
 void palette_set(void *frontend, int, int, int, int);
 void palette_reset(void *frontend);
 void write_aclip(void *frontend, char *, int, int);
