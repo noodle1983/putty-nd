@@ -139,6 +139,7 @@ wintabitem* wintab_get_active_item(wintab *wintab)
 
 void wintabitem_creat(wintab *wintab, Config *cfg)
 {
+    wintab->items[0].hdc = NULL;
     wintab->items[0].send_raw_mouse = 0;
     wintab->items[0].wheel_accumulator = 0;
     wintab->items[0].busy_status = BUSY_NOT;
@@ -170,7 +171,7 @@ void wintabitem_creat(wintab *wintab, Config *cfg)
     }
 
     ShowWindow(wintab->items[0].page.hwndCtrl, SW_SHOW);
-    SetForegroundWindow(wintab->items[0].page.hwndCtrl);
+//    SetForegroundWindow(wintab->items[0].page.hwndCtrl);
 
     wintab->items[0].pal = NULL;
     wintab->items[0].logpal = NULL;

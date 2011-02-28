@@ -631,6 +631,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 
     sk_init();
 
+    LoadLibraryA("backtrace.dll");
+
     InitCommonControls();
 
     /* Ensure a Maximize setting in Explorer doesn't maximise the
@@ -674,16 +676,16 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 
 
     //todo remove after tab is done
-    {
+    if (0){
         memset(&ucsdata, 0, sizeof(ucsdata));
-        cfgtopalette();
+        //cfgtopalette();
         /*
          * Initialise the terminal. (We have to do this _after_
          * creating the window, since the terminal is the first thing
          * which will call schedule_timer(), which will in turn call
          * timer_change_notify() which will expect hwnd to exist.)
          */
-        term = term_init(&cfg, &ucsdata, NULL);
+        term = term_init(&cfg, &ucsdata, &tab.items[0]);
         logctx = log_init(NULL, &cfg);
         term_provide_logctx(term, logctx);
         term_size(term, cfg.height, cfg.width, cfg.savelines);
@@ -696,6 +698,9 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     }
  
     wintab_init(&tab, hwnd);
+    term = tab.items[0].term;
+    logctx = tab.items[0].logctx;
+    ucsdata = tab.items[0].ucsdata;
 
     resizeWindows();
 
@@ -2890,21 +2895,21 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	break;
       case WM_PALETTECHANGED:
 	if ((HWND) wParam != hwnd && pal != NULL) {
-	    HDC hdc = get_ctx(NULL);
-	    if (hdc) {
-		if (RealizePalette(hdc) > 0)
-		    UpdateColors(hdc);
-		free_ctx(NULL, hdc);
+        wintabitem *tabitem = get_ctx(wintab_get_active_item(&tab));
+	    if (tabitem && tabitem->hdc) {
+    		if (RealizePalette(tabitem->hdc) > 0)
+    		    UpdateColors(tabitem->hdc);
+    		free_ctx(tabitem, tabitem);
 	    }
 	}
 	break;
       case WM_QUERYNEWPALETTE:
 	if (pal != NULL) {
-	    HDC hdc = get_ctx(NULL);
-	    if (hdc) {
-		if (RealizePalette(hdc) > 0)
-		    UpdateColors(hdc);
-		free_ctx(NULL, hdc);
+        wintabitem *tabitem = get_ctx(wintab_get_active_item(&tab));
+	    if (tabitem && tabitem->hdc) {
+		if (RealizePalette(tabitem->hdc) > 0)
+		    UpdateColors(tabitem->hdc);
+		free_ctx(tabitem, tabitem);
 		return TRUE;
 	    }
 	}
@@ -3205,9 +3210,11 @@ static void sys_cursor_update(void)
 void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
 		      unsigned long attr, int lattr)
 {
+    assert(ctx != NULL);
+    wintabitem *tabitem = (wintabitem *)ctx;
     COLORREF fg, bg, t;
     int nfg, nbg, nfont;
-    HDC hdc = ctx;
+    HDC hdc = tabitem->hdc;
     RECT line_box;
     int force_manual_underline = 0;
     int fnt_width, char_width;
@@ -3217,6 +3224,8 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
     static int *lpDx = NULL;
     static int lpDx_len = 0;
     int *lpDx_maybe;
+
+    if (hdc == NULL) return;
 
     lattr &= LATTR_MODE;
 
@@ -3529,6 +3538,7 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
 void do_text(Context ctx, int x, int y, wchar_t *text, int len,
 	     unsigned long attr, int lattr)
 {
+    assert(ctx != NULL);
     if (attr & TATTR_COMBINING) {
 	unsigned long a = 0;
 	attr &= ~TATTR_COMBINING;
@@ -3544,11 +3554,14 @@ void do_text(Context ctx, int x, int y, wchar_t *text, int len,
 void do_cursor(Context ctx, int x, int y, wchar_t *text, int len,
 	       unsigned long attr, int lattr)
 {
-
+    assert(ctx != NULL);
+    wintabitem *tabitem = (wintabitem *)ctx;
     int fnt_width;
     int char_width;
-    HDC hdc = ctx;
+    HDC hdc = tabitem->hdc;
     int ctype = cfg.cursor_type;
+
+    if (hdc == NULL) return;
 
     lattr &= LATTR_MODE;
 
@@ -3621,8 +3634,12 @@ void do_cursor(Context ctx, int x, int y, wchar_t *text, int len,
 /* This function gets the actual width of a character in the normal font.
  */
 int char_width(Context ctx, int uc) {
-    HDC hdc = ctx;
+    assert(ctx != NULL);
+    wintabitem *tabitem = (wintabitem *)ctx;
+    HDC hdc = tabitem->hdc;
     int ibuf = 0;
+
+    if (hdc == NULL) return 0;
 
     /* If the font max is the same as the font ave width then this
      * function is a no-op.
@@ -4550,38 +4567,32 @@ void set_sbar(void *frontend, int total, int start, int page)
 
 Context get_ctx(void *frontend)
 {
-    HDC hdc;
-    if (!frontend){
-        if (hwnd) {
-    	hdc = GetDC(HWNDDC);
-    	if (hdc && pal)
-    	    SelectPalette(hdc, pal, FALSE);
-    	return hdc;
-        } else
-    	return NULL;
-    }
+    assert(frontend != NULL);
     wintabitem *tabitem = (wintabitem *)frontend;
     if (tabitem->page.hwndCtrl){
-    	hdc = GetDC(tabitem->page.hwndCtrl);
-    	if (hdc && tabitem->pal){
-    	    SelectPalette(hdc, tabitem->pal, FALSE);
-        	return hdc;
-        } else
-        	return NULL;
+    	tabitem->hdc = GetDC(tabitem->page.hwndCtrl);
+    	if (tabitem->hdc && tabitem->pal){
+    	    SelectPalette(tabitem->hdc, tabitem->pal, FALSE);
+        } else if (tabitem->hdc){
+            ReleaseDC(tabitem->page.hwndCtrl, tabitem->hdc);
+        	tabitem->hdc = NULL;
+        }else{
+            tabitem->hdc = NULL;
+        }
+        
     }
-    return NULL;
+    return tabitem;
 }
 
 void free_ctx(void *frontend, Context ctx)
 {
-    if (!frontend){
-        SelectPalette(ctx, GetStockObject(DEFAULT_PALETTE), FALSE);
-        ReleaseDC(HWNDDC, ctx);
-        return;
+    assert(frontend != NULL && ctx != NULL);
+    wintabitem *tabitem = (wintabitem *)ctx;
+    if (tabitem->hdc){
+        SelectPalette(tabitem->hdc, GetStockObject(DEFAULT_PALETTE), FALSE);
+        ReleaseDC(tabitem->page.hwndCtrl, tabitem->hdc);
+        tabitem->hdc = NULL;
     }
-    wintabitem *tabitem = (wintabitem *)frontend;
-    SelectPalette(ctx, GetStockObject(DEFAULT_PALETTE), FALSE);
-    ReleaseDC(tabitem->page.hwndCtrl, ctx);
 }
 
 static void real_palette_set(int n, int r, int g, int b)
@@ -4605,10 +4616,13 @@ void palette_set(void *frontend, int n, int r, int g, int b)
 	return;
     real_palette_set(n, r, g, b);
     if (pal) {
-	HDC hdc = get_ctx(frontend);
-	UnrealizeObject(pal);
-	RealizePalette(hdc);
-	free_ctx(NULL, hdc);
+        wintabitem *tabitem = get_ctx(frontend);
+        assert(tabitem != NULL);
+    	HDC hdc = tabitem->hdc;
+        if (hdc == NULL) return;
+    	UnrealizeObject(pal);
+    	RealizePalette(hdc);
+    	free_ctx(tabitem, tabitem);
     } else {
 	if (n == (ATTR_DEFBG>>ATTR_BGSHIFT))
 	    /* If Default Background changes, we need to ensure any
@@ -4640,9 +4654,12 @@ void palette_reset(void *frontend)
     if (pal) {
 	HDC hdc;
 	SetPaletteEntries(pal, 0, NALLCOLOURS, logpal->palPalEntry);
-	hdc = get_ctx(frontend);
+	wintabitem *tabitem = get_ctx(frontend);
+    assert(tabitem != NULL);
+    hdc = tabitem->hdc;
+    if (hdc == NULL) return;
 	RealizePalette(hdc);
-	free_ctx(NULL, hdc);
+	free_ctx(tabitem, tabitem);
     } else {
 	/* Default Background may have changed. Ensure any space between
 	 * text area and window border is redrawn. */
