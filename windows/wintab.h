@@ -42,6 +42,8 @@ typedef struct {
 
 typedef struct {
     wintabpage page;
+
+    HDC hdc;
     
     Config cfg;
     Terminal *term;
@@ -55,6 +57,7 @@ typedef struct {
     bold_mode_t bold_mode;
     und_mode_t und_mode;
     int font_width, font_height, font_dualwidth, font_varpitch;
+    int offset_width, offset_height;
     int descent;
 
     HBITMAP caretbm;
@@ -96,6 +99,7 @@ void wintab_onsize(wintab *wintab, HWND hwndParent, LPARAM lParam);
 void wintab_check_closed_session(wintab *wintab);
 void wintab_term_paste(wintab *wintab);
 void wintab_term_set_focus(wintab *wintab, int has_focus);
+wintabitem* wintab_get_active_item(wintab *wintab);
 //-----------------------------------------------------------------------
 // tabbar item related
 //-----------------------------------------------------------------------

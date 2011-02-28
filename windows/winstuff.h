@@ -144,7 +144,7 @@ typedef struct terminal_tag Terminal;
 
 #define DEFAULT_CODEPAGE CP_ACP
 
-typedef HDC Context;
+typedef void* Context;
 
 typedef unsigned int uint32; /* int is 32-bits on Win32 and Win64. */
 #define PUTTY_UINT32_DEFINED
