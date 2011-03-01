@@ -58,6 +58,7 @@ typedef struct {
     und_mode_t und_mode;
     int font_width, font_height, font_dualwidth, font_varpitch;
     int offset_width, offset_height;
+    int caret_x, caret_y;
     int descent;
 
     HBITMAP caretbm;
@@ -100,6 +101,9 @@ void wintab_check_closed_session(wintab *wintab);
 void wintab_term_paste(wintab *wintab);
 void wintab_term_set_focus(wintab *wintab, int has_focus);
 wintabitem* wintab_get_active_item(wintab *wintab);
+
+int wintab_on_paint(wintab *wintab, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
 //-----------------------------------------------------------------------
 // tabbar item related
 //-----------------------------------------------------------------------

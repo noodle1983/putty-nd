@@ -33,16 +33,6 @@ extern void *ldisc;
 const char* const WINTAB_PAGE_CLASS = "WintabPage";
 int wintabpage_registed = 0;
 
-static int send_raw_mouse = 0;
-static int wheel_accumulator = 0;
-static int dbltime, lasttime, lastact;
-static Mouse_Button lastbtn;
-static int extra_width, extra_height;
-static int font_width, font_height, font_dualwidth, font_varpitch;
-static int offset_width, offset_height;
-static int caret_x = -1, caret_y = -1;
-
-
 //-----------------------------------------------------------------------
 // tabbar related
 //-----------------------------------------------------------------------
@@ -133,6 +123,109 @@ wintabitem* wintab_get_active_item(wintab *wintab)
     //get select ...
     return &wintab->items[0];
 }
+
+//-----------------------------------------------------------------------
+
+int wintab_on_paint(wintab *wintab, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    wintabitem tabitem = wintab->items[0];
+    PAINTSTRUCT p;
+
+    HideCaret(tabitem.page.hwndCtrl);
+    tabitem.hdc = BeginPaint(tabitem.page.hwndCtrl, &p);
+    if (tabitem.pal) {
+    	SelectPalette(tabitem.hdc, tabitem.pal, TRUE);
+    	RealizePalette(tabitem.hdc);
+    }
+
+    /*
+     * We have to be careful about term_paint(). It will
+     * set a bunch of character cells to INVALID and then
+     * call do_paint(), which will redraw those cells and
+     * _then mark them as done_. This may not be accurate:
+     * when painting in WM_PAINT context we are restricted
+     * to the rectangle which has just been exposed - so if
+     * that only covers _part_ of a character cell and the
+     * rest of it was already visible, that remainder will
+     * not be redrawn at all. Accordingly, we must not
+     * paint any character cell in a WM_PAINT context which
+     * already has a pending update due to terminal output.
+     * The simplest solution to this - and many, many
+     * thanks to Hung-Te Lin for working all this out - is
+     * not to do any actual painting at _all_ if there's a
+     * pending terminal update: just mark the relevant
+     * character cells as INVALID and wait for the
+     * scheduled full update to sort it out.
+     * 
+     * I have a suspicion this isn't the _right_ solution.
+     * An alternative approach would be to have terminal.c
+     * separately track what _should_ be on the terminal
+     * screen and what _is_ on the terminal screen, and
+     * have two completely different types of redraw (one
+     * for full updates, which syncs the former with the
+     * terminal itself, and one for WM_PAINT which syncs
+     * the latter with the former); yet another possibility
+     * would be to have the Windows front end do what the
+     * GTK one already does, and maintain a bitmap of the
+     * current terminal appearance so that WM_PAINT becomes
+     * completely trivial. However, this should do for now.
+     */
+    term_paint(tabitem.term, (Context)&tabitem, 
+	       (p.rcPaint.left-tabitem.offset_width)/tabitem.font_width,
+	       (p.rcPaint.top-tabitem.offset_height)/tabitem.font_height,
+	       (p.rcPaint.right-tabitem.offset_width-1)/tabitem.font_width,
+	       (p.rcPaint.bottom-tabitem.offset_height-1)/tabitem.font_height,
+	       !tabitem.term->window_update_pending);
+
+    if (p.fErase ||
+        p.rcPaint.left  < tabitem.offset_width  ||
+	p.rcPaint.top   < tabitem.offset_height ||
+	p.rcPaint.right >= tabitem.offset_width + tabitem.font_width*tabitem.term->cols ||
+	p.rcPaint.bottom>= tabitem.offset_height + tabitem.font_height*tabitem.term->rows)
+    {
+    	HBRUSH fillcolour, oldbrush;
+    	HPEN   edge, oldpen;
+    	fillcolour = CreateSolidBrush (
+    			    tabitem.colours[ATTR_DEFBG>>ATTR_BGSHIFT]);
+    	oldbrush = SelectObject(tabitem.hdc, fillcolour);
+    	edge = CreatePen(PS_SOLID, 0, 
+    			    tabitem.colours[ATTR_DEFBG>>ATTR_BGSHIFT]);
+    	oldpen = SelectObject(tabitem.hdc, edge);
+
+    	/*
+    	 * Jordan Russell reports that this apparently
+    	 * ineffectual IntersectClipRect() call masks a
+    	 * Windows NT/2K bug causing strange display
+    	 * problems when the PuTTY window is taller than
+    	 * the primary monitor. It seems harmless enough...
+    	 */
+    	IntersectClipRect(tabitem.hdc,
+    		p.rcPaint.left, p.rcPaint.top,
+    		p.rcPaint.right, p.rcPaint.bottom);
+
+    	ExcludeClipRect(tabitem.hdc, 
+    		tabitem.offset_width, tabitem.offset_height,
+    		tabitem.offset_width+tabitem.font_width*tabitem.term->cols,
+    		tabitem.offset_height+tabitem.font_height*tabitem.term->rows);
+
+    	Rectangle(tabitem.hdc, p.rcPaint.left, p.rcPaint.top, 
+    		  p.rcPaint.right, p.rcPaint.bottom);
+
+    	/* SelectClipRgn(hdc, NULL); */
+
+    	SelectObject(tabitem.hdc, oldbrush);
+    	DeleteObject(fillcolour);
+    	SelectObject(tabitem.hdc, oldpen);
+    	DeleteObject(edge);
+    }
+    SelectObject(tabitem.hdc, GetStockObject(SYSTEM_FONT));
+    SelectObject(tabitem.hdc, GetStockObject(WHITE_PEN));
+    EndPaint(tabitem.page.hwndCtrl, &p);
+    ShowCaret(tabitem.page.hwndCtrl);
+
+    return 0;
+}
 //-----------------------------------------------------------------------
 //tabbar item related
 //-----------------------------------------------------------------------
@@ -146,6 +239,8 @@ void wintabitem_creat(wintab *wintab, Config *cfg)
     wintab->items[0].compose_state = 0;
     wintab->items[0].wm_mousewheel = WM_MOUSEWHEEL;
     wintab->items[0].offset_width = wintab->items[0].offset_height = wintab->items[0].cfg.window_border;
+    wintab->items[0].caret_x = -1; 
+    wintab->items[0].caret_y = -1;
     
     wintabpage_init(&wintab->items[0].page, cfg, wintab->hwndTab);
     

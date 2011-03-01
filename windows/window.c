@@ -85,7 +85,7 @@ static void cfgtopalette(void);
 static void systopalette(void);
 static void init_palette(void);
 static void init_fonts(int, int);
-static void another_font(int);
+static void another_font(Context,int);
 static void deinit_fonts(void);
 static void set_input_locale(HKL);
 static void update_savedsess_menu(void);
@@ -110,7 +110,7 @@ static WPARAM pend_netevent_wParam = 0;
 static LPARAM pend_netevent_lParam = 0;
 static void enact_pending_netevent(void);
 static void flash_window(int mode);
-static void sys_cursor_update(void);
+static void sys_cursor_update(wintabitem *tabitem);
 static int get_fullscreen_rect(RECT * ss);
 
 static int caret_x = -1, caret_y = -1;
@@ -1277,10 +1277,15 @@ static void exact_textout(HDC hdc, int x, int y, CONST RECT *lprc,
  * and for everything else we use a simple ExtTextOut as we did
  * before exact_textout() was introduced.
  */
-static void general_textout(HDC hdc, int x, int y, CONST RECT *lprc,
+static void general_textout(Context ctx, int x, int y, CONST RECT *lprc,
 			    unsigned short *lpString, UINT cbCount,
 			    CONST INT *lpDx, int opaque)
 {
+    assert(ctx != NULL);
+    wintabitem *tabitem = (wintabitem *)ctx;
+    HDC hdc = tabitem->hdc;
+    assert(hdc != NULL);
+    
     int i, j, xp, xn;
     int bkmode = 0, got_bkmode = FALSE;
 
@@ -1304,11 +1309,11 @@ static void general_textout(HDC hdc, int x, int y, CONST RECT *lprc,
 	 */
 	if (rtl) {
 	    exact_textout(hdc, xp, y, lprc, lpString+i, j-i,
-                          font_varpitch ? NULL : lpDx+i, opaque);
+                          tabitem->font_varpitch ? NULL : lpDx+i, opaque);
 	} else {
 	    ExtTextOutW(hdc, xp, y, ETO_CLIPPED | (opaque ? ETO_OPAQUE : 0),
 			lprc, lpString+i, j-i,
-                        font_varpitch ? NULL : lpDx+i);
+                        tabitem->font_varpitch ? NULL : lpDx+i);
 	}
 
 	i = j;
@@ -1545,21 +1550,23 @@ static void init_fonts(int pick_width, int pick_height)
     init_ucs(&cfg, &ucsdata);
 }
 
-static void another_font(int fontno)
+static void another_font(Context ctx, int fontno)
 {
+    assert(ctx != NULL);
+    wintabitem *tabitem = (wintabitem *)ctx;
     int basefont;
     int fw_dontcare, fw_bold;
     int c, u, w, x;
     char *s;
 
-    if (fontno < 0 || fontno >= FONT_MAXNO || fontflag[fontno])
+    if (fontno < 0 || fontno >= FONT_MAXNO || tabitem->fontflag[fontno])
 	return;
 
     basefont = (fontno & ~(FONT_BOLDUND));
-    if (basefont != fontno && !fontflag[basefont])
-	another_font(basefont);
+    if (basefont != fontno && !tabitem->fontflag[basefont])
+	another_font(ctx, basefont);
 
-    if (cfg.font.isbold) {
+    if (tabitem->cfg.font.isbold) {
 	fw_dontcare = FW_BOLD;
 	fw_bold = FW_HEAVY;
     } else {
@@ -1567,11 +1574,11 @@ static void another_font(int fontno)
 	fw_bold = FW_BOLD;
     }
 
-    c = cfg.font.charset;
+    c = tabitem->cfg.font.charset;
     w = fw_dontcare;
     u = FALSE;
-    s = cfg.font.name;
-    x = font_width;
+    s = tabitem->cfg.font.name;
+    x = tabitem->font_width;
 
     if (fontno & FONT_WIDE)
 	x *= 2;
@@ -1584,13 +1591,13 @@ static void another_font(int fontno)
     if (fontno & FONT_UNDERLINE)
 	u = TRUE;
 
-    fonts[fontno] =
-	CreateFont(font_height * (1 + !!(fontno & FONT_HIGH)), x, 0, 0, w,
+    tabitem->fonts[fontno] =
+	CreateFont(tabitem->font_height * (1 + !!(fontno & FONT_HIGH)), x, 0, 0, w,
 		   FALSE, u, FALSE, c, OUT_DEFAULT_PRECIS,
-		   CLIP_DEFAULT_PRECIS, FONT_QUALITY(cfg.font_quality),
+		   CLIP_DEFAULT_PRECIS, FONT_QUALITY(tabitem->cfg.font_quality),
 		   DEFAULT_PITCH | FF_DONTCARE, s);
 
-    fontflag[fontno] = 1;
+    tabitem->fontflag[fontno] = 1;
 }
 
 static void deinit_fonts(void)
@@ -1989,6 +1996,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
     static int fullscr_on_max = FALSE;
     static int processed_resize = FALSE;
     static UINT last_mousemove = 0;
+
+    wintabitem *tabitem = wintab_get_active_item(&tab);
 
     switch (message) {
       case WM_TIMER:
@@ -2512,102 +2521,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	ignore_clip = FALSE;
 	return 0;
       case WM_PAINT:
-	{
-	    PAINTSTRUCT p;
-
-	    HideCaret(hwnd);
-	    hdc = BeginPaint(hwnd, &p);
-	    if (pal) {
-		SelectPalette(hdc, pal, TRUE);
-		RealizePalette(hdc);
-	    }
-
-	    /*
-	     * We have to be careful about term_paint(). It will
-	     * set a bunch of character cells to INVALID and then
-	     * call do_paint(), which will redraw those cells and
-	     * _then mark them as done_. This may not be accurate:
-	     * when painting in WM_PAINT context we are restricted
-	     * to the rectangle which has just been exposed - so if
-	     * that only covers _part_ of a character cell and the
-	     * rest of it was already visible, that remainder will
-	     * not be redrawn at all. Accordingly, we must not
-	     * paint any character cell in a WM_PAINT context which
-	     * already has a pending update due to terminal output.
-	     * The simplest solution to this - and many, many
-	     * thanks to Hung-Te Lin for working all this out - is
-	     * not to do any actual painting at _all_ if there's a
-	     * pending terminal update: just mark the relevant
-	     * character cells as INVALID and wait for the
-	     * scheduled full update to sort it out.
-	     * 
-	     * I have a suspicion this isn't the _right_ solution.
-	     * An alternative approach would be to have terminal.c
-	     * separately track what _should_ be on the terminal
-	     * screen and what _is_ on the terminal screen, and
-	     * have two completely different types of redraw (one
-	     * for full updates, which syncs the former with the
-	     * terminal itself, and one for WM_PAINT which syncs
-	     * the latter with the former); yet another possibility
-	     * would be to have the Windows front end do what the
-	     * GTK one already does, and maintain a bitmap of the
-	     * current terminal appearance so that WM_PAINT becomes
-	     * completely trivial. However, this should do for now.
-	     */
-	    term_paint(term, hdc, 
-		       (p.rcPaint.left-offset_width)/font_width,
-		       (p.rcPaint.top-offset_height)/font_height,
-		       (p.rcPaint.right-offset_width-1)/font_width,
-		       (p.rcPaint.bottom-offset_height-1)/font_height,
-		       !term->window_update_pending);
-
-	    if (p.fErase ||
-	        p.rcPaint.left  < offset_width  ||
-		p.rcPaint.top   < offset_height ||
-		p.rcPaint.right >= offset_width + font_width*term->cols ||
-		p.rcPaint.bottom>= offset_height + font_height*term->rows)
-	    {
-		HBRUSH fillcolour, oldbrush;
-		HPEN   edge, oldpen;
-		fillcolour = CreateSolidBrush (
-				    colours[ATTR_DEFBG>>ATTR_BGSHIFT]);
-		oldbrush = SelectObject(hdc, fillcolour);
-		edge = CreatePen(PS_SOLID, 0, 
-				    colours[ATTR_DEFBG>>ATTR_BGSHIFT]);
-		oldpen = SelectObject(hdc, edge);
-
-		/*
-		 * Jordan Russell reports that this apparently
-		 * ineffectual IntersectClipRect() call masks a
-		 * Windows NT/2K bug causing strange display
-		 * problems when the PuTTY window is taller than
-		 * the primary monitor. It seems harmless enough...
-		 */
-		IntersectClipRect(hdc,
-			p.rcPaint.left, p.rcPaint.top,
-			p.rcPaint.right, p.rcPaint.bottom);
-
-		ExcludeClipRect(hdc, 
-			offset_width, offset_height,
-			offset_width+font_width*term->cols,
-			offset_height+font_height*term->rows);
-
-		Rectangle(hdc, p.rcPaint.left, p.rcPaint.top, 
-			  p.rcPaint.right, p.rcPaint.bottom);
-
-		/* SelectClipRgn(hdc, NULL); */
-
-		SelectObject(hdc, oldbrush);
-		DeleteObject(fillcolour);
-		SelectObject(hdc, oldpen);
-		DeleteObject(edge);
-	    }
-	    SelectObject(hdc, GetStockObject(SYSTEM_FONT));
-	    SelectObject(hdc, GetStockObject(WHITE_PEN));
-	    EndPaint(hwnd, &p);
-	    ShowCaret(hwnd);
-	}
-	return 0;
+        wintab_on_paint(&tab, hwnd, message,wParam, lParam);
+		return 0;
       case WM_NETEVENT:
 	/* Notice we can get multiple netevents, FD_READ, FD_WRITE etc
 	 * but the only one that's likely to try to overload us is FD_READ.
@@ -2754,7 +2669,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	fullscr_on_max = TRUE;
 	break;
       case WM_MOVE:
-	sys_cursor_update();
+	sys_cursor_update(wintab_get_active_item(&tab));
 	break;
       case WM_SIZE:
 #ifdef RDB_DEBUG_PATCH
@@ -2865,7 +2780,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
                 reset_window(0);
 	    }
 	}
-	sys_cursor_update();
+	sys_cursor_update(wintab_get_active_item(&tab));
 	return 0;
       case WM_VSCROLL:
 	switch (LOWORD(wParam)) {
@@ -2979,7 +2894,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	/* wParam == Font number */
 	/* lParam == Locale */
 	set_input_locale((HKL)lParam);
-	sys_cursor_update();
+	sys_cursor_update(wintab_get_active_item(&tab));
 	break;
       case WM_IME_STARTCOMPOSITION:
 	{
@@ -3155,35 +3070,38 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
  */
 void sys_cursor(void *frontend, int x, int y)
 {
+    assert(frontend != NULL);
     int cx, cy;
 
-    if (!term->has_focus) return;
+    wintabitem *tabitem = (wintabitem*) frontend;
+
+    if (!tabitem->term->has_focus) return;
 
     /*
      * Avoid gratuitously re-updating the cursor position and IMM
      * window if there's no actual change required.
      */
-    cx = x * font_width + offset_width;
-    cy = y * font_height + offset_height;
-    if (cx == caret_x && cy == caret_y)
+    cx = x * tabitem->font_width + tabitem->offset_width;
+    cy = y * tabitem->font_height + tabitem->offset_height;
+    if (cx == tabitem->caret_x && cy == tabitem->caret_y)
 	return;
-    caret_x = cx;
-    caret_y = cy;
+    tabitem->caret_x = cx;
+    tabitem->caret_y = cy;
 
-    sys_cursor_update();
+    sys_cursor_update(tabitem);
 }
 
-static void sys_cursor_update(void)
+static void sys_cursor_update(wintabitem *tabitem)
 {
     COMPOSITIONFORM cf;
     HIMC hIMC;
 
-    if (!term->has_focus) return;
+    if (!tabitem->term->has_focus) return;
 
-    if (caret_x < 0 || caret_y < 0)
+    if (tabitem->caret_x < 0 || tabitem->caret_y < 0)
 	return;
 
-    SetCaretPos(caret_x, caret_y);
+    SetCaretPos(tabitem->caret_x, tabitem->caret_y);
 
     /* IMM calls on Win98 and beyond only */
     if(osVersion.dwPlatformId == VER_PLATFORM_WIN32s) return; /* 3.11 */
@@ -3192,13 +3110,13 @@ static void sys_cursor_update(void)
 	    osVersion.dwMinorVersion == 0) return; /* 95 */
 
     /* we should have the IMM functions */
-    hIMC = ImmGetContext(hwnd);
+    hIMC = ImmGetContext(tabitem->page.hwndCtrl);
     cf.dwStyle = CFS_POINT;
-    cf.ptCurrentPos.x = caret_x;
-    cf.ptCurrentPos.y = caret_y;
+    cf.ptCurrentPos.x = tabitem->caret_x;
+    cf.ptCurrentPos.y = tabitem->caret_y;
     ImmSetCompositionWindow(hIMC, &cf);
 
-    ImmReleaseContext(hwnd, hIMC);
+    ImmReleaseContext(tabitem->page.hwndCtrl, hIMC);
 }
 
 /*
@@ -3229,23 +3147,23 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
 
     lattr &= LATTR_MODE;
 
-    char_width = fnt_width = font_width * (1 + (lattr != LATTR_NORM));
+    char_width = fnt_width = tabitem->font_width * (1 + (lattr != LATTR_NORM));
 
     if (attr & ATTR_WIDE)
 	char_width *= 2;
 
     /* Only want the left half of double width lines */
-    if (lattr != LATTR_NORM && x*2 >= term->cols)
+    if (lattr != LATTR_NORM && x*2 >= tabitem->term->cols)
 	return;
 
     x *= fnt_width;
-    y *= font_height;
-    x += offset_width;
-    y += offset_height;
+    y *= tabitem->font_height;
+    x += tabitem->offset_width;
+    y += tabitem->offset_height;
 
-    if ((attr & TATTR_ACTCURS) && (cfg.cursor_type == 0 || term->big_cursor)) {
+    if ((attr & TATTR_ACTCURS) && (tabitem->cfg.cursor_type == 0 || tabitem->term->big_cursor)) {
 	attr &= ~(ATTR_REVERSE|ATTR_BLINK|ATTR_COLOURS);
-	if (bold_mode == BOLD_COLOURS)
+	if (tabitem->bold_mode == BOLD_COLOURS)
 	    attr &= ~ATTR_BOLD;
 
 	/* cursor fg and bg */
@@ -3253,7 +3171,7 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
     }
 
     nfont = 0;
-    if (cfg.vtmode == VT_POORMAN && lattr != LATTR_NORM) {
+    if (tabitem->cfg.vtmode == VT_POORMAN && lattr != LATTR_NORM) {
 	/* Assume a poorman font is borken in other ways too. */
 	lattr = LATTR_WIDE;
     } else
@@ -3274,21 +3192,21 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
     if (text[0] >= 0x23BA && text[0] <= 0x23BD) {
 	switch ((unsigned char) (text[0])) {
 	  case 0xBA:
-	    text_adjust = -2 * font_height / 5;
+	    text_adjust = -2 * tabitem->font_height / 5;
 	    break;
 	  case 0xBB:
-	    text_adjust = -1 * font_height / 5;
+	    text_adjust = -1 * tabitem->font_height / 5;
 	    break;
 	  case 0xBC:
-	    text_adjust = font_height / 5;
+	    text_adjust = tabitem->font_height / 5;
 	    break;
 	  case 0xBD:
-	    text_adjust = 2 * font_height / 5;
+	    text_adjust = 2 * tabitem->font_height / 5;
 	    break;
 	}
 	if (lattr == LATTR_TOP || lattr == LATTR_BOT)
 	    text_adjust *= 2;
-	text[0] = ucsdata.unitab_xterm['q'];
+	text[0] = tabitem->ucsdata.unitab_xterm['q'];
 	if (attr & ATTR_UNDER) {
 	    attr &= ~ATTR_UNDER;
 	    force_manual_underline = 1;
@@ -3308,37 +3226,37 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
 
     nfg = ((attr & ATTR_FGMASK) >> ATTR_FGSHIFT);
     nbg = ((attr & ATTR_BGMASK) >> ATTR_BGSHIFT);
-    if (bold_mode == BOLD_FONT && (attr & ATTR_BOLD))
+    if (tabitem->bold_mode == BOLD_FONT && (attr & ATTR_BOLD))
 	nfont |= FONT_BOLD;
-    if (und_mode == UND_FONT && (attr & ATTR_UNDER))
+    if (tabitem->und_mode == UND_FONT && (attr & ATTR_UNDER))
 	nfont |= FONT_UNDERLINE;
-    another_font(nfont);
-    if (!fonts[nfont]) {
+    another_font(ctx, nfont);
+    if (!tabitem->fonts[nfont]) {
 	if (nfont & FONT_UNDERLINE)
 	    force_manual_underline = 1;
 	/* Don't do the same for manual bold, it could be bad news. */
 
 	nfont &= ~(FONT_BOLD | FONT_UNDERLINE);
     }
-    another_font(nfont);
-    if (!fonts[nfont])
+    another_font(ctx, nfont);
+    if (!tabitem->fonts[nfont])
 	nfont = FONT_NORMAL;
     if (attr & ATTR_REVERSE) {
 	t = nfg;
 	nfg = nbg;
 	nbg = t;
     }
-    if (bold_mode == BOLD_COLOURS && (attr & ATTR_BOLD)) {
+    if (tabitem->bold_mode == BOLD_COLOURS && (attr & ATTR_BOLD)) {
 	if (nfg < 16) nfg |= 8;
 	else if (nfg >= 256) nfg |= 1;
     }
-    if (bold_mode == BOLD_COLOURS && (attr & ATTR_BLINK)) {
+    if (tabitem->bold_mode == BOLD_COLOURS && (attr & ATTR_BLINK)) {
 	if (nbg < 16) nbg |= 8;
 	else if (nbg >= 256) nbg |= 1;
     }
-    fg = colours[nfg];
-    bg = colours[nbg];
-    SelectObject(hdc, fonts[nfont]);
+    fg = tabitem->colours[nfg];
+    bg = tabitem->colours[nbg];
+    SelectObject(hdc, tabitem->fonts[nfont]);
     SetTextColor(hdc, fg);
     SetBkColor(hdc, bg);
     if (attr & TATTR_COMBINING)
@@ -3348,13 +3266,13 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
     line_box.left = x;
     line_box.top = y;
     line_box.right = x + char_width * len;
-    line_box.bottom = y + font_height;
+    line_box.bottom = y + tabitem->font_height;
 
     /* Only want the left half of double width lines */
-    if (line_box.right > font_width*term->cols+offset_width)
-	line_box.right = font_width*term->cols+offset_width;
+    if (line_box.right > tabitem->font_width*tabitem->term->cols+tabitem->offset_width)
+	line_box.right = tabitem->font_width*tabitem->term->cols+tabitem->offset_width;
 
-    if (font_varpitch) {
+    if (tabitem->font_varpitch) {
         /*
          * If we're using a variable-pitch font, we unconditionally
          * draw the glyphs one at a time and centre them in their
@@ -3395,7 +3313,7 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
         }
 
         /* We're using a private area for direct to font. (512 chars.) */
-        if (ucsdata.dbcs_screenfont && (text[0] & CSET_MASK) == CSET_ACP) {
+        if (tabitem->ucsdata.dbcs_screenfont && (text[0] & CSET_MASK) == CSET_ACP) {
             /* Ho Hum, dbcs fonts are a PITA! */
             /* To display on W9x I have to convert to UCS */
             static wchar_t *uni_buf = 0;
@@ -3409,13 +3327,13 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
 
             for(nlen = mptr = 0; mptr<len; mptr++) {
                 uni_buf[nlen] = 0xFFFD;
-                if (IsDBCSLeadByteEx(ucsdata.font_codepage,
+                if (IsDBCSLeadByteEx(tabitem->ucsdata.font_codepage,
                                      (BYTE) text[mptr])) {
                     char dbcstext[2];
                     dbcstext[0] = text[mptr] & 0xFF;
                     dbcstext[1] = text[mptr+1] & 0xFF;
                     lpDx[nlen] += char_width;
-                    MultiByteToWideChar(ucsdata.font_codepage, MB_USEGLYPHCHARS,
+                    MultiByteToWideChar(tabitem->ucsdata.font_codepage, MB_USEGLYPHCHARS,
                                         dbcstext, 2, uni_buf+nlen, 1);
                     mptr++;
                 }
@@ -3423,7 +3341,7 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
                 {
                     char dbcstext[1];
                     dbcstext[0] = text[mptr] & 0xFF;
-                    MultiByteToWideChar(ucsdata.font_codepage, MB_USEGLYPHCHARS,
+                    MultiByteToWideChar(tabitem->ucsdata.font_codepage, MB_USEGLYPHCHARS,
                                         dbcstext, 1, uni_buf+nlen, 1);
                 }
                 nlen++;
@@ -3432,14 +3350,14 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
                 return;		       /* Eeek! */
 
             ExtTextOutW(hdc, x + xoffset,
-                        y - font_height * (lattr == LATTR_BOT) + text_adjust,
+                        y - tabitem->font_height * (lattr == LATTR_BOT) + text_adjust,
                         ETO_CLIPPED | (opaque ? ETO_OPAQUE : 0),
                         &line_box, uni_buf, nlen,
                         lpDx_maybe);
-            if (bold_mode == BOLD_SHADOW && (attr & ATTR_BOLD)) {
+            if (tabitem->bold_mode == BOLD_SHADOW && (attr & ATTR_BOLD)) {
                 SetBkMode(hdc, TRANSPARENT);
                 ExtTextOutW(hdc, x + xoffset - 1,
-                            y - font_height * (lattr ==
+                            y - tabitem->font_height * (lattr ==
                                                LATTR_BOT) + text_adjust,
                             ETO_CLIPPED, &line_box, uni_buf, nlen, lpDx_maybe);
             }
@@ -3458,10 +3376,10 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
                 directbuf[i] = text[i] & 0xFF;
 
             ExtTextOut(hdc, x + xoffset,
-                       y - font_height * (lattr == LATTR_BOT) + text_adjust,
+                       y - tabitem->font_height * (lattr == LATTR_BOT) + text_adjust,
                        ETO_CLIPPED | (opaque ? ETO_OPAQUE : 0),
                        &line_box, directbuf, len, lpDx_maybe);
-            if (bold_mode == BOLD_SHADOW && (attr & ATTR_BOLD)) {
+            if (tabitem->bold_mode == BOLD_SHADOW && (attr & ATTR_BOLD)) {
                 SetBkMode(hdc, TRANSPARENT);
 
                 /* GRR: This draws the character outside its box and
@@ -3474,7 +3392,7 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
                  * column is blank...
                  */
                 ExtTextOut(hdc, x + xoffset - 1,
-                           y - font_height * (lattr ==
+                           y - tabitem->font_height * (lattr ==
                                               LATTR_BOT) + text_adjust,
                            ETO_CLIPPED, &line_box, directbuf, len, lpDx_maybe);
             }
@@ -3494,16 +3412,16 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
                 wbuf[i] = text[i];
 
             /* print Glyphs as they are, without Windows' Shaping*/
-            general_textout(hdc, x + xoffset,
-                            y - font_height * (lattr==LATTR_BOT) + text_adjust,
+            general_textout(ctx, x + xoffset,
+                            y - tabitem->font_height * (lattr==LATTR_BOT) + text_adjust,
                             &line_box, wbuf, len, lpDx,
                             opaque && !(attr & TATTR_COMBINING));
 
             /* And the shadow bold hack. */
-            if (bold_mode == BOLD_SHADOW && (attr & ATTR_BOLD)) {
+            if (tabitem->bold_mode == BOLD_SHADOW && (attr & ATTR_BOLD)) {
                 SetBkMode(hdc, TRANSPARENT);
                 ExtTextOutW(hdc, x + xoffset - 1,
-                            y - font_height * (lattr ==
+                            y - tabitem->font_height * (lattr ==
                                                LATTR_BOT) + text_adjust,
                             ETO_CLIPPED, &line_box, wbuf, len, lpDx_maybe);
             }
@@ -3517,12 +3435,12 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
         opaque = FALSE;
     }
     if (lattr != LATTR_TOP && (force_manual_underline ||
-			       (und_mode == UND_LINE
+			       (tabitem->und_mode == UND_LINE
 				&& (attr & ATTR_UNDER)))) {
 	HPEN oldpen;
-	int dec = descent;
+	int dec = tabitem->descent;
 	if (lattr == LATTR_BOT)
-	    dec = dec * 2 - font_height;
+	    dec = dec * 2 - tabitem->font_height;
 
 	oldpen = SelectObject(hdc, CreatePen(PS_SOLID, 0, fg));
 	MoveToEx(hdc, x, y + dec, NULL);
@@ -3565,7 +3483,7 @@ void do_cursor(Context ctx, int x, int y, wchar_t *text, int len,
 
     lattr &= LATTR_MODE;
 
-    if ((attr & TATTR_ACTCURS) && (ctype == 0 || term->big_cursor)) {
+    if ((attr & TATTR_ACTCURS) && (ctype == 0 || tabitem->term->big_cursor)) {
 	if (*text != UCSWIDE) {
 	    do_text(ctx, x, y, text, len, attr, lattr);
 	    return;
@@ -3574,22 +3492,22 @@ void do_cursor(Context ctx, int x, int y, wchar_t *text, int len,
 	attr |= TATTR_RIGHTCURS;
     }
 
-    fnt_width = char_width = font_width * (1 + (lattr != LATTR_NORM));
+    fnt_width = char_width = tabitem->font_width * (1 + (lattr != LATTR_NORM));
     if (attr & ATTR_WIDE)
 	char_width *= 2;
     x *= fnt_width;
-    y *= font_height;
-    x += offset_width;
-    y += offset_height;
+    y *= tabitem->font_height;
+    x += tabitem->offset_width;
+    y += tabitem->offset_height;
 
-    if ((attr & TATTR_PASCURS) && (ctype == 0 || term->big_cursor)) {
+    if ((attr & TATTR_PASCURS) && (ctype == 0 || tabitem->term->big_cursor)) {
 	POINT pts[5];
 	HPEN oldpen;
 	pts[0].x = pts[1].x = pts[4].x = x;
 	pts[2].x = pts[3].x = x + char_width - 1;
 	pts[0].y = pts[3].y = pts[4].y = y;
-	pts[1].y = pts[2].y = y + font_height - 1;
-	oldpen = SelectObject(hdc, CreatePen(PS_SOLID, 0, colours[261]));
+	pts[1].y = pts[2].y = y + tabitem->font_height - 1;
+	oldpen = SelectObject(hdc, CreatePen(PS_SOLID, 0, tabitem->colours[261]));
 	Polyline(hdc, pts, 5);
 	oldpen = SelectObject(hdc, oldpen);
 	DeleteObject(oldpen);
@@ -3597,7 +3515,7 @@ void do_cursor(Context ctx, int x, int y, wchar_t *text, int len,
 	int startx, starty, dx, dy, length, i;
 	if (ctype == 1) {
 	    startx = x;
-	    starty = y + descent;
+	    starty = y + tabitem->descent;
 	    dx = 1;
 	    dy = 0;
 	    length = char_width;
@@ -3609,12 +3527,12 @@ void do_cursor(Context ctx, int x, int y, wchar_t *text, int len,
 	    starty = y;
 	    dx = 0;
 	    dy = 1;
-	    length = font_height;
+	    length = tabitem->font_height;
 	}
 	if (attr & TATTR_ACTCURS) {
 	    HPEN oldpen;
 	    oldpen =
-		SelectObject(hdc, CreatePen(PS_SOLID, 0, colours[261]));
+		SelectObject(hdc, CreatePen(PS_SOLID, 0, tabitem->colours[261]));
 	    MoveToEx(hdc, startx, starty, NULL);
 	    LineTo(hdc, startx + dx * length, starty + dy * length);
 	    oldpen = SelectObject(hdc, oldpen);
@@ -3622,7 +3540,7 @@ void do_cursor(Context ctx, int x, int y, wchar_t *text, int len,
 	} else {
 	    for (i = 0; i < length; i++) {
 		if (i % 2 == 0) {
-		    SetPixel(hdc, startx, starty, colours[261]);
+		    SetPixel(hdc, startx, starty, tabitem->colours[261]);
 		}
 		startx += dx;
 		starty += dy;
@@ -3644,33 +3562,33 @@ int char_width(Context ctx, int uc) {
     /* If the font max is the same as the font ave width then this
      * function is a no-op.
      */
-    if (!font_dualwidth) return 1;
+    if (!tabitem->font_dualwidth) return 1;
 
     switch (uc & CSET_MASK) {
       case CSET_ASCII:
-	uc = ucsdata.unitab_line[uc & 0xFF];
+	uc = tabitem->ucsdata.unitab_line[uc & 0xFF];
 	break;
       case CSET_LINEDRW:
-	uc = ucsdata.unitab_xterm[uc & 0xFF];
+	uc = tabitem->ucsdata.unitab_xterm[uc & 0xFF];
 	break;
       case CSET_SCOACS:
-	uc = ucsdata.unitab_scoacs[uc & 0xFF];
+	uc = tabitem->ucsdata.unitab_scoacs[uc & 0xFF];
 	break;
     }
     if (DIRECT_FONT(uc)) {
-	if (ucsdata.dbcs_screenfont) return 1;
+	if (tabitem->ucsdata.dbcs_screenfont) return 1;
 
 	/* Speedup, I know of no font where ascii is the wrong width */
 	if ((uc&~CSET_MASK) >= ' ' && (uc&~CSET_MASK)<= '~')
 	    return 1;
 
 	if ( (uc & CSET_MASK) == CSET_ACP ) {
-	    SelectObject(hdc, fonts[FONT_NORMAL]);
+	    SelectObject(hdc, tabitem->fonts[FONT_NORMAL]);
 	} else if ( (uc & CSET_MASK) == CSET_OEMCP ) {
-	    another_font(FONT_OEM);
-	    if (!fonts[FONT_OEM]) return 0;
+	    another_font(ctx, FONT_OEM);
+	    if (!tabitem->fonts[FONT_OEM]) return 0;
 
-	    SelectObject(hdc, fonts[FONT_OEM]);
+	    SelectObject(hdc, tabitem->fonts[FONT_OEM]);
 	} else
 	    return 0;
 
@@ -3681,7 +3599,7 @@ int char_width(Context ctx, int uc) {
 	/* Speedup, I know of no font where ascii is the wrong width */
 	if (uc >= ' ' && uc <= '~') return 1;
 
-	SelectObject(hdc, fonts[FONT_NORMAL]);
+	SelectObject(hdc, tabitem->fonts[FONT_NORMAL]);
 	if ( GetCharWidth32W(hdc, uc, uc, &ibuf) == 1 )
 	    /* Okay that one worked */ ;
 	else if ( GetCharWidthW(hdc, uc, uc, &ibuf) == 1 )
@@ -3690,8 +3608,8 @@ int char_width(Context ctx, int uc) {
 	    return 0;
     }
 
-    ibuf += font_width / 2 -1;
-    ibuf /= font_width;
+    ibuf += tabitem->font_width / 2 -1;
+    ibuf /= tabitem->font_width;
 
     return ibuf;
 }
