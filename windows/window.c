@@ -77,7 +77,7 @@
 #define WHEEL_DELTA 120
 #endif
 
-static Mouse_Button translate_button(Mouse_Button button);
+static Mouse_Button translate_button(wintabitem* tabitem, Mouse_Button button);
 static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 			unsigned char *output);
@@ -131,6 +131,8 @@ static int n_specials = 0;
 
 static wchar_t *clipboard_contents;
 static size_t clipboard_length;
+
+static UINT last_mousemove = 0;
 
 #define TIMING_TIMER_ID 1234
 static long timing_next_time;
@@ -208,9 +210,7 @@ void ldisc_update(void *frontend, int echo, int edit)
 
 char *get_ttymode(void *frontend, const char *mode)
 {
-    if (!frontend){
-    return term_get_ttymode(term, mode);
-    }
+    assert(frontend != NULL);
     wintabitem *tabitem = (wintabitem *)frontend;
     return term_get_ttymode(tabitem->term, mode);
 }
@@ -929,15 +929,19 @@ static void update_savedsess_menu(void)
  */
 void update_specials_menu(void *frontend)
 {
+    if (frontend == NULL)
+        return;
+
+    wintabitem *tabitem = (wintabitem*) frontend;
     HMENU new_menu;
     int i, j;
 
-    if (back)
-	specials = back->get_specials(backhandle);
+    if (tabitem->back)
+	tabitem->specials = tabitem->back->get_specials(tabitem->backhandle);
     else
-	specials = NULL;
+	tabitem->specials = NULL;
 
-    if (specials) {
+    if (tabitem->specials) {
 	/* We can't use Windows to provide a stack for submenus, so
 	 * here's a lame "stack" that will do for now. */
 	HMENU saved_menu = NULL;
@@ -945,7 +949,7 @@ void update_specials_menu(void *frontend)
 	new_menu = CreatePopupMenu();
 	for (i = 0; nesting > 0; i++) {
 	    assert(IDM_SPECIAL_MIN + 0x10 * i < IDM_SPECIAL_MAX);
-	    switch (specials[i].code) {
+	    switch (tabitem->specials[i].code) {
 	      case TS_SEP:
 		AppendMenu(new_menu, MF_SEPARATOR, 0, 0);
 		break;
@@ -955,7 +959,7 @@ void update_specials_menu(void *frontend)
 		saved_menu = new_menu; /* XXX lame stacking */
 		new_menu = CreatePopupMenu();
 		AppendMenu(saved_menu, MF_POPUP | MF_ENABLED,
-			   (UINT) new_menu, specials[i].name);
+			   (UINT) new_menu, tabitem->specials[i].name);
 		break;
 	      case TS_EXITMENU:
 		nesting--;
@@ -966,19 +970,19 @@ void update_specials_menu(void *frontend)
 		break;
 	      default:
 		AppendMenu(new_menu, MF_ENABLED, IDM_SPECIAL_MIN + 0x10 * i,
-			   specials[i].name);
+			   tabitem->specials[i].name);
 		break;
 	    }
 	}
 	/* Squirrel the highest special. */
-	n_specials = i - 1;
+	tabitem->n_specials = i - 1;
     } else {
 	new_menu = NULL;
-	n_specials = 0;
+	tabitem->n_specials = 0;
     }
 
     for (j = 0; j < lenof(popup_menus); j++) {
-	if (specials_menu) {
+	if (tabitem->specials_menu) {
 	    /* XXX does this free up all submenus? */
 	    DeleteMenu(popup_menus[j].menu, (UINT)specials_menu, MF_BYCOMMAND);
 	    DeleteMenu(popup_menus[j].menu, IDM_SPECIALSEP, MF_BYCOMMAND);
@@ -991,7 +995,7 @@ void update_specials_menu(void *frontend)
 		       MF_BYCOMMAND | MF_SEPARATOR, IDM_SPECIALSEP, 0);
 	}
     }
-    specials_menu = new_menu;
+    tabitem->specials_menu = new_menu;
 }
 
 static void update_mouse_pointer(void *frontend)
@@ -1885,57 +1889,57 @@ static void set_input_locale(HKL kl)
     kbd_codepage = atoi(lbuf);
 }
 
-static void click(Mouse_Button b, int x, int y, int shift, int ctrl, int alt)
+static void click(wintabitem* tabitem, Mouse_Button b, int x, int y, int shift, int ctrl, int alt)
 {
     int thistime = GetMessageTime();
 
-    if (send_raw_mouse && !(cfg.mouse_override && shift)) {
-	lastbtn = MBT_NOTHING;
-	term_mouse(term, b, translate_button(b), MA_CLICK,
+    if (tabitem->send_raw_mouse && !(tabitem->cfg.mouse_override && shift)) {
+	tabitem->lastbtn = MBT_NOTHING;
+	term_mouse(tabitem->term, b, translate_button(tabitem, b), MA_CLICK,
 		   x, y, shift, ctrl, alt);
 	return;
     }
 
-    if (lastbtn == b && thistime - lasttime < dbltime) {
-	lastact = (lastact == MA_CLICK ? MA_2CLK :
-		   lastact == MA_2CLK ? MA_3CLK :
-		   lastact == MA_3CLK ? MA_CLICK : MA_NOTHING);
+    if (tabitem->lastbtn == b && thistime - tabitem->lasttime < tabitem->dbltime) {
+	tabitem->lastact = (tabitem->lastact == MA_CLICK ? MA_2CLK :
+		   tabitem->lastact == MA_2CLK ? MA_3CLK :
+		   tabitem->lastact == MA_3CLK ? MA_CLICK : MA_NOTHING);
     } else {
-	lastbtn = b;
-	lastact = MA_CLICK;
+	tabitem->lastbtn = b;
+	tabitem->lastact = MA_CLICK;
     }
-    if (lastact != MA_NOTHING)
-	term_mouse(term, b, translate_button(b), lastact,
+    if (tabitem->lastact != MA_NOTHING)
+	term_mouse(tabitem->term, b, translate_button(tabitem, b), lastact,
 		   x, y, shift, ctrl, alt);
-    lasttime = thistime;
+    tabitem->lasttime = thistime;
 }
 
 /*
  * Translate a raw mouse button designation (LEFT, MIDDLE, RIGHT)
  * into a cooked one (SELECT, EXTEND, PASTE).
  */
-static Mouse_Button translate_button(Mouse_Button button)
+static Mouse_Button translate_button(wintabitem* tabitem, Mouse_Button button)
 {
     if (button == MBT_LEFT)
 	return MBT_SELECT;
     if (button == MBT_MIDDLE)
-	return cfg.mouse_is_xterm == 1 ? MBT_PASTE : MBT_EXTEND;
+	return tabitem->cfg.mouse_is_xterm == 1 ? MBT_PASTE : MBT_EXTEND;
     if (button == MBT_RIGHT)
-	return cfg.mouse_is_xterm == 1 ? MBT_EXTEND : MBT_PASTE;
+	return tabitem->cfg.mouse_is_xterm == 1 ? MBT_EXTEND : MBT_PASTE;
     return 0;			       /* shouldn't happen */
 }
 
-static void show_mouseptr(int show)
+static void show_mouseptr(wintabitem *tabitem, int show)
 {
     /* NB that the counter in ShowCursor() is also frobbed by
      * update_mouse_pointer() */
     static int cursor_visible = 1;
-    if (!cfg.hide_mouseptr)	       /* override if this feature disabled */
-	show = 1;
+    if (!tabitem->cfg.hide_mouseptr)	       /* override if this feature disabled */
+    	show = 1;
     if (cursor_visible && !show)
-	ShowCursor(FALSE);
+    	ShowCursor(FALSE);
     else if (!cursor_visible && show)
-	ShowCursor(TRUE);
+    	ShowCursor(TRUE);
     cursor_visible = show;
 }
 
@@ -1987,52 +1991,43 @@ void timer_change_notify(long next)
     timing_next_time = next;
 }
 
-static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
+int on_timer(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    HDC hdc;
-    static int ignore_clip = FALSE;
-    static int need_backend_resize = FALSE;
-    static int fullscr_on_max = FALSE;
-    static int processed_resize = FALSE;
-    static UINT last_mousemove = 0;
-
-    wintabitem *tabitem = wintab_get_active_item(&tab);
-
-    switch (message) {
-      case WM_TIMER:
-	if ((UINT_PTR)wParam == TIMING_TIMER_ID) {
+    if ((UINT_PTR)wParam == TIMING_TIMER_ID) {
 	    long next;
 
 	    KillTimer(hwnd, TIMING_TIMER_ID);
 	    if (run_timers(timing_next_time, &next)) {
-		timer_change_notify(next);
+    		timer_change_notify(next);
 	    } else {
 	    }
 	}
-	return 0;
-      case WM_CREATE:
-	break;
-      case WM_CLOSE:
-	{
-	    char *str;
-	    show_mouseptr(1);
-	    str = dupprintf("%s Exit Confirmation", appname);
-	    if (!cfg.warn_on_close || session_closed ||
-		MessageBox(hwnd,
-			   "Are you sure you want to close this session?",
-			   str, MB_ICONWARNING | MB_OKCANCEL | MB_DEFBUTTON1)
-		== IDOK)
-		DestroyWindow(hwnd);
-	    sfree(str);
-	}
-	return 0;
-      case WM_DESTROY:
-	show_mouseptr(1);
-	PostQuitMessage(0);
-	return 0;
-      case WM_INITMENUPOPUP:
-	if ((HMENU)wParam == savedsess_menu) {
+    return 0;
+}
+
+int on_close(HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    //todo
+    char *str;
+    show_mouseptr(wintab_get_active_item(&tab), 1);
+    str = dupprintf("%s Exit Confirmation", appname);
+    if (!cfg.warn_on_close || session_closed ||
+            MessageBox(hwnd,
+            	   "Are you sure you want to close this session?",
+            	   str, MB_ICONWARNING | MB_OKCANCEL | MB_DEFBUTTON1)
+            == IDOK){
+        DestroyWindow(hwnd);
+    }
+    sfree(str);
+    return 0;
+}
+
+int on_init_menu_popup(HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    if ((HMENU)wParam == savedsess_menu) {
 	    /* About to pop up Saved Sessions sub-menu.
 	     * Refresh the session list. */
 	    get_sesslist(&sesslist, FALSE); /* free */
@@ -2040,334 +2035,350 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	    update_savedsess_menu();
 	    return 0;
 	}
-	break;
-      case WM_COMMAND:
-      case WM_SYSCOMMAND:
-	switch (wParam & ~0xF) {       /* low 4 bits reserved to Windows */
-	  case IDM_SHOWLOG:
-	    showeventlog(hwnd);
-	    break;
-	  case IDM_NEWSESS:
-	  case IDM_DUPSESS:
-	  case IDM_SAVEDSESS:
-	    {
-		char b[2048];
-		char c[30], *cl;
-		int freecl = FALSE;
-		BOOL inherit_handles;
-		STARTUPINFO si;
-		PROCESS_INFORMATION pi;
-		HANDLE filemap = NULL;
+    return 0;
+}
 
-		if (wParam == IDM_DUPSESS) {
-		    /*
-		     * Allocate a file-mapping memory chunk for the
-		     * config structure.
-		     */
-		    SECURITY_ATTRIBUTES sa;
-		    Config *p;
+int on_session_menu(HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    char b[2048];
+    char c[30], *cl;
+    int freecl = FALSE;
+    BOOL inherit_handles;
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    HANDLE filemap = NULL;
 
-		    sa.nLength = sizeof(sa);
-		    sa.lpSecurityDescriptor = NULL;
-		    sa.bInheritHandle = TRUE;
-		    filemap = CreateFileMapping(INVALID_HANDLE_VALUE,
-						&sa,
-						PAGE_READWRITE,
-						0, sizeof(Config), NULL);
-		    if (filemap && filemap != INVALID_HANDLE_VALUE) {
-			p = (Config *) MapViewOfFile(filemap,
-						     FILE_MAP_WRITE,
-						     0, 0, sizeof(Config));
-			if (p) {
-			    *p = cfg;  /* structure copy */
-			    UnmapViewOfFile(p);
-			}
-		    }
-		    inherit_handles = TRUE;
-		    sprintf(c, "putty &%p", filemap);
-		    cl = c;
-		} else if (wParam == IDM_SAVEDSESS) {
-		    unsigned int sessno = ((lParam - IDM_SAVED_MIN)
-					   / MENU_SAVED_STEP) + 1;
-		    if (sessno < (unsigned)sesslist.nsessions) {
-			char *session = sesslist.sessions[sessno];
-			cl = dupprintf("putty @%s", session);
-			inherit_handles = FALSE;
-			freecl = TRUE;
-		    } else
-			break;
-		} else /* IDM_NEWSESS */ {
-		    cl = NULL;
-		    inherit_handles = FALSE;
-		}
+    if (wParam == IDM_DUPSESS) {
+        /*
+         * Allocate a file-mapping memory chunk for the
+         * config structure.
+         */
+        SECURITY_ATTRIBUTES sa;
+        Config *p;
 
-		GetModuleFileName(NULL, b, sizeof(b) - 1);
-		si.cb = sizeof(si);
-		si.lpReserved = NULL;
-		si.lpDesktop = NULL;
-		si.lpTitle = NULL;
-		si.dwFlags = 0;
-		si.cbReserved2 = 0;
-		si.lpReserved2 = NULL;
-		CreateProcess(b, cl, NULL, NULL, inherit_handles,
-			      NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
+        sa.nLength = sizeof(sa);
+        sa.lpSecurityDescriptor = NULL;
+        sa.bInheritHandle = TRUE;
+        filemap = CreateFileMapping(INVALID_HANDLE_VALUE,
+    				&sa,
+    				PAGE_READWRITE,
+    				0, sizeof(Config), NULL);
+        if (filemap && filemap != INVALID_HANDLE_VALUE) {
+    	p = (Config *) MapViewOfFile(filemap,
+    				     FILE_MAP_WRITE,
+    				     0, 0, sizeof(Config));
+    	if (p) {
+    	    *p = cfg;  /* structure copy */
+    	    UnmapViewOfFile(p);
+    	}
+        }
+        inherit_handles = TRUE;
+        sprintf(c, "putty &%p", filemap);
+        cl = c;
+    } else if (wParam == IDM_SAVEDSESS) {
+        unsigned int sessno = ((lParam - IDM_SAVED_MIN)
+    			   / MENU_SAVED_STEP) + 1;
+        if (sessno < (unsigned)sesslist.nsessions) {
+    	char *session = sesslist.sessions[sessno];
+    	cl = dupprintf("putty @%s", session);
+    	inherit_handles = FALSE;
+    	freecl = TRUE;
+        } else
+    	return 0;
+    } else /* IDM_NEWSESS */ {
+        cl = NULL;
+        inherit_handles = FALSE;
+    }
 
-		if (filemap)
-		    CloseHandle(filemap);
-		if (freecl)
-		    sfree(cl);
-	    }
-	    break;
-	  case IDM_RESTART:
-	    if (!back) {
-		logevent(NULL, "----- Session restarted -----");
-		term_pwron(term, FALSE);
-		start_backend();
-	    }
+    GetModuleFileName(NULL, b, sizeof(b) - 1);
+    si.cb = sizeof(si);
+    si.lpReserved = NULL;
+    si.lpDesktop = NULL;
+    si.lpTitle = NULL;
+    si.dwFlags = 0;
+    si.cbReserved2 = 0;
+    si.lpReserved2 = NULL;
+    CreateProcess(b, cl, NULL, NULL, inherit_handles,
+    	      NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
 
-	    break;
-	  case IDM_RECONF:
-	    {
-		Config prev_cfg;
-		int init_lvl = 1;
-		int reconfig_result;
+    if (filemap)
+        CloseHandle(filemap);
+    if (freecl)
+        sfree(cl);
+    return 0;
+}
 
-		if (reconfiguring)
-		    break;
-		else
-		    reconfiguring = TRUE;
+int on_reconfig(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+	Config prev_cfg;
+	int init_lvl = 1;
+	int reconfig_result;
 
-		GetWindowText(hwnd, cfg.wintitle, sizeof(cfg.wintitle));
-		prev_cfg = cfg;
+	if (reconfiguring)
+	    return 0;
+	else
+	    reconfiguring = TRUE;
 
-		reconfig_result =
-		    do_reconfig(hwnd, back ? back->cfg_info(backhandle) : 0);
-		reconfiguring = FALSE;
-		if (!reconfig_result)
-		    break;
+	//GetWindowText(hwnd, cfg.wintitle, sizeof(cfg.wintitle));
+	prev_cfg = tabitem->cfg;
+    cfg = tabitem->cfg;
 
-		{
-		    /* Disable full-screen if resizing forbidden */
-		    int i;
-		    for (i = 0; i < lenof(popup_menus); i++)
-			EnableMenuItem(popup_menus[i].menu, IDM_FULLSCREEN,
-				       MF_BYCOMMAND | 
-				       (cfg.resize_action == RESIZE_DISABLED)
-				       ? MF_GRAYED : MF_ENABLED);
-		    /* Gracefully unzoom if necessary */
-		    if (IsZoomed(hwnd) &&
-			(cfg.resize_action == RESIZE_DISABLED)) {
-			ShowWindow(hwnd, SW_RESTORE);
-		    }
-		}
-
-		/* Pass new config data to the logging module */
-		log_reconfig(logctx, &cfg);
-
-		sfree(logpal);
-		/*
-		 * Flush the line discipline's edit buffer in the
-		 * case where local editing has just been disabled.
-		 */
-		if (ldisc)
-		    ldisc_send(ldisc, NULL, 0, 0);
-		if (pal)
-		    DeleteObject(pal);
-		logpal = NULL;
-		pal = NULL;
-		cfgtopalette();
-		init_palette();
-
-		/* Pass new config data to the terminal */
-		term_reconfig(term, &cfg);
-
-		/* Pass new config data to the back end */
-		if (back)
-		    back->reconfig(backhandle, &cfg);
-
-		/* Screen size changed ? */
-		if (cfg.height != prev_cfg.height ||
-		    cfg.width != prev_cfg.width ||
-		    cfg.savelines != prev_cfg.savelines ||
-		    cfg.resize_action == RESIZE_FONT ||
-		    (cfg.resize_action == RESIZE_EITHER && IsZoomed(hwnd)) ||
-		    cfg.resize_action == RESIZE_DISABLED)
-		    term_size(term, cfg.height, cfg.width, cfg.savelines);
-
-		/* Enable or disable the scroll bar, etc */
-		{
-		    LONG nflg, flag = GetWindowLongPtr(hwnd, GWL_STYLE);
-		    LONG nexflag, exflag =
-			GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-
-		    nexflag = exflag;
-		    if (cfg.alwaysontop != prev_cfg.alwaysontop) {
-			if (cfg.alwaysontop) {
-			    nexflag |= WS_EX_TOPMOST;
-			    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
-					 SWP_NOMOVE | SWP_NOSIZE);
-			} else {
-			    nexflag &= ~(WS_EX_TOPMOST);
-			    SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
-					 SWP_NOMOVE | SWP_NOSIZE);
-			}
-		    }
-		    if (cfg.sunken_edge)
-			nexflag |= WS_EX_CLIENTEDGE;
-		    else
-			nexflag &= ~(WS_EX_CLIENTEDGE);
-
-		    nflg = flag;
-		    if (is_full_screen() ?
-			cfg.scrollbar_in_fullscreen : cfg.scrollbar)
-			nflg |= WS_VSCROLL;
-		    else
-			nflg &= ~WS_VSCROLL;
-
-		    if (cfg.resize_action == RESIZE_DISABLED ||
-                        is_full_screen())
-			nflg &= ~WS_THICKFRAME;
-		    else
-			nflg |= WS_THICKFRAME;
-
-		    if (cfg.resize_action == RESIZE_DISABLED)
-			nflg &= ~WS_MAXIMIZEBOX;
-		    else
-			nflg |= WS_MAXIMIZEBOX;
-
-		    if (nflg != flag || nexflag != exflag) {
-			if (nflg != flag)
-			    SetWindowLongPtr(hwnd, GWL_STYLE, nflg);
-			if (nexflag != exflag)
-			    SetWindowLongPtr(hwnd, GWL_EXSTYLE, nexflag);
-
-			SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
-				     SWP_NOACTIVATE | SWP_NOCOPYBITS |
-				     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-				     SWP_FRAMECHANGED);
-
-			init_lvl = 2;
-		    }
-		}
-
-		/* Oops */
-		if (cfg.resize_action == RESIZE_DISABLED && IsZoomed(hwnd)) {
-		    force_normal(hwnd);
-		    init_lvl = 2;
-		}
-
-		set_title(NULL, cfg.wintitle);
-		if (IsIconic(hwnd)) {
-		    SetWindowText(hwnd,
-				  cfg.win_name_always ? window_name :
-				  icon_name);
-		}
-
-		if (strcmp(cfg.font.name, prev_cfg.font.name) != 0 ||
-		    strcmp(cfg.line_codepage, prev_cfg.line_codepage) != 0 ||
-		    cfg.font.isbold != prev_cfg.font.isbold ||
-		    cfg.font.height != prev_cfg.font.height ||
-		    cfg.font.charset != prev_cfg.font.charset ||
-		    cfg.font_quality != prev_cfg.font_quality ||
-		    cfg.vtmode != prev_cfg.vtmode ||
-		    cfg.bold_colour != prev_cfg.bold_colour ||
-		    cfg.resize_action == RESIZE_DISABLED ||
-		    cfg.resize_action == RESIZE_EITHER ||
-		    (cfg.resize_action != prev_cfg.resize_action))
-		    init_lvl = 2;
-
-		InvalidateRect(hwnd, NULL, TRUE);
-		reset_window(init_lvl);
-		net_pending_errors();
-	    }
-	    break;
-	  case IDM_COPYALL:
-	    term_copyall(term);
-	    break;
-	  case IDM_PASTE:
-	    request_paste(NULL);
-	    break;
-	  case IDM_CLRSB:
-	    term_clrsb(term);
-	    break;
-	  case IDM_RESET:
-	    term_pwron(term, TRUE);
-	    if (ldisc)
-		ldisc_send(ldisc, NULL, 0, 0);
-	    break;
-	  case IDM_ABOUT:
-	    showabout(hwnd);
-	    break;
-	  case IDM_HELP:
-	    launch_help(hwnd, NULL);
-	    break;
-	  case SC_MOUSEMENU:
-	    /*
-	     * We get this if the System menu has been activated
-	     * using the mouse.
-	     */
-	    show_mouseptr(1);
-	    break;
-          case SC_KEYMENU:
-	    /*
-	     * We get this if the System menu has been activated
-	     * using the keyboard. This might happen from within
-	     * TranslateKey, in which case it really wants to be
-	     * followed by a `space' character to actually _bring
-	     * the menu up_ rather than just sitting there in
-	     * `ready to appear' state.
-	     */
-	    show_mouseptr(1);	       /* make sure pointer is visible */
-	    if( lParam == 0 )
-		PostMessage(hwnd, WM_CHAR, ' ', 0);
-	    break;
-	  case IDM_FULLSCREEN:
-	    flip_full_screen();
-	    break;
-	  default:
-	    if (wParam >= IDM_SAVED_MIN && wParam < IDM_SAVED_MAX) {
-		SendMessage(hwnd, WM_SYSCOMMAND, IDM_SAVEDSESS, wParam);
-	    }
-	    if (wParam >= IDM_SPECIAL_MIN && wParam <= IDM_SPECIAL_MAX) {
-		int i = (wParam - IDM_SPECIAL_MIN) / 0x10;
-		/*
-		 * Ensure we haven't been sent a bogus SYSCOMMAND
-		 * which would cause us to reference invalid memory
-		 * and crash. Perhaps I'm just too paranoid here.
-		 */
-		if (i >= n_specials)
-		    break;
-		if (back)
-		    back->special(backhandle, specials[i].code);
-		net_pending_errors();
+	reconfig_result =
+	    do_reconfig(hwnd, tabitem->back ? tabitem->back->cfg_info(tabitem->backhandle) : 0);
+	reconfiguring = FALSE;
+	if (!reconfig_result)
+	    return 0;
+    
+    tabitem->cfg = cfg;
+	{
+	    /* Disable full-screen if resizing forbidden */
+	    int i;
+	    for (i = 0; i < lenof(popup_menus); i++)
+		EnableMenuItem(popup_menus[i].menu, IDM_FULLSCREEN,
+			       MF_BYCOMMAND | 
+			       (cfg.resize_action == RESIZE_DISABLED)
+			       ? MF_GRAYED : MF_ENABLED);
+	    /* Gracefully unzoom if necessary */
+	    if (IsZoomed(hwnd) &&
+		(cfg.resize_action == RESIZE_DISABLED)) {
+		ShowWindow(hwnd, SW_RESTORE);
 	    }
 	}
-	break;
+
+	/* Pass new config data to the logging module */
+	log_reconfig(tabitem->logctx, &cfg);
+
+	sfree(tabitem->logpal);
+	/*
+	 * Flush the line discipline's edit buffer in the
+	 * case where local editing has just been disabled.
+	 */
+	if (tabitem->ldisc)
+	    ldisc_send(tabitem->ldisc, NULL, 0, 0);
+	if (tabitem->pal)
+	    DeleteObject(tabitem->pal);
+	tabitem->logpal = NULL;
+	tabitem->pal = NULL;
+	wintabitem_cfgtopalette(tabitem);
+	wintabitem_init_palette(tabitem);
+
+	/* Pass new config data to the terminal */
+	term_reconfig(tabitem->term, &tabitem->cfg);
+
+	/* Pass new config data to the back end */
+	if (tabitem->back)
+	    tabitem->back->reconfig(tabitem->backhandle, &tabitem->cfg);
+
+	/* Screen size changed ? */
+	if (tabitem->cfg.height != prev_cfg.height ||
+	    tabitem->cfg.width != prev_cfg.width ||
+	    tabitem->cfg.savelines != prev_cfg.savelines ||
+	    tabitem->cfg.resize_action == RESIZE_FONT ||
+	    (tabitem->cfg.resize_action == RESIZE_EITHER && IsZoomed(hwnd)) ||
+	    tabitem->cfg.resize_action == RESIZE_DISABLED)
+	    term_size(tabitem->term, tabitem->cfg.height, tabitem->cfg.width, tabitem->cfg.savelines);
+
+	/* Enable or disable the scroll bar, etc */
+	{
+	    LONG nflg, flag = GetWindowLongPtr(hwnd, GWL_STYLE);
+	    LONG nexflag, exflag =
+		GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+
+	    nexflag = exflag;
+	    if (tabitem->cfg.alwaysontop != prev_cfg.alwaysontop) {
+		if (tabitem->cfg.alwaysontop) {
+		    nexflag |= WS_EX_TOPMOST;
+		    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+				 SWP_NOMOVE | SWP_NOSIZE);
+		} else {
+		    nexflag &= ~(WS_EX_TOPMOST);
+		    SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+				 SWP_NOMOVE | SWP_NOSIZE);
+		}
+	    }
+	    if (tabitem->cfg.sunken_edge)
+		nexflag |= WS_EX_CLIENTEDGE;
+	    else
+		nexflag &= ~(WS_EX_CLIENTEDGE);
+
+	    nflg = flag;
+	    if (is_full_screen() ?
+    		tabitem->cfg.scrollbar_in_fullscreen : tabitem->cfg.scrollbar)
+		nflg |= WS_VSCROLL;
+	    else
+		nflg &= ~WS_VSCROLL;
+
+	    if (tabitem->cfg.resize_action == RESIZE_DISABLED ||
+                    is_full_screen())
+		nflg &= ~WS_THICKFRAME;
+	    else
+		nflg |= WS_THICKFRAME;
+
+	    if (tabitem->cfg.resize_action == RESIZE_DISABLED)
+		nflg &= ~WS_MAXIMIZEBOX;
+	    else
+		nflg |= WS_MAXIMIZEBOX;
+
+	    if (nflg != flag || nexflag != exflag) {
+		if (nflg != flag)
+		    SetWindowLongPtr(hwnd, GWL_STYLE, nflg);
+		if (nexflag != exflag)
+		    SetWindowLongPtr(hwnd, GWL_EXSTYLE, nexflag);
+
+		SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
+			     SWP_NOACTIVATE | SWP_NOCOPYBITS |
+			     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+			     SWP_FRAMECHANGED);
+
+		init_lvl = 2;
+	    }
+	}
+
+	/* Oops */
+	if (tabitem->cfg.resize_action == RESIZE_DISABLED && IsZoomed(hwnd)) {
+	    force_normal(hwnd);
+	    init_lvl = 2;
+	}
+
+	set_title(NULL, tabitem->cfg.wintitle);
+	if (IsIconic(hwnd)) {
+	    SetWindowText(hwnd,
+			  tabitem->cfg.win_name_always ? window_name :
+			  icon_name);
+	}
+
+	if (strcmp(tabitem->cfg.font.name, prev_cfg.font.name) != 0 ||
+	    strcmp(tabitem->cfg.line_codepage, prev_cfg.line_codepage) != 0 ||
+	    tabitem->cfg.font.isbold != prev_cfg.font.isbold ||
+	    tabitem->cfg.font.height != prev_cfg.font.height ||
+	    tabitem->cfg.font.charset != prev_cfg.font.charset ||
+	    tabitem->cfg.font_quality != prev_cfg.font_quality ||
+	    tabitem->cfg.vtmode != prev_cfg.vtmode ||
+	    tabitem->cfg.bold_colour != prev_cfg.bold_colour ||
+	    tabitem->cfg.resize_action == RESIZE_DISABLED ||
+	    tabitem->cfg.resize_action == RESIZE_EITHER ||
+	    (tabitem->cfg.resize_action != prev_cfg.resize_action))
+	    init_lvl = 2;
+
+	InvalidateRect(hwnd, NULL, TRUE);
+	reset_window(init_lvl);
+	net_pending_errors();
+	    
+
+    return 0;
+}
+
+
+int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    switch (wParam & ~0xF) {       /* low 4 bits reserved to Windows */
+        case IDM_SHOWLOG:
+            showeventlog(hwnd);
+            break;
+        case IDM_NEWSESS:
+        case IDM_DUPSESS:
+        case IDM_SAVEDSESS:
+            on_session_menu(hwnd, message, wParam, lParam);
+            break;
+        case IDM_RESTART:
+            if (!tabitem->back) {
+            logevent(NULL, "----- Session restarted -----");
+            term_pwron(tabitem->term, FALSE);
+            wintabitem_start_backend(tabitem);
+            }
+            break;
+        case IDM_RECONF:
+            on_reconfig(tabitem, hwnd, message, wParam, lParam);
+            break;
+        case IDM_COPYALL:
+            term_copyall(tabitem->term);
+            break;
+        case IDM_PASTE:
+            request_paste(tabitem);
+            break;
+        case IDM_CLRSB:
+            term_clrsb(tabitem->term);
+            break;
+        case IDM_RESET:
+            term_pwron(tabitem->term, TRUE);
+            if (tabitem->ldisc)
+            ldisc_send(tabitem->ldisc, NULL, 0, 0);
+            break;
+        case IDM_ABOUT:
+            showabout(hwnd);
+            break;
+        case IDM_HELP:
+            launch_help(hwnd, NULL);
+            break;
+        case SC_MOUSEMENU:
+            /*
+             * We get this if the System menu has been activated
+             * using the mouse.
+             */
+            show_mouseptr(wintab_get_active_item(&tab), 1);
+            break;
+        case SC_KEYMENU:
+            /*
+             * We get this if the System menu has been activated
+             * using the keyboard. This might happen from within
+             * TranslateKey, in which case it really wants to be
+             * followed by a `space' character to actually _bring
+             * the menu up_ rather than just sitting there in
+             * `ready to appear' state.
+             */
+            show_mouseptr(wintab_get_active_item(&tab), 1);	       /* make sure pointer is visible */
+            if( lParam == 0 )
+                PostMessage(tabitem->page.hwndCtrl, WM_CHAR, ' ', 0);
+            break;
+        case IDM_FULLSCREEN:
+            flip_full_screen();
+            break;
+        default:
+            if (wParam >= IDM_SAVED_MIN && wParam < IDM_SAVED_MAX) {
+                SendMessage(hwnd, WM_SYSCOMMAND, IDM_SAVEDSESS, wParam);
+            }
+            if (wParam >= IDM_SPECIAL_MIN && wParam <= IDM_SPECIAL_MAX) {
+                int i = (wParam - IDM_SPECIAL_MIN) / 0x10;
+                /*
+                 * Ensure we haven't been sent a bogus SYSCOMMAND
+                 * which would cause us to reference invalid memory
+                 * and crash. Perhaps I'm just too paranoid here.
+                 */
+                if (i >= tabitem->n_specials)
+                    break;
+                if (tabitem->back)
+                    tabitem->back->special(tabitem->backhandle, tabitem->specials[i].code);
+                net_pending_errors();
+            }
+	}
+    return 0;
+}
 
 #define X_POS(l) ((int)(short)LOWORD(l))
 #define Y_POS(l) ((int)(short)HIWORD(l))
 
-#define TO_CHR_X(x) ((((x)<0 ? (x)-font_width+1 : (x))-offset_width) / font_width)
-#define TO_CHR_Y(y) ((((y)<0 ? (y)-font_height+1: (y))-offset_height) / font_height)
-      case WM_LBUTTONDOWN:
-      case WM_MBUTTONDOWN:
-      case WM_RBUTTONDOWN:
-      case WM_LBUTTONUP:
-      case WM_MBUTTONUP:
-      case WM_RBUTTONUP:
-	if (message == WM_RBUTTONDOWN &&
-	    ((wParam & MK_CONTROL) || (cfg.mouse_is_xterm == 2))) {
+#define TO_CHR_X(x) ((((x)<0 ? (x)-tabitem->font_width+1 : (x))-tabitem->offset_width) / tabitem->font_width)
+#define TO_CHR_Y(y) ((((y)<0 ? (y)-tabitem->font_height+1: (y))-tabitem->offset_height) / tabitem->font_height)
+ 
+int on_button(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    if (message == WM_RBUTTONDOWN &&
+    	    ((wParam & MK_CONTROL) || (tabitem->cfg.mouse_is_xterm == 2))) {
 	    POINT cursorpos;
 
-	    show_mouseptr(1);	       /* make sure pointer is visible */
+	    show_mouseptr(tabitem, 1);	       /* make sure pointer is visible */
 	    GetCursorPos(&cursorpos);
 	    TrackPopupMenu(popup_menus[CTXMENU].menu,
 			   TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON,
 			   cursorpos.x, cursorpos.y,
 			   0, hwnd, NULL);
-	    break;
+	    return 0;
 	}
-	{
+    {
 	    int button, press;
 
 	    switch (message) {
@@ -2404,7 +2415,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	      default:
 		button = press = 0;    /* shouldn't happen */
 	    }
-	    show_mouseptr(1);
+	    show_mouseptr(tabitem, 1);
 	    /*
 	     * Special case: in full-screen mode, if the left
 	     * button is clicked in the very top left corner of the
@@ -2447,13 +2458,13 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	    }
 
 	    if (press) {
-		click(button,
+		click(tabitem, button,
 		      TO_CHR_X(X_POS(lParam)), TO_CHR_Y(Y_POS(lParam)),
 		      wParam & MK_SHIFT, wParam & MK_CONTROL,
 		      is_alt_pressed());
-		SetCapture(hwnd);
+		SetCapture(tabitem->page.hwndCtrl);
 	    } else {
-		term_mouse(term, button, translate_button(button), MA_RELEASE,
+		term_mouse(tabitem->term, button, translate_button(tabitem, button), MA_RELEASE,
 			   TO_CHR_X(X_POS(lParam)),
 			   TO_CHR_Y(Y_POS(lParam)), wParam & MK_SHIFT,
 			   wParam & MK_CONTROL, is_alt_pressed());
@@ -2461,9 +2472,14 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		    ReleaseCapture();
 	    }
 	}
-	return 0;
-      case WM_MOUSEMOVE:
-	{
+    return 0;
+
+}
+
+int on_mouse_move(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    {
 	    /*
 	     * Windows seems to like to occasionally send MOUSEMOVE
 	     * events even if the mouse hasn't moved. Don't unhide
@@ -2473,7 +2489,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	    static LPARAM lp = 0;
 	    if (wParam != wp || lParam != lp ||
 		last_mousemove != WM_MOUSEMOVE) {
-		show_mouseptr(1);
+		show_mouseptr(tabitem, 1);
 		wp = wParam; lp = lParam;
 		last_mousemove = WM_MOUSEMOVE;
 	    }
@@ -2485,7 +2501,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	noise_ultralight(lParam);
 
 	if (wParam & (MK_LBUTTON | MK_MBUTTON | MK_RBUTTON) &&
-	    GetCapture() == hwnd) {
+	    GetCapture() == tabitem->page.hwndCtrl) {
 	    Mouse_Button b;
 	    if (wParam & MK_LBUTTON)
 		b = MBT_LEFT;
@@ -2493,19 +2509,64 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		b = MBT_MIDDLE;
 	    else
 		b = MBT_RIGHT;
-	    term_mouse(term, b, translate_button(b), MA_DRAG,
+	    term_mouse(tabitem->term, b, translate_button(tabitem, b), MA_DRAG,
 		       TO_CHR_X(X_POS(lParam)),
 		       TO_CHR_Y(Y_POS(lParam)), wParam & MK_SHIFT,
 		       wParam & MK_CONTROL, is_alt_pressed());
 	}
-	return 0;
+    return 0;
+}
+
+static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    HDC hdc;
+    static int ignore_clip = FALSE;
+    static int need_backend_resize = FALSE;
+    static int fullscr_on_max = FALSE;
+    static int processed_resize = FALSE;
+
+    wintabitem *tabitem = wintab_get_active_item(&tab);
+
+    switch (message) {
+        case WM_TIMER:
+            on_timer(hwnd, message, wParam, lParam);
+	        return 0;
+        case WM_CREATE:
+        	break;
+        case WM_CLOSE:
+            on_close(hwnd, message, wParam, lParam);
+            return 0;
+        case WM_DESTROY:
+            show_mouseptr(tabitem, 1);
+            PostQuitMessage(0);
+            return 0;
+        case WM_INITMENUPOPUP:
+            on_init_menu_popup(hwnd, message, wParam, lParam);
+            break;
+        case WM_COMMAND:
+        case WM_SYSCOMMAND:
+            on_menu(tabitem, hwnd, message, wParam, lParam);
+            break;
+
+      case WM_LBUTTONDOWN:
+      case WM_MBUTTONDOWN:
+      case WM_RBUTTONDOWN:
+      case WM_LBUTTONUP:
+      case WM_MBUTTONUP:
+      case WM_RBUTTONUP:
+	        on_button(tabitem, hwnd, message, wParam, lParam);
+    		return 0;
+      case WM_MOUSEMOVE:
+            on_mouse_move(tabitem, hwnd, message, wParam, lParam);
+        	return 0;
       case WM_NCMOUSEMOVE:
 	{
 	    static WPARAM wp = 0;
 	    static LPARAM lp = 0;
 	    if (wParam != wp || lParam != lp ||
 		last_mousemove != WM_NCMOUSEMOVE) {
-		show_mouseptr(1);
+		show_mouseptr(wintab_get_active_item(&tab), 1);
 		wp = wParam; lp = lParam;
 		last_mousemove = WM_NCMOUSEMOVE;
 	    }
@@ -2548,7 +2609,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	term_update(term);
 	break;
       case WM_KILLFOCUS:
-	show_mouseptr(1);
+	show_mouseptr(wintab_get_active_item(&tab), 1);
 	term_set_focus(term, FALSE);
 	DestroyCaret();
 	caret_x = caret_y = -1;	       /* ensure caret is replaced next time */
@@ -2884,7 +2945,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		    term_seen_key_event(term);
 		    if (ldisc)
 			ldisc_send(ldisc, buf, len, 1);
-		    show_mouseptr(0);
+		    show_mouseptr(wintab_get_active_item(&tab), 0);
 		}
 	    }
 	}
@@ -3030,12 +3091,12 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		    p.x = X_POS(lParam); p.y = Y_POS(lParam);
 		    if (ScreenToClient(hwnd, &p)) {
 			/* send a mouse-down followed by a mouse up */
-			term_mouse(term, b, translate_button(b),
+			term_mouse(term, b, translate_button(tabitem, b),
 				   MA_CLICK,
 				   TO_CHR_X(p.x),
 				   TO_CHR_Y(p.y), shift_pressed,
 				   control_pressed, is_alt_pressed());
-			term_mouse(term, b, translate_button(b),
+			term_mouse(term, b, translate_button(tabitem, b),
 				   MA_RELEASE, TO_CHR_X(p.x),
 				   TO_CHR_Y(p.y), shift_pressed,
 				   control_pressed, is_alt_pressed());
@@ -4419,7 +4480,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 				       cbuf+!left_alt, 1+!!left_alt, 1);
 		    }
 		}
-		show_mouseptr(0);
+		show_mouseptr(wintab_get_active_item(&tab), 0);
 	    }
 
 	    /* This is so the ALT-Numpad and dead keys work correctly. */
@@ -4468,9 +4529,13 @@ void set_icon(void *frontend, char *title)
 
 void set_sbar(void *frontend, int total, int start, int page)
 {
+    if (frontend == NULL)
+        return;
+
+    wintabitem *tabitem = (wintabitem*) frontend;
     SCROLLINFO si;
 
-    if (is_full_screen() ? !cfg.scrollbar_in_fullscreen : !cfg.scrollbar)
+    if (is_full_screen() ? !tabitem->cfg.scrollbar_in_fullscreen : !tabitem->cfg.scrollbar)
 	return;
 
     si.cbSize = sizeof(si);
@@ -4479,8 +4544,8 @@ void set_sbar(void *frontend, int total, int start, int page)
     si.nMax = total - 1;
     si.nPage = page;
     si.nPos = start;
-    if (hwnd)
-	SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+    if (tabitem->page.hwndCtrl)
+    	SetScrollInfo(tabitem->page.hwndCtrl, SB_VERT, &si, TRUE);
 }
 
 Context get_ctx(void *frontend)
@@ -4513,32 +4578,39 @@ void free_ctx(void *frontend, Context ctx)
     }
 }
 
-static void real_palette_set(int n, int r, int g, int b)
+static void real_palette_set(void *frontend, int n, int r, int g, int b)
 {
-    if (pal) {
-	logpal->palPalEntry[n].peRed = r;
-	logpal->palPalEntry[n].peGreen = g;
-	logpal->palPalEntry[n].peBlue = b;
-	logpal->palPalEntry[n].peFlags = PC_NOCOLLAPSE;
-	colours[n] = PALETTERGB(r, g, b);
-	SetPaletteEntries(pal, 0, NALLCOLOURS, logpal->palPalEntry);
+    if (frontend == NULL)
+        return;
+    wintabitem *tabitem = (wintabitem*) frontend;
+    if (tabitem->pal) {
+    	tabitem->logpal->palPalEntry[n].peRed = r;
+    	tabitem->logpal->palPalEntry[n].peGreen = g;
+    	tabitem->logpal->palPalEntry[n].peBlue = b;
+    	tabitem->logpal->palPalEntry[n].peFlags = PC_NOCOLLAPSE;
+    	tabitem->colours[n] = PALETTERGB(r, g, b);
+    	SetPaletteEntries(tabitem->pal, 0, NALLCOLOURS, tabitem->logpal->palPalEntry);
     } else
-	colours[n] = RGB(r, g, b);
+    	tabitem->colours[n] = RGB(r, g, b);
 }
 
 void palette_set(void *frontend, int n, int r, int g, int b)
 {
+    if (frontend == NULL)
+        return;
+    wintabitem *tabitem = (wintabitem*) frontend;
+    
     if (n >= 16)
 	n += 256 - 16;
     if (n > NALLCOLOURS)
 	return;
-    real_palette_set(n, r, g, b);
-    if (pal) {
+    real_palette_set(frontend, n, r, g, b);
+    if (tabitem->pal) {
         wintabitem *tabitem = get_ctx(frontend);
         assert(tabitem != NULL);
     	HDC hdc = tabitem->hdc;
         if (hdc == NULL) return;
-    	UnrealizeObject(pal);
+    	UnrealizeObject(tabitem->pal);
     	RealizePalette(hdc);
     	free_ctx(tabitem, tabitem);
     } else {
@@ -4546,32 +4618,35 @@ void palette_set(void *frontend, int n, int r, int g, int b)
 	    /* If Default Background changes, we need to ensure any
 	     * space between the text area and the window border is
 	     * redrawn. */
-	    InvalidateRect(hwnd, NULL, TRUE);
+	    InvalidateRect(tabitem->page.hwndCtrl, NULL, TRUE);
     }
 }
 
 void palette_reset(void *frontend)
 {
+    if (frontend == NULL)
+        return;
+    wintabitem *tabitem = (wintabitem*) frontend;
     int i;
 
     /* And this */
     for (i = 0; i < NALLCOLOURS; i++) {
-	if (pal) {
-	    logpal->palPalEntry[i].peRed = defpal[i].rgbtRed;
-	    logpal->palPalEntry[i].peGreen = defpal[i].rgbtGreen;
-	    logpal->palPalEntry[i].peBlue = defpal[i].rgbtBlue;
-	    logpal->palPalEntry[i].peFlags = 0;
-	    colours[i] = PALETTERGB(defpal[i].rgbtRed,
-				    defpal[i].rgbtGreen,
-				    defpal[i].rgbtBlue);
+	if (tabitem->pal) {
+	    tabitem->logpal->palPalEntry[i].peRed = tabitem->defpal[i].rgbtRed;
+	    tabitem->logpal->palPalEntry[i].peGreen = tabitem->defpal[i].rgbtGreen;
+	    tabitem->logpal->palPalEntry[i].peBlue = tabitem->defpal[i].rgbtBlue;
+	    tabitem->logpal->palPalEntry[i].peFlags = 0;
+	    tabitem->colours[i] = PALETTERGB(tabitem->defpal[i].rgbtRed,
+				    tabitem->defpal[i].rgbtGreen,
+				    tabitem->defpal[i].rgbtBlue);
 	} else
-	    colours[i] = RGB(defpal[i].rgbtRed,
-			     defpal[i].rgbtGreen, defpal[i].rgbtBlue);
+	    tabitem->colours[i] = RGB(tabitem->defpal[i].rgbtRed,
+			     tabitem->defpal[i].rgbtGreen, tabitem->defpal[i].rgbtBlue);
     }
 
-    if (pal) {
+    if (tabitem->pal) {
 	HDC hdc;
-	SetPaletteEntries(pal, 0, NALLCOLOURS, logpal->palPalEntry);
+	SetPaletteEntries(tabitem->pal, 0, NALLCOLOURS, tabitem->logpal->palPalEntry);
 	wintabitem *tabitem = get_ctx(frontend);
     assert(tabitem != NULL);
     hdc = tabitem->hdc;
@@ -4579,14 +4654,17 @@ void palette_reset(void *frontend)
 	RealizePalette(hdc);
 	free_ctx(tabitem, tabitem);
     } else {
-	/* Default Background may have changed. Ensure any space between
-	 * text area and window border is redrawn. */
-	InvalidateRect(hwnd, NULL, TRUE);
+    	/* Default Background may have changed. Ensure any space between
+    	 * text area and window border is redrawn. */
+    	InvalidateRect(tabitem->page.hwndCtrl, NULL, TRUE);
     }
 }
 
 void write_aclip(void *frontend, char *data, int len, int must_deselect)
 {
+if (frontend == NULL)
+        return;
+    wintabitem *tabitem = (wintabitem*) frontend;
     HGLOBAL clipdata;
     void *lock;
 
@@ -4601,9 +4679,9 @@ void write_aclip(void *frontend, char *data, int len, int must_deselect)
     GlobalUnlock(clipdata);
 
     if (!must_deselect)
-	SendMessage(hwnd, WM_IGNORE_CLIP, TRUE, 0);
+	SendMessage(tabitem->page.hwndCtrl, WM_IGNORE_CLIP, TRUE, 0);
 
-    if (OpenClipboard(hwnd)) {
+    if (OpenClipboard(tabitem->page.hwndCtrl)) {
 	EmptyClipboard();
 	SetClipboardData(CF_TEXT, clipdata);
 	CloseClipboard();
@@ -4611,7 +4689,7 @@ void write_aclip(void *frontend, char *data, int len, int must_deselect)
 	GlobalFree(clipdata);
 
     if (!must_deselect)
-	SendMessage(hwnd, WM_IGNORE_CLIP, FALSE, 0);
+	SendMessage(tabitem->page.hwndCtrl, WM_IGNORE_CLIP, FALSE, 0);
 }
 
 /*
@@ -4619,6 +4697,9 @@ void write_aclip(void *frontend, char *data, int len, int must_deselect)
  */
 void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_deselect)
 {
+if (frontend == NULL)
+        return;
+    wintabitem *tabitem = (wintabitem*) frontend;
     HGLOBAL clipdata, clipdata2, clipdata3;
     int len2;
     void *lock, *lock2, *lock3;
@@ -4644,7 +4725,7 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
     memcpy(lock, data, len * sizeof(wchar_t));
     WideCharToMultiByte(CP_ACP, 0, data, len, lock2, len2, NULL, NULL);
 
-    if (cfg.rtf_paste) {
+    if (tabitem->cfg.rtf_paste) {
 	wchar_t unitab[256];
 	char *rtf = NULL;
 	unsigned char *tdata = (unsigned char *)lock2;
@@ -4662,10 +4743,10 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
 
 	get_unitab(CP_ACP, unitab, 0);
 
-	rtfsize = 100 + strlen(cfg.font.name);
+	rtfsize = 100 + strlen(tabitem->cfg.font.name);
 	rtf = snewn(rtfsize, char);
 	rtflen = sprintf(rtf, "{\\rtf1\\ansi\\deff0{\\fonttbl\\f0\\fmodern %s;}\\f0\\fs%d",
-			 cfg.font.name, cfg.font.height*2);
+			 tabitem->cfg.font.name, tabitem->cfg.font.height*2);
 
 	/*
 	 * Add colour palette
@@ -4688,7 +4769,7 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
 		    bgcolour = tmpcolour;
 		}
 
-		if (bold_mode == BOLD_COLOURS && (attr[i] & ATTR_BOLD)) {
+		if (tabitem->bold_mode == BOLD_COLOURS && (attr[i] & ATTR_BOLD)) {
 		    if (fgcolour  <   8)	/* ANSI colours */
 			fgcolour +=   8;
 		    else if (fgcolour >= 256)	/* Default colours */
@@ -4724,7 +4805,7 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
 
 	    for (i = 0; i < NALLCOLOURS; i++) {
 		if (palette[i] != 0) {
-		    rtflen += sprintf(&rtf[rtflen], "\\red%d\\green%d\\blue%d;", defpal[i].rgbtRed, defpal[i].rgbtGreen, defpal[i].rgbtBlue);
+		    rtflen += sprintf(&rtf[rtflen], "\\red%d\\green%d\\blue%d;", tabitem->defpal[i].rgbtRed, tabitem->defpal[i].rgbtGreen, tabitem->defpal[i].rgbtBlue);
 		}
 	    }
 	    strcpy(&rtf[rtflen], "}");
@@ -4779,7 +4860,7 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
 		    bgcolour = tmpcolour;
 		}
 
-		if (bold_mode == BOLD_COLOURS && (attr[tindex] & ATTR_BOLD)) {
+		if (tabitem->bold_mode == BOLD_COLOURS && (attr[tindex] & ATTR_BOLD)) {
 		    if (fgcolour  <   8)	    /* ANSI colours */
 			fgcolour +=   8;
 		    else if (fgcolour >= 256)	    /* Default colours */
@@ -4796,7 +4877,7 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
                 /*
                  * Collect other attributes
                  */
-		if (bold_mode != BOLD_COLOURS)
+		if (tabitem->bold_mode != BOLD_COLOURS)
 		    attrBold  = attr[tindex] & ATTR_BOLD;
 		else
 		    attrBold  = 0;
@@ -4815,7 +4896,7 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
 			bgcolour  = -1;		    /* No coloring */
 
 		    if (fgcolour >= 256) {	    /* Default colour */
-			if (bold_mode == BOLD_COLOURS && (fgcolour & 1) && bgcolour == -1)
+			if (tabitem->bold_mode == BOLD_COLOURS && (fgcolour & 1) && bgcolour == -1)
 			    attrBold = ATTR_BOLD;   /* Emphasize text with bold attribute */
 
 			fgcolour  = -1;		    /* No coloring */
@@ -4921,9 +5002,9 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
     GlobalUnlock(clipdata2);
 
     if (!must_deselect)
-	SendMessage(hwnd, WM_IGNORE_CLIP, TRUE, 0);
+	SendMessage(tabitem->page.hwndCtrl, WM_IGNORE_CLIP, TRUE, 0);
 
-    if (OpenClipboard(hwnd)) {
+    if (OpenClipboard(tabitem->page.hwndCtrl)) {
 	EmptyClipboard();
 	SetClipboardData(CF_UNICODETEXT, clipdata);
 	SetClipboardData(CF_TEXT, clipdata2);
@@ -4936,7 +5017,7 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
     }
 
     if (!must_deselect)
-	SendMessage(hwnd, WM_IGNORE_CLIP, FALSE, 0);
+	SendMessage(tabitem->page.hwndCtrl, WM_IGNORE_CLIP, FALSE, 0);
 }
 
 static DWORD WINAPI clipboard_read_threadfunc(void *param)
@@ -4995,6 +5076,9 @@ static int process_clipdata(HGLOBAL clipdata, int unicode)
 
 void request_paste(void *frontend)
 {
+    if (frontend == NULL)
+        return;
+    wintabitem *tabitem = (wintabitem*) frontend;
     /*
      * I always thought pasting was synchronous in Windows; the
      * clipboard access functions certainly _look_ synchronous,
@@ -5013,7 +5097,7 @@ void request_paste(void *frontend)
      */
     DWORD in_threadid; /* required for Win9x */
     CreateThread(NULL, 0, clipboard_read_threadfunc,
-		 hwnd, 0, &in_threadid);
+		 tabitem->page.hwndCtrl, 0, &in_threadid);
 }
 
 void get_clip(void *frontend, wchar_t **p, int *len)
@@ -5169,6 +5253,9 @@ static void flash_window(int mode)
  */
 void do_beep(void *frontend, int mode)
 {
+    if (frontend == NULL)
+        return;
+    wintabitem *tabitem = (wintabitem*) frontend;
     if (mode == BELL_DEFAULT) {
 	/*
 	 * For MessageBeep style bells, we want to be careful of
@@ -5189,16 +5276,16 @@ void do_beep(void *frontend, int mode)
 	 */
 	lastbeep = GetTickCount();
     } else if (mode == BELL_WAVEFILE) {
-	if (!PlaySound(cfg.bell_wavefile.path, NULL,
+	if (!PlaySound(tabitem->cfg.bell_wavefile.path, NULL,
 		       SND_ASYNC | SND_FILENAME)) {
-	    char buf[sizeof(cfg.bell_wavefile.path) + 80];
+	    char buf[sizeof(tabitem->cfg.bell_wavefile.path) + 80];
 	    char otherbuf[100];
 	    sprintf(buf, "Unable to play sound file\n%s\n"
-		    "Using default sound instead", cfg.bell_wavefile.path);
+		    "Using default sound instead", tabitem->cfg.bell_wavefile.path);
 	    sprintf(otherbuf, "%.70s Sound Error", appname);
 	    MessageBox(hwnd, buf, otherbuf,
 		       MB_OK | MB_ICONEXCLAMATION);
-	    cfg.beep = BELL_DEFAULT;
+	    tabitem->cfg.beep = BELL_DEFAULT;
 	}
     } else if (mode == BELL_PCSPEAKER) {
 	static long lastbeep = 0;
@@ -5219,7 +5306,7 @@ void do_beep(void *frontend, int mode)
 	lastbeep = GetTickCount();
     }
     /* Otherwise, either visual bell or disabled; do nothing here */
-    if (!term->has_focus) {
+    if (!tabitem->term->has_focus) {
 	flash_window(2);	       /* start */
     }
 }
@@ -5230,12 +5317,15 @@ void do_beep(void *frontend, int mode)
  */
 void set_iconic(void *frontend, int iconic)
 {
-    if (IsIconic(hwnd)) {
+    if (frontend == NULL)
+        return;
+    wintabitem *tabitem = (wintabitem*) frontend;
+    if (IsIconic(tabitem->page.hwndCtrl)) {
 	if (!iconic)
-	    ShowWindow(hwnd, SW_RESTORE);
+	    ShowWindow(tabitem->page.hwndCtrl, SW_RESTORE);
     } else {
 	if (iconic)
-	    ShowWindow(hwnd, SW_MINIMIZE);
+	    ShowWindow(tabitem->page.hwndCtrl, SW_MINIMIZE);
     }
 }
 
@@ -5244,12 +5334,15 @@ void set_iconic(void *frontend, int iconic)
  */
 void move_window(void *frontend, int x, int y)
 {
-    if (cfg.resize_action == RESIZE_DISABLED || 
-        cfg.resize_action == RESIZE_FONT ||
+    if (frontend == NULL)
+        return;
+    wintabitem *tabitem = (wintabitem*) frontend;
+    if (tabitem->cfg.resize_action == RESIZE_DISABLED || 
+        tabitem->cfg.resize_action == RESIZE_FONT ||
 	IsZoomed(hwnd))
        return;
 
-    SetWindowPos(hwnd, NULL, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+    SetWindowPos(tabitem->page.hwndCtrl, NULL, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 }
 
 /*
@@ -5258,9 +5351,12 @@ void move_window(void *frontend, int x, int y)
  */
 void set_zorder(void *frontend, int top)
 {
-    if (cfg.alwaysontop)
+    if (frontend == NULL)
+        return;
+    wintabitem *tabitem = (wintabitem*) frontend;
+    if (tabitem->cfg.alwaysontop)
 	return;			       /* ignore */
-    SetWindowPos(hwnd, top ? HWND_TOP : HWND_BOTTOM, 0, 0, 0, 0,
+    SetWindowPos(tabitem->page.hwndCtrl, top ? HWND_TOP : HWND_BOTTOM, 0, 0, 0, 0,
 		 SWP_NOMOVE | SWP_NOSIZE);
 }
 
@@ -5269,7 +5365,10 @@ void set_zorder(void *frontend, int top)
  */
 void refresh_window(void *frontend)
 {
-    InvalidateRect(hwnd, NULL, TRUE);
+if (frontend == NULL)
+        return;
+    wintabitem *tabitem = (wintabitem*) frontend;
+    InvalidateRect(tabitem->page.hwndCtrl, NULL, TRUE);
 }
 
 /*

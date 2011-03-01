@@ -241,6 +241,9 @@ void wintabitem_creat(wintab *wintab, Config *cfg)
     wintab->items[0].offset_width = wintab->items[0].offset_height = wintab->items[0].cfg.window_border;
     wintab->items[0].caret_x = -1; 
     wintab->items[0].caret_y = -1;
+    wintab->items[0].n_specials = 0;
+    wintab->items[0].specials = NULL;
+    wintab->items[0].specials_menu = NULL;
     
     wintabpage_init(&wintab->items[0].page, cfg, wintab->hwndTab);
     

@@ -82,6 +82,10 @@ typedef struct {
     int compose_state;
     UINT wm_mousewheel;
 
+    const struct telnet_special *specials;
+    HMENU specials_menu;
+    int n_specials;
+
 }wintabitem;
 
 typedef struct {
