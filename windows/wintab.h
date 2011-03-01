@@ -86,6 +86,7 @@ typedef struct {
     HMENU specials_menu;
     int n_specials;
 
+    int prev_rows, prev_cols;
 }wintabitem;
 
 typedef struct {

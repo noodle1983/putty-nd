@@ -92,8 +92,8 @@ static void update_savedsess_menu(void);
 static void init_flashwindow(void);
 
 static int is_full_screen(void);
-static void make_full_screen(void);
-static void clear_full_screen(void);
+static void make_full_screen(wintabitem* tabitem);
+static void clear_full_screen(wintabitem* tabitem);
 static void flip_full_screen(void);
 static int process_clipdata(HGLOBAL clipdata, int unicode);
 
@@ -136,6 +136,11 @@ static UINT last_mousemove = 0;
 
 #define TIMING_TIMER_ID 1234
 static long timing_next_time;
+
+static int need_backend_resize = FALSE;
+static int ignore_clip = FALSE;
+static int fullscr_on_max = FALSE;
+static int processed_resize = FALSE;
 
 static struct {
     HMENU menu;
@@ -2517,14 +2522,311 @@ int on_mouse_move(wintabitem* tabitem, HWND hwnd, UINT message,
     return 0;
 }
 
+int on_nc_mouse_move(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    {
+	    static WPARAM wp = 0;
+	    static LPARAM lp = 0;
+	    if (wParam != wp || lParam != lp ||
+		last_mousemove != WM_NCMOUSEMOVE) {
+		show_mouseptr(tabitem, 1);
+		wp = wParam; lp = lParam;
+		last_mousemove = WM_NCMOUSEMOVE;
+	    }
+	}
+	noise_ultralight(lParam);
+    return 0;
+}
+
+int on_net_event(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    /* Notice we can get multiple netevents, FD_READ, FD_WRITE etc
+	 * but the only one that's likely to try to overload us is FD_READ.
+	 * This means buffering just one is fine.
+	 */
+	if (pending_netevent)
+	    enact_pending_netevent();
+
+	pending_netevent = TRUE;
+	pend_netevent_wParam = wParam;
+	pend_netevent_lParam = lParam;
+	if (WSAGETSELECTEVENT(lParam) != FD_READ)
+	    enact_pending_netevent();
+
+	net_pending_errors();
+    return 0;
+}
+int on_set_focus(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    term_set_focus(tabitem->term, TRUE);
+	CreateCaret(tabitem->page.hwndCtrl, tabitem->caretbm, tabitem->font_width, tabitem->font_height);
+	ShowCaret(tabitem->page.hwndCtrl);
+	flash_window(0);	       /* stop */
+	tabitem->compose_state = 0;
+	term_update(tabitem->term);
+	return 0;
+}
+
+int on_kill_focus(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+	show_mouseptr(tabitem, 1);
+	term_set_focus(tabitem->term, FALSE);
+	DestroyCaret();
+	tabitem->caret_x = tabitem->caret_y = -1;	       /* ensure caret is replaced next time */
+	term_update(tabitem->term);
+    return 0;
+}
+
+int on_sizing(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    /*
+	 * This does two jobs:
+	 * 1) Keep the sizetip uptodate
+	 * 2) Make sure the window size is _stepped_ in units of the font size.
+	 */
+        if (tabitem->cfg.resize_action == RESIZE_TERM ||
+            (tabitem->cfg.resize_action == RESIZE_EITHER && !is_alt_pressed())) {
+	    int width, height, w, h, ew, eh;
+	    LPRECT r = (LPRECT) lParam;
+
+	    if ( !need_backend_resize && tabitem->cfg.resize_action == RESIZE_EITHER &&
+		    (tabitem->cfg.height != tabitem->term->rows || tabitem->cfg.width != tabitem->term->cols )) {
+		/* 
+		 * Great! It seems that both the terminal size and the
+		 * font size have been changed and the user is now dragging.
+		 * 
+		 * It will now be difficult to get back to the configured
+		 * font size!
+		 *
+		 * This would be easier but it seems to be too confusing.
+
+		term_size(term, cfg.height, cfg.width, cfg.savelines);
+		reset_window(2);
+		 */
+	        tabitem->cfg.height=tabitem->term->rows; tabitem->cfg.width=tabitem->term->cols;
+
+		InvalidateRect(hwnd, NULL, TRUE);
+		need_backend_resize = TRUE;
+	    }
+
+	    width = r->right - r->left - extra_width;
+	    height = r->bottom - r->top - extra_height;
+	    w = (width + tabitem->font_width / 2) / tabitem->font_width;
+	    if (w < 1)
+		w = 1;
+	    h = (height + tabitem->font_height / 2) / tabitem->font_height;
+	    if (h < 1)
+		h = 1;
+	    UpdateSizeTip(hwnd, w, h);
+	    ew = width - w * tabitem->font_width;
+	    eh = height - h * tabitem->font_height;
+	    if (ew != 0) {
+		if (wParam == WMSZ_LEFT ||
+		    wParam == WMSZ_BOTTOMLEFT || wParam == WMSZ_TOPLEFT)
+		    r->left += ew;
+		else
+		    r->right -= ew;
+	    }
+	    if (eh != 0) {
+		if (wParam == WMSZ_TOP ||
+		    wParam == WMSZ_TOPRIGHT || wParam == WMSZ_TOPLEFT)
+		    r->top += eh;
+		else
+		    r->bottom -= eh;
+	    }
+	    if (ew || eh)
+		return 1;
+	    else
+		return 0;
+	} else {
+	    int width, height, w, h, rv = 0;
+	    int ex_width = extra_width + (tabitem->cfg.window_border - tabitem->offset_width) * 2;
+	    int ex_height = extra_height + (tabitem->cfg.window_border - tabitem->offset_height) * 2;
+	    LPRECT r = (LPRECT) lParam;
+
+	    width = r->right - r->left - ex_width;
+	    height = r->bottom - r->top - ex_height;
+
+	    w = (width + tabitem->term->cols/2)/tabitem->term->cols;
+	    h = (height + tabitem->term->rows/2)/tabitem->term->rows;
+	    if ( r->right != r->left + w*tabitem->term->cols + ex_width)
+		rv = 1;
+
+	    if (wParam == WMSZ_LEFT ||
+		wParam == WMSZ_BOTTOMLEFT || wParam == WMSZ_TOPLEFT)
+		r->left = r->right - w*tabitem->term->cols - ex_width;
+	    else
+		r->right = r->left + w*tabitem->term->cols + ex_width;
+
+	    if (r->bottom != r->top + h*tabitem->term->rows + ex_height)
+		rv = 1;
+
+	    if (wParam == WMSZ_TOP ||
+		wParam == WMSZ_TOPRIGHT || wParam == WMSZ_TOPLEFT)
+		r->top = r->bottom - h*tabitem->term->rows - ex_height;
+	    else
+		r->bottom = r->top + h*tabitem->term->rows + ex_height;
+
+	    return rv;
+	}
+    return 0;
+}
+
+int on_size(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+#ifdef RDB_DEBUG_PATCH
+        	debug((27, "WM_SIZE %s (%d,%d)",
+        		(wParam == SIZE_MINIMIZED) ? "SIZE_MINIMIZED":
+        		(wParam == SIZE_MAXIMIZED) ? "SIZE_MAXIMIZED":
+        		(wParam == SIZE_RESTORED && resizing) ? "to":
+        		(wParam == SIZE_RESTORED) ? "SIZE_RESTORED":
+        		"...",
+        	    LOWORD(lParam), HIWORD(lParam)));
+#endif
+    wintab_onsize(&tab, hwnd, lParam);
+	if (wParam == SIZE_MINIMIZED)
+	    SetWindowText(hwnd,
+			  tabitem->cfg.win_name_always ? window_name : icon_name);
+	if (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)
+	    SetWindowText(hwnd, window_name);
+        if (wParam == SIZE_RESTORED) {
+            processed_resize = FALSE;
+            clear_full_screen(tabitem);
+            if (processed_resize) {
+                /*
+                 * Inhibit normal processing of this WM_SIZE; a
+                 * secondary one was triggered just now by
+                 * clear_full_screen which contained the correct
+                 * client area size.
+                 */
+                return 0;
+            }
+        }
+        if (wParam == SIZE_MAXIMIZED && fullscr_on_max) {
+            fullscr_on_max = FALSE;
+            processed_resize = FALSE;
+            make_full_screen(tabitem);
+            if (processed_resize) {
+                /*
+                 * Inhibit normal processing of this WM_SIZE; a
+                 * secondary one was triggered just now by
+                 * make_full_screen which contained the correct client
+                 * area size.
+                 */
+                return 0;
+            }
+        }
+
+        processed_resize = TRUE;
+
+	if (tabitem->cfg.resize_action == RESIZE_DISABLED) {
+	    /* A resize, well it better be a minimize. */
+	    reset_window(-1);
+	} else {
+
+	    int width, height, w, h;
+
+	    width = LOWORD(lParam);
+	    height = HIWORD(lParam);
+
+            if (wParam == SIZE_MAXIMIZED && !was_zoomed) {
+                was_zoomed = 1;
+                tabitem->prev_rows = tabitem->term->rows;
+                tabitem->prev_cols = tabitem->term->cols;
+                if (tabitem->cfg.resize_action == RESIZE_TERM) {
+                    w = width / tabitem->font_width;
+                    if (w < 1) w = 1;
+                    h = height / tabitem->font_height;
+                    if (h < 1) h = 1;
+
+                    term_size(tabitem->term, h, w, tabitem->cfg.savelines);
+                }
+                reset_window(0);
+            } else if (wParam == SIZE_RESTORED && was_zoomed) {
+                was_zoomed = 0;
+                if (tabitem->cfg.resize_action == RESIZE_TERM) {
+                    w = (width-tabitem->cfg.window_border*2) / tabitem->font_width;
+                    if (w < 1) w = 1;
+                    h = (height-tabitem->cfg.window_border*2) / tabitem->font_height;
+                    if (h < 1) h = 1;
+                    term_size(tabitem->term, h, w, tabitem->cfg.savelines);
+                    reset_window(2);
+                } else if (tabitem->cfg.resize_action != RESIZE_FONT)
+                    reset_window(2);
+                else
+                    reset_window(0);
+            } else if (wParam == SIZE_MINIMIZED) {
+                /* do nothing */
+	    } else if (tabitem->cfg.resize_action == RESIZE_TERM ||
+                       (tabitem->cfg.resize_action == RESIZE_EITHER &&
+                        !is_alt_pressed())) {
+                w = (width-tabitem->cfg.window_border*2) / tabitem->font_width;
+                if (w < 1) w = 1;
+                h = (height-tabitem->cfg.window_border*2) / tabitem->font_height;
+                if (h < 1) h = 1;
+
+                if (resizing) {
+                    /*
+                     * Don't call back->size in mid-resize. (To
+                     * prevent massive numbers of resize events
+                     * getting sent down the connection during an NT
+                     * opaque drag.)
+                     */
+		    need_backend_resize = TRUE;
+		    tabitem->cfg.height = h;
+		    tabitem->cfg.width = w;
+                } else {
+                    term_size(tabitem->term, h, w, tabitem->cfg.savelines);
+                }
+            } else {
+                reset_window(0);
+	    }
+	}
+	sys_cursor_update(tabitem);
+    return 0;
+
+}
+
+
+int on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    switch (LOWORD(wParam)) {
+	  case SB_BOTTOM:
+	    term_scroll(tabitem->term, -1, 0);
+	    break;
+	  case SB_TOP:
+	    term_scroll(tabitem->term, +1, 0);
+	    break;
+	  case SB_LINEDOWN:
+	    term_scroll(tabitem->term, 0, +1);
+	    break;
+	  case SB_LINEUP:
+	    term_scroll(tabitem->term, 0, -1);
+	    break;
+	  case SB_PAGEDOWN:
+	    term_scroll(tabitem->term, 0, +tabitem->term->rows / 2);
+	    break;
+	  case SB_PAGEUP:
+	    term_scroll(tabitem->term, 0, -tabitem->term->rows / 2);
+	    break;
+	  case SB_THUMBPOSITION:
+	  case SB_THUMBTRACK:
+	    term_scroll(tabitem->term, 1, HIWORD(wParam));
+	    break;
+	}
+    return 0;
+}
+
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    HDC hdc;
-    static int ignore_clip = FALSE;
-    static int need_backend_resize = FALSE;
-    static int fullscr_on_max = FALSE;
-    static int processed_resize = FALSE;
 
     wintabitem *tabitem = wintab_get_active_item(&tab);
 
@@ -2549,326 +2851,74 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
             on_menu(tabitem, hwnd, message, wParam, lParam);
             break;
 
-      case WM_LBUTTONDOWN:
-      case WM_MBUTTONDOWN:
-      case WM_RBUTTONDOWN:
-      case WM_LBUTTONUP:
-      case WM_MBUTTONUP:
-      case WM_RBUTTONUP:
+        case WM_LBUTTONDOWN:
+        case WM_MBUTTONDOWN:
+        case WM_RBUTTONDOWN:
+        case WM_LBUTTONUP:
+        case WM_MBUTTONUP:
+        case WM_RBUTTONUP:
 	        on_button(tabitem, hwnd, message, wParam, lParam);
     		return 0;
-      case WM_MOUSEMOVE:
+        case WM_MOUSEMOVE:
             on_mouse_move(tabitem, hwnd, message, wParam, lParam);
         	return 0;
-      case WM_NCMOUSEMOVE:
-	{
-	    static WPARAM wp = 0;
-	    static LPARAM lp = 0;
-	    if (wParam != wp || lParam != lp ||
-		last_mousemove != WM_NCMOUSEMOVE) {
-		show_mouseptr(wintab_get_active_item(&tab), 1);
-		wp = wParam; lp = lParam;
-		last_mousemove = WM_NCMOUSEMOVE;
-	    }
-	}
-	noise_ultralight(lParam);
-	break;
-      case WM_IGNORE_CLIP:
-	ignore_clip = wParam;	       /* don't panic on DESTROYCLIPBOARD */
-	break;
-      case WM_DESTROYCLIPBOARD:
-	if (!ignore_clip)
-	    term_deselect(term);
-	ignore_clip = FALSE;
-	return 0;
-      case WM_PAINT:
-        wintab_on_paint(&tab, hwnd, message,wParam, lParam);
-		return 0;
-      case WM_NETEVENT:
-	/* Notice we can get multiple netevents, FD_READ, FD_WRITE etc
-	 * but the only one that's likely to try to overload us is FD_READ.
-	 * This means buffering just one is fine.
-	 */
-	if (pending_netevent)
-	    enact_pending_netevent();
-
-	pending_netevent = TRUE;
-	pend_netevent_wParam = wParam;
-	pend_netevent_lParam = lParam;
-	if (WSAGETSELECTEVENT(lParam) != FD_READ)
-	    enact_pending_netevent();
-
-	net_pending_errors();
-	return 0;
-      case WM_SETFOCUS:
-	term_set_focus(term, TRUE);
-	CreateCaret(hwnd, caretbm, font_width, font_height);
-	ShowCaret(hwnd);
-	flash_window(0);	       /* stop */
-	compose_state = 0;
-	term_update(term);
-	break;
-      case WM_KILLFOCUS:
-	show_mouseptr(wintab_get_active_item(&tab), 1);
-	term_set_focus(term, FALSE);
-	DestroyCaret();
-	caret_x = caret_y = -1;	       /* ensure caret is replaced next time */
-	term_update(term);
-	break;
-      case WM_ENTERSIZEMOVE:
+        case WM_NCMOUSEMOVE:
+        	on_nc_mouse_move(tabitem, hwnd, message, wParam, lParam);
+        	break;
+        case WM_IGNORE_CLIP:
+        	ignore_clip = wParam;	       /* don't panic on DESTROYCLIPBOARD */
+        	break;
+        case WM_DESTROYCLIPBOARD:
+        	if (!ignore_clip)
+        	    term_deselect(tabitem->term);
+        	ignore_clip = FALSE;
+        	return 0;
+        case WM_PAINT:
+            wintab_on_paint(&tab, hwnd, message,wParam, lParam);
+    		return 0;
+        case WM_NETEVENT:
+            on_net_event(tabitem, hwnd, message,wParam, lParam);
+        	return 0;
+        case WM_SETFOCUS:
+        	on_set_focus(tabitem, hwnd, message,wParam, lParam);
+        	break;
+        case WM_KILLFOCUS:
+        	on_kill_focus(tabitem, hwnd, message,wParam, lParam);
+        	break;
+        case WM_ENTERSIZEMOVE:
 #ifdef RDB_DEBUG_PATCH
-	debug((27, "WM_ENTERSIZEMOVE"));
+        	debug((27, "WM_ENTERSIZEMOVE"));
 #endif
-	EnableSizeTip(1);
-	resizing = TRUE;
-	need_backend_resize = FALSE;
-	break;
-      case WM_EXITSIZEMOVE:
-	EnableSizeTip(0);
-	resizing = FALSE;
+        	EnableSizeTip(1);
+        	resizing = TRUE;
+        	need_backend_resize = FALSE;
+        	break;
+        case WM_EXITSIZEMOVE:
+        	EnableSizeTip(0);
+        	resizing = FALSE;
 #ifdef RDB_DEBUG_PATCH
-	debug((27, "WM_EXITSIZEMOVE"));
+        	debug((27, "WM_EXITSIZEMOVE"));
 #endif
-	if (need_backend_resize) {
-	    term_size(term, cfg.height, cfg.width, cfg.savelines);
-	    InvalidateRect(hwnd, NULL, TRUE);
-	}
-	break;
-      case WM_SIZING:
-	/*
-	 * This does two jobs:
-	 * 1) Keep the sizetip uptodate
-	 * 2) Make sure the window size is _stepped_ in units of the font size.
-	 */
-        if (cfg.resize_action == RESIZE_TERM ||
-            (cfg.resize_action == RESIZE_EITHER && !is_alt_pressed())) {
-	    int width, height, w, h, ew, eh;
-	    LPRECT r = (LPRECT) lParam;
-
-	    if ( !need_backend_resize && cfg.resize_action == RESIZE_EITHER &&
-		    (cfg.height != term->rows || cfg.width != term->cols )) {
-		/* 
-		 * Great! It seems that both the terminal size and the
-		 * font size have been changed and the user is now dragging.
-		 * 
-		 * It will now be difficult to get back to the configured
-		 * font size!
-		 *
-		 * This would be easier but it seems to be too confusing.
-
-		term_size(term, cfg.height, cfg.width, cfg.savelines);
-		reset_window(2);
-		 */
-	        cfg.height=term->rows; cfg.width=term->cols;
-
-		InvalidateRect(hwnd, NULL, TRUE);
-		need_backend_resize = TRUE;
-	    }
-
-	    width = r->right - r->left - extra_width;
-	    height = r->bottom - r->top - extra_height;
-	    w = (width + font_width / 2) / font_width;
-	    if (w < 1)
-		w = 1;
-	    h = (height + font_height / 2) / font_height;
-	    if (h < 1)
-		h = 1;
-	    UpdateSizeTip(hwnd, w, h);
-	    ew = width - w * font_width;
-	    eh = height - h * font_height;
-	    if (ew != 0) {
-		if (wParam == WMSZ_LEFT ||
-		    wParam == WMSZ_BOTTOMLEFT || wParam == WMSZ_TOPLEFT)
-		    r->left += ew;
-		else
-		    r->right -= ew;
-	    }
-	    if (eh != 0) {
-		if (wParam == WMSZ_TOP ||
-		    wParam == WMSZ_TOPRIGHT || wParam == WMSZ_TOPLEFT)
-		    r->top += eh;
-		else
-		    r->bottom -= eh;
-	    }
-	    if (ew || eh)
-		return 1;
-	    else
-		return 0;
-	} else {
-	    int width, height, w, h, rv = 0;
-	    int ex_width = extra_width + (cfg.window_border - offset_width) * 2;
-	    int ex_height = extra_height + (cfg.window_border - offset_height) * 2;
-	    LPRECT r = (LPRECT) lParam;
-
-	    width = r->right - r->left - ex_width;
-	    height = r->bottom - r->top - ex_height;
-
-	    w = (width + term->cols/2)/term->cols;
-	    h = (height + term->rows/2)/term->rows;
-	    if ( r->right != r->left + w*term->cols + ex_width)
-		rv = 1;
-
-	    if (wParam == WMSZ_LEFT ||
-		wParam == WMSZ_BOTTOMLEFT || wParam == WMSZ_TOPLEFT)
-		r->left = r->right - w*term->cols - ex_width;
-	    else
-		r->right = r->left + w*term->cols + ex_width;
-
-	    if (r->bottom != r->top + h*term->rows + ex_height)
-		rv = 1;
-
-	    if (wParam == WMSZ_TOP ||
-		wParam == WMSZ_TOPRIGHT || wParam == WMSZ_TOPLEFT)
-		r->top = r->bottom - h*term->rows - ex_height;
-	    else
-		r->bottom = r->top + h*term->rows + ex_height;
-
-	    return rv;
-	}
-	/* break;  (never reached) */
-      case WM_FULLSCR_ON_MAX:
-	fullscr_on_max = TRUE;
-	break;
-      case WM_MOVE:
-	sys_cursor_update(wintab_get_active_item(&tab));
-	break;
+        	if (need_backend_resize) {
+        	    term_size(tabitem->term, tabitem->cfg.height, tabitem->cfg.width, tabitem->cfg.savelines);
+        	    InvalidateRect(hwnd, NULL, TRUE);
+        	}
+        	break;
+        case WM_SIZING:
+            return on_sizing(tabitem, hwnd, message,wParam, lParam);
+        	/* break;  (never reached) */
+        case WM_FULLSCR_ON_MAX:
+        	fullscr_on_max = TRUE;
+        	break;
+        case WM_MOVE:
+        	sys_cursor_update(tabitem);
+        	break;
       case WM_SIZE:
-#ifdef RDB_DEBUG_PATCH
-	debug((27, "WM_SIZE %s (%d,%d)",
-		(wParam == SIZE_MINIMIZED) ? "SIZE_MINIMIZED":
-		(wParam == SIZE_MAXIMIZED) ? "SIZE_MAXIMIZED":
-		(wParam == SIZE_RESTORED && resizing) ? "to":
-		(wParam == SIZE_RESTORED) ? "SIZE_RESTORED":
-		"...",
-	    LOWORD(lParam), HIWORD(lParam)));
-#endif
-    wintab_onsize(&tab, hwnd, lParam);
-	if (wParam == SIZE_MINIMIZED)
-	    SetWindowText(hwnd,
-			  cfg.win_name_always ? window_name : icon_name);
-	if (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)
-	    SetWindowText(hwnd, window_name);
-        if (wParam == SIZE_RESTORED) {
-            processed_resize = FALSE;
-            clear_full_screen();
-            if (processed_resize) {
-                /*
-                 * Inhibit normal processing of this WM_SIZE; a
-                 * secondary one was triggered just now by
-                 * clear_full_screen which contained the correct
-                 * client area size.
-                 */
-                return 0;
-            }
-        }
-        if (wParam == SIZE_MAXIMIZED && fullscr_on_max) {
-            fullscr_on_max = FALSE;
-            processed_resize = FALSE;
-            make_full_screen();
-            if (processed_resize) {
-                /*
-                 * Inhibit normal processing of this WM_SIZE; a
-                 * secondary one was triggered just now by
-                 * make_full_screen which contained the correct client
-                 * area size.
-                 */
-                return 0;
-            }
-        }
-
-        processed_resize = TRUE;
-
-	if (cfg.resize_action == RESIZE_DISABLED) {
-	    /* A resize, well it better be a minimize. */
-	    reset_window(-1);
-	} else {
-
-	    int width, height, w, h;
-
-	    width = LOWORD(lParam);
-	    height = HIWORD(lParam);
-
-            if (wParam == SIZE_MAXIMIZED && !was_zoomed) {
-                was_zoomed = 1;
-                prev_rows = term->rows;
-                prev_cols = term->cols;
-                if (cfg.resize_action == RESIZE_TERM) {
-                    w = width / font_width;
-                    if (w < 1) w = 1;
-                    h = height / font_height;
-                    if (h < 1) h = 1;
-
-                    term_size(term, h, w, cfg.savelines);
-                }
-                reset_window(0);
-            } else if (wParam == SIZE_RESTORED && was_zoomed) {
-                was_zoomed = 0;
-                if (cfg.resize_action == RESIZE_TERM) {
-                    w = (width-cfg.window_border*2) / font_width;
-                    if (w < 1) w = 1;
-                    h = (height-cfg.window_border*2) / font_height;
-                    if (h < 1) h = 1;
-                    term_size(term, h, w, cfg.savelines);
-                    reset_window(2);
-                } else if (cfg.resize_action != RESIZE_FONT)
-                    reset_window(2);
-                else
-                    reset_window(0);
-            } else if (wParam == SIZE_MINIMIZED) {
-                /* do nothing */
-	    } else if (cfg.resize_action == RESIZE_TERM ||
-                       (cfg.resize_action == RESIZE_EITHER &&
-                        !is_alt_pressed())) {
-                w = (width-cfg.window_border*2) / font_width;
-                if (w < 1) w = 1;
-                h = (height-cfg.window_border*2) / font_height;
-                if (h < 1) h = 1;
-
-                if (resizing) {
-                    /*
-                     * Don't call back->size in mid-resize. (To
-                     * prevent massive numbers of resize events
-                     * getting sent down the connection during an NT
-                     * opaque drag.)
-                     */
-		    need_backend_resize = TRUE;
-		    cfg.height = h;
-		    cfg.width = w;
-                } else {
-                    term_size(term, h, w, cfg.savelines);
-                }
-            } else {
-                reset_window(0);
-	    }
-	}
-	sys_cursor_update(wintab_get_active_item(&tab));
-	return 0;
+            on_size(tabitem, hwnd, message,wParam, lParam);
+        	return 0;
       case WM_VSCROLL:
-	switch (LOWORD(wParam)) {
-	  case SB_BOTTOM:
-	    term_scroll(term, -1, 0);
-	    break;
-	  case SB_TOP:
-	    term_scroll(term, +1, 0);
-	    break;
-	  case SB_LINEDOWN:
-	    term_scroll(term, 0, +1);
-	    break;
-	  case SB_LINEUP:
-	    term_scroll(term, 0, -1);
-	    break;
-	  case SB_PAGEDOWN:
-	    term_scroll(term, 0, +term->rows / 2);
-	    break;
-	  case SB_PAGEUP:
-	    term_scroll(term, 0, -term->rows / 2);
-	    break;
-	  case SB_THUMBPOSITION:
-	  case SB_THUMBTRACK:
-	    term_scroll(term, 1, HIWORD(wParam));
-	    break;
-	}
-	break;
+	        on_scroll(tabitem, hwnd, message,wParam, lParam);
+        	break;
       case WM_PALETTECHANGED:
 	if ((HWND) wParam != hwnd && pal != NULL) {
         wintabitem *tabitem = get_ctx(wintab_get_active_item(&tab));
@@ -5466,7 +5516,7 @@ static int get_fullscreen_rect(RECT * ss)
  * Go full-screen. This should only be called when we are already
  * maximised.
  */
-static void make_full_screen()
+static void make_full_screen(wintabitem* tabitem)
 {
     DWORD style;
 	RECT ss;
@@ -5477,17 +5527,17 @@ static void make_full_screen()
 		return;
 	
     /* Remove the window furniture. */
-    style = GetWindowLongPtr(hwnd, GWL_STYLE);
+    style = GetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE);
     style &= ~(WS_CAPTION | WS_BORDER | WS_THICKFRAME);
-    if (cfg.scrollbar_in_fullscreen)
+    if (tabitem->cfg.scrollbar_in_fullscreen)
 	style |= WS_VSCROLL;
     else
 	style &= ~WS_VSCROLL;
-    SetWindowLongPtr(hwnd, GWL_STYLE, style);
+    SetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE, style);
 
     /* Resize ourselves to exactly cover the nearest monitor. */
 	get_fullscreen_rect(&ss);
-    SetWindowPos(hwnd, HWND_TOP, ss.left, ss.top,
+    SetWindowPos(tabitem->page.hwndCtrl, HWND_TOP, ss.left, ss.top,
 			ss.right - ss.left,
 			ss.bottom - ss.top,
 			SWP_FRAMECHANGED);
@@ -5507,24 +5557,24 @@ static void make_full_screen()
 /*
  * Clear the full-screen attributes.
  */
-static void clear_full_screen()
+static void clear_full_screen(wintabitem* tabitem)
 {
     DWORD oldstyle, style;
 
     /* Reinstate the window furniture. */
-    style = oldstyle = GetWindowLongPtr(hwnd, GWL_STYLE);
+    style = oldstyle = GetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE);
     style |= WS_CAPTION | WS_BORDER;
-    if (cfg.resize_action == RESIZE_DISABLED)
+    if (tabitem->cfg.resize_action == RESIZE_DISABLED)
         style &= ~WS_THICKFRAME;
     else
         style |= WS_THICKFRAME;
-    if (cfg.scrollbar)
+    if (tabitem->cfg.scrollbar)
 	style |= WS_VSCROLL;
     else
 	style &= ~WS_VSCROLL;
     if (style != oldstyle) {
-	SetWindowLongPtr(hwnd, GWL_STYLE, style);
-	SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
+	SetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE, style);
+	SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, 0, 0,
 		     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
 		     SWP_FRAMECHANGED);
     }
@@ -5545,7 +5595,7 @@ static void flip_full_screen()
     if (is_full_screen()) {
 	ShowWindow(hwnd, SW_RESTORE);
     } else if (IsZoomed(hwnd)) {
-	make_full_screen();
+	make_full_screen(wintab_get_active_item(&tab));
     } else {
 	SendMessage(hwnd, WM_FULLSCR_ON_MAX, 0, 0);
 	ShowWindow(hwnd, SW_MAXIMIZE);
