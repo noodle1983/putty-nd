@@ -54,8 +54,9 @@ int wintab_init(wintab *wintab, HWND hwndParent)
         WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE, 
         0, 0, rc.right, rc.bottom, 
         hwndParent, NULL, hinst, NULL); 
-    if (wintab->hwndTab == NULL)
-        return -1; 
+    if (wintab->hwndTab == NULL){
+        ErrorExit("CreateWindow(WC_TABCONTROL...)"); 
+    }
 
     wintab->hwndParent = hwndParent;
  
@@ -540,6 +541,16 @@ void wintabitem_init_fonts(wintabitem *tabitem, const int pick_width, const int 
     init_ucs(&tabitem->cfg, &tabitem->ucsdata);
 }
 
+void wintabitem_deinit_fonts(wintabitem *tabitem)
+{
+    int i;
+    for (i = 0; i < FONT_MAXNO; i++) {
+    	if (tabitem->fonts[i])
+    	    DeleteObject(tabitem->fonts[i]);
+    	tabitem->fonts[i] = 0;
+    	tabitem->fontflag[i] = 0;
+    }
+}
 //-----------------------------------------------------------------------
 
 int wintabitem_get_font_width(wintabitem *tabitem, HDC hdc, const TEXTMETRIC *tm)
@@ -759,7 +770,7 @@ int wintabpage_init(wintabpage *page, const Config *cfg, HWND hwndParent)
 			        NULL);  /* lpParam */
 
     if (page->hwndCtrl == NULL){
-        MessageBox(NULL, "Can't create the page!", "Error",MB_OK|MB_ICONINFORMATION);
+        ErrorExit("CreatePage");
         ExitProcess(2); 
     }
     
@@ -963,9 +974,10 @@ void adjust_host(Config *cfg)
 //-----------------------------------------------------------------------
 //debug related
 //-----------------------------------------------------------------------
-void ErrorExit() 
+void ErrorExit(char * str) 
 { 
     LPVOID lpMsgBuf;
+    char* buf;
     DWORD dw = GetLastError(); 
 
     FormatMessage(
@@ -977,9 +989,11 @@ void ErrorExit()
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
         (LPTSTR) &lpMsgBuf,
         0, NULL );
+    buf = dupprintf("%s failed with error %d: %s", str, dw, lpMsgBuf);
 
-    MessageBox(NULL, (LPCTSTR)lpMsgBuf, TEXT("Error"), MB_OK); 
+    MessageBox(NULL, (LPCTSTR)buf, TEXT("Error"), MB_OK); 
 
+    sfree(buf);
     LocalFree(lpMsgBuf);
     ExitProcess(dw); 
 }

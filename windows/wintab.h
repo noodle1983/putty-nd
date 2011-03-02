@@ -116,6 +116,7 @@ void wintabitem_creat(wintab *wintab, Config *cfg);
 void wintabitem_cfgtopalette(wintabitem *tabitem);
 void wintabitem_systopalette(wintabitem *tabitem);
 void wintabitem_init_fonts(wintabitem *tabitem, const int pick_width, const int pick_height);
+void wintabitem_deinit_fonts(wintabitem *tabitem);
 int wintabitem_get_font_width(wintabitem *tabitem, HDC hdc, const TEXTMETRIC *tm);
 int wintabitem_CreateCaret(wintabitem *tabitem);
 int wintabitem_init_mouse(wintabitem *tabitem);
@@ -147,6 +148,6 @@ void adjust_host(Config *cfg);
 //-----------------------------------------------------------------------
 //debug related
 //-----------------------------------------------------------------------
-void ErrorExit() ;
+void ErrorExit(char * str) ;
 
 #endif

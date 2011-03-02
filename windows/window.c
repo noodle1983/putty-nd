@@ -79,7 +79,7 @@
 
 static Mouse_Button translate_button(wintabitem* tabitem, Mouse_Button button);
 static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
+static int TranslateKey(wintabitem* tabitem, UINT message, WPARAM wParam, LPARAM lParam,
 			unsigned char *output);
 static void cfgtopalette(void);
 static void systopalette(void);
@@ -219,6 +219,7 @@ char *get_ttymode(void *frontend, const char *mode)
     wintabitem *tabitem = (wintabitem *)frontend;
     return term_get_ttymode(tabitem->term, mode);
 }
+#if 0
 static void start_backend(void)
 {
     const char *error;
@@ -286,7 +287,7 @@ static void start_backend(void)
     must_close_session = FALSE;
     session_closed = FALSE;
 }
-
+#endif
 #if 0
 static void close_session(void)
 {
@@ -679,7 +680,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     guessSize(&guess_width, &guess_height);
     creatMainWindow(inst, guess_width, guess_height);
 
-
+#if 0
     //todo remove after tab is done
     if (0){
         memset(&ucsdata, 0, sizeof(ucsdata));
@@ -701,7 +702,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
          */
         init_fonts(0,0);
     }
- 
+#endif
     wintab_init(&tab, hwnd);
     term = tab.items[0].term;
     logctx = tab.items[0].logctx;
@@ -864,7 +865,7 @@ void cleanup_exit(int code)
     /*
      * Clean up.
      */
-    deinit_fonts();
+    wintabitem_deinit_fonts(wintab_get_active_item(&tab));
     sfree(logpal);
     if (pal)
 	DeleteObject(pal);
@@ -1368,7 +1369,7 @@ static int get_font_width(HDC hdc, const TEXTMETRIC *tm)
     }
     return ret;
 }
-
+#if 0
 /*
  * Initialise all the fonts we will need initially. There may be as many as
  * three or as few as one.  The other (potentially) twenty-one fonts are done
@@ -1558,7 +1559,7 @@ static void init_fonts(int pick_width, int pick_height)
 
     init_ucs(&cfg, &ucsdata);
 }
-
+#endif
 static void another_font(Context ctx, int fontno)
 {
     assert(ctx != NULL);
@@ -1709,8 +1710,8 @@ static void reset_window(int reinit) {
 #ifdef RDB_DEBUG_PATCH
 	debug((27, "reset_window() -- Forced deinit"));
 #endif
-	deinit_fonts();
-	init_fonts(0,0);
+	wintabitem_deinit_fonts(wintab_get_active_item(&tab));
+	wintabitem_init_fonts(wintab_get_active_item(&tab), 0,0);
     }
 
     /* Oh, looks like we're minimised */
@@ -1740,8 +1741,8 @@ static void reset_window(int reinit) {
 	if (cfg.resize_action != RESIZE_TERM) {
 	    if (  font_width != win_width/term->cols || 
 		  font_height != win_height/term->rows) {
-		deinit_fonts();
-		init_fonts(win_width/term->cols, win_height/term->rows);
+		wintabitem_deinit_fonts(wintab_get_active_item(&tab));
+		wintabitem_init_fonts(wintab_get_active_item(&tab), win_width/term->cols, win_height/term->rows);
 		offset_width = (win_width-font_width*term->cols)/2;
 		offset_height = (win_height-font_height*term->rows)/2;
 		InvalidateRect(hwnd, NULL, TRUE);
@@ -1831,8 +1832,8 @@ static void reset_window(int reinit) {
 			font_height = (ss.bottom - ss.top - extra_height)
 			    / term->rows;
 
-		    deinit_fonts();
-		    init_fonts(font_width, font_height);
+		    wintabitem_deinit_fonts(wintab_get_active_item(&tab));
+		    wintabitem_init_fonts(wintab_get_active_item(&tab), font_width, font_height);
 
 		    width = (ss.right - ss.left - extra_width) / font_width;
 		    height = (ss.bottom - ss.top - extra_height) / font_height;
@@ -1867,8 +1868,8 @@ static void reset_window(int reinit) {
     if (font_width != (win_width-cfg.window_border*2)/term->cols || 
 	font_height != (win_height-cfg.window_border*2)/term->rows) {
 
-	deinit_fonts();
-	init_fonts((win_width-cfg.window_border*2)/term->cols, 
+	wintabitem_deinit_fonts(wintab_get_active_item(&tab));
+	wintabitem_init_fonts(wintab_get_active_item(&tab), (win_width-cfg.window_border*2)/term->cols, 
 		   (win_height-cfg.window_border*2)/term->rows);
 	offset_width = (win_width-font_width*term->cols)/2;
 	offset_height = (win_height-font_height*term->rows)/2;
@@ -2680,15 +2681,6 @@ int on_sizing(wintabitem* tabitem, HWND hwnd, UINT message,
 int on_size(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-#ifdef RDB_DEBUG_PATCH
-        	debug((27, "WM_SIZE %s (%d,%d)",
-        		(wParam == SIZE_MINIMIZED) ? "SIZE_MINIMIZED":
-        		(wParam == SIZE_MAXIMIZED) ? "SIZE_MAXIMIZED":
-        		(wParam == SIZE_RESTORED && resizing) ? "to":
-        		(wParam == SIZE_RESTORED) ? "SIZE_RESTORED":
-        		"...",
-        	    LOWORD(lParam), HIWORD(lParam)));
-#endif
     wintab_onsize(&tab, hwnd, lParam);
 	if (wParam == SIZE_MINIMIZED)
 	    SetWindowText(hwnd,
@@ -2824,6 +2816,254 @@ int on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
     return 0;
 }
 
+int on_palette_changed(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    if ((HWND) wParam != hwnd && tabitem->pal != NULL) {
+        wintabitem *item = get_ctx(tabitem);
+	    if (item && item->hdc) {
+    		if (RealizePalette(item->hdc) > 0)
+    		    UpdateColors(item->hdc);
+    		free_ctx(item, item);
+	    }
+	}
+    return 0;
+}
+
+int on_query_new_palette(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    if (tabitem->pal != NULL) {
+        wintabitem *item = get_ctx(tabitem);
+	    if (item && item->hdc) {
+		if (RealizePalette(item->hdc) > 0)
+		    UpdateColors(item->hdc);
+		free_ctx(item, item);
+		return TRUE;
+	    }
+	}
+	return FALSE;
+}
+
+
+int on_key(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    /*
+	 * Add the scan code and keypress timing to the random
+	 * number noise.
+	 */
+	noise_ultralight(lParam);
+
+	/*
+	 * We don't do TranslateMessage since it disassociates the
+	 * resulting CHAR message from the KEYDOWN that sparked it,
+	 * which we occasionally don't want. Instead, we process
+	 * KEYDOWN, and call the Win32 translator functions so that
+	 * we get the translations under _our_ control.
+	 */
+	{
+	    unsigned char buf[20];
+	    int len;
+
+	    if (wParam == VK_PROCESSKEY) { /* IME PROCESS key */
+		if (message == WM_KEYDOWN) {
+		    MSG m;
+		    m.hwnd = hwnd;
+		    m.message = WM_KEYDOWN;
+		    m.wParam = wParam;
+		    m.lParam = lParam & 0xdfff;
+		    TranslateMessage(&m);
+		} else return 1; /* pass to Windows for default processing */
+	    } else {
+		len = TranslateKey(tabitem, message, wParam, lParam, buf);
+		if (len == -1)
+		    return DefWindowProc(hwnd, message, wParam, lParam);
+
+		if (len != 0) {
+		    /*
+		     * Interrupt an ongoing paste. I'm not sure
+		     * this is sensible, but for the moment it's
+		     * preferable to having to faff about buffering
+		     * things.
+		     */
+		    term_nopaste(tabitem->term);
+
+		    /*
+		     * We need not bother about stdin backlogs
+		     * here, because in GUI PuTTY we can't do
+		     * anything about it anyway; there's no means
+		     * of asking Windows to hold off on KEYDOWN
+		     * messages. We _have_ to buffer everything
+		     * we're sent.
+		     */
+		    term_seen_key_event(tabitem->term);
+		    if (tabitem->ldisc)
+			ldisc_send(tabitem->ldisc, buf, len, 1);
+		    show_mouseptr(tabitem, 0);
+		}
+	    }
+	}
+	net_pending_errors();
+    return 0;
+}
+
+int on_ime_composition(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    HIMC hIMC;
+    int n;
+    char *buff;
+
+    if(osVersion.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS || 
+        osVersion.dwPlatformId == VER_PLATFORM_WIN32s) return 1; /* no Unicode */
+
+    if ((lParam & GCS_RESULTSTR) == 0) /* Composition unfinished. */
+    	return 1; /* fall back to DefWindowProc */
+
+    hIMC = ImmGetContext(tabitem->page.hwndCtrl);
+    n = ImmGetCompositionStringW(hIMC, GCS_RESULTSTR, NULL, 0);
+
+    if (n > 0) {
+	int i;
+	buff = snewn(n, char);
+	ImmGetCompositionStringW(hIMC, GCS_RESULTSTR, buff, n);
+	/*
+	 * Jaeyoun Chung reports that Korean character
+	 * input doesn't work correctly if we do a single
+	 * luni_send() covering the whole of buff. So
+	 * instead we luni_send the characters one by one.
+	 */
+	term_seen_key_event(tabitem->term);
+	for (i = 0; i < n; i += 2) {
+	    if (tabitem->ldisc)
+		luni_send(tabitem->ldisc, (unsigned short *)(buff+i), 1, 1);
+	}
+	free(buff);
+    }
+    ImmReleaseContext(tabitem->page.hwndCtrl, hIMC);
+    return 0;
+}
+
+int on_ime_char(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    if (wParam & 0xFF00) {
+	    unsigned char buf[2];
+
+	    buf[1] = wParam;
+	    buf[0] = wParam >> 8;
+	    term_seen_key_event(tabitem->term);
+	    if (tabitem->ldisc)
+		lpage_send(tabitem->ldisc, kbd_codepage, buf, 2, 1);
+	} else {
+	    char c = (unsigned char) wParam;
+	    term_seen_key_event(tabitem->term);
+	    if (tabitem->ldisc)
+		lpage_send(tabitem->ldisc, kbd_codepage, &c, 1, 1);
+	}
+    return 0;
+}
+
+int on_char(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    /*
+	 * Nevertheless, we are prepared to deal with WM_CHAR
+	 * messages, should they crop up. So if someone wants to
+	 * post the things to us as part of a macro manoeuvre,
+	 * we're ready to cope.
+	 */
+	{
+	    char c = (unsigned char)wParam;
+	    term_seen_key_event(tabitem->term);
+	    if (tabitem->ldisc)
+		lpage_send(tabitem->ldisc, CP_ACP, &c, 1, 1);
+	}
+    return 0;
+}
+
+int on_sys_color_change(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    if (tabitem->cfg.system_colour) {
+	    /* Refresh palette from system colours. */
+	    /* XXX actually this zaps the entire palette. */
+	    wintabitem_systopalette(tabitem);
+	    wintabitem_init_palette(tabitem);
+	    /* Force a repaint of the terminal window. */
+	    term_invalidate(tabitem->term);
+	}
+    return 0;
+}
+
+int on_default(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    if (message == tabitem->wm_mousewheel || message == WM_MOUSEWHEEL) {
+	    int shift_pressed=0, control_pressed=0;
+
+	    if (message == WM_MOUSEWHEEL) {
+		tabitem->wheel_accumulator += (short)HIWORD(wParam);
+		shift_pressed=LOWORD(wParam) & MK_SHIFT;
+		control_pressed=LOWORD(wParam) & MK_CONTROL;
+	    } else {
+		BYTE keys[256];
+		tabitem->wheel_accumulator += (int)wParam;
+		if (GetKeyboardState(keys)!=0) {
+		    shift_pressed=keys[VK_SHIFT]&0x80;
+		    control_pressed=keys[VK_CONTROL]&0x80;
+		}
+	    }
+
+	    /* process events when the threshold is reached */
+	    while (abs(tabitem->wheel_accumulator) >= WHEEL_DELTA) {
+		int b;
+
+		/* reduce amount for next time */
+		if (tabitem->wheel_accumulator > 0) {
+		    b = MBT_WHEEL_UP;
+		    tabitem->wheel_accumulator -= WHEEL_DELTA;
+		} else if (tabitem->wheel_accumulator < 0) {
+		    b = MBT_WHEEL_DOWN;
+		    tabitem->wheel_accumulator += WHEEL_DELTA;
+		} else
+		    break;
+
+		if (tabitem->send_raw_mouse &&
+		    !(tabitem->cfg.mouse_override && shift_pressed)) {
+		    /* Mouse wheel position is in screen coordinates for
+		     * some reason */
+		    POINT p;
+		    p.x = X_POS(lParam); p.y = Y_POS(lParam);
+		    if (ScreenToClient(hwnd, &p)) {
+			/* send a mouse-down followed by a mouse up */
+			term_mouse(tabitem->term, b, translate_button(tabitem, b),
+				   MA_CLICK,
+				   TO_CHR_X(p.x),
+				   TO_CHR_Y(p.y), shift_pressed,
+				   control_pressed, is_alt_pressed());
+			term_mouse(tabitem->term, b, translate_button(tabitem, b),
+				   MA_RELEASE, TO_CHR_X(p.x),
+				   TO_CHR_Y(p.y), shift_pressed,
+				   control_pressed, is_alt_pressed());
+		    } /* else: not sure when this can fail */
+		} else {
+		    /* trigger a scroll */
+		    int scrollLines = tabitem->cfg.scrolllines == -1 ? tabitem->term->rows/2
+		            : tabitem->cfg.scrolllines == -2          ? tabitem->term->rows
+		            : tabitem->cfg.scrolllines < -2            ? 3
+		            : tabitem->cfg.scrolllines;
+		    term_scroll(tabitem->term, 0,
+				b == MBT_WHEEL_UP ?
+				-scrollLines : scrollLines);
+		}
+	    }
+	    return 0;
+	}
+
+    return 0;
+}
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
@@ -2913,257 +3153,66 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
         case WM_MOVE:
         	sys_cursor_update(tabitem);
         	break;
-      case WM_SIZE:
+        case WM_SIZE:
             on_size(tabitem, hwnd, message,wParam, lParam);
         	return 0;
-      case WM_VSCROLL:
+        case WM_VSCROLL:
 	        on_scroll(tabitem, hwnd, message,wParam, lParam);
         	break;
-      case WM_PALETTECHANGED:
-	if ((HWND) wParam != hwnd && pal != NULL) {
-        wintabitem *tabitem = get_ctx(wintab_get_active_item(&tab));
-	    if (tabitem && tabitem->hdc) {
-    		if (RealizePalette(tabitem->hdc) > 0)
-    		    UpdateColors(tabitem->hdc);
-    		free_ctx(tabitem, tabitem);
-	    }
-	}
-	break;
-      case WM_QUERYNEWPALETTE:
-	if (pal != NULL) {
-        wintabitem *tabitem = get_ctx(wintab_get_active_item(&tab));
-	    if (tabitem && tabitem->hdc) {
-		if (RealizePalette(tabitem->hdc) > 0)
-		    UpdateColors(tabitem->hdc);
-		free_ctx(tabitem, tabitem);
-		return TRUE;
-	    }
-	}
-	return FALSE;
-      case WM_KEYDOWN:
-      case WM_SYSKEYDOWN:
-      case WM_KEYUP:
-      case WM_SYSKEYUP:
-	/*
-	 * Add the scan code and keypress timing to the random
-	 * number noise.
-	 */
-	noise_ultralight(lParam);
+        case WM_PALETTECHANGED:
+	        on_palette_changed(tabitem, hwnd, message,wParam, lParam);
+        	break;
+        case WM_QUERYNEWPALETTE:
+	        return on_query_new_palette(tabitem, hwnd, message,wParam, lParam);
+        case WM_KEYDOWN:
+        case WM_SYSKEYDOWN:
+        case WM_KEYUP:
+        case WM_SYSKEYUP:
+	        if (on_key(tabitem, hwnd, message,wParam, lParam))
+                break;
+        	return 0;
+        case WM_INPUTLANGCHANGE:
+        	/* wParam == Font number */
+        	/* lParam == Locale */
+        	set_input_locale((HKL)lParam);
+        	sys_cursor_update(tabitem);
+        	break;
+        case WM_IME_STARTCOMPOSITION:
+        	{
+        	    HIMC hImc = ImmGetContext(hwnd);
+        	    ImmSetCompositionFont(hImc, &tabitem->lfont);
+        	    ImmReleaseContext(hwnd, hImc);
+        	}
+        	break;
+        case WM_IME_COMPOSITION:
+            if (on_ime_composition(tabitem, hwnd, message,wParam, lParam))
+                break;
+            return 1;
 
-	/*
-	 * We don't do TranslateMessage since it disassociates the
-	 * resulting CHAR message from the KEYDOWN that sparked it,
-	 * which we occasionally don't want. Instead, we process
-	 * KEYDOWN, and call the Win32 translator functions so that
-	 * we get the translations under _our_ control.
-	 */
-	{
-	    unsigned char buf[20];
-	    int len;
-
-	    if (wParam == VK_PROCESSKEY) { /* IME PROCESS key */
-		if (message == WM_KEYDOWN) {
-		    MSG m;
-		    m.hwnd = hwnd;
-		    m.message = WM_KEYDOWN;
-		    m.wParam = wParam;
-		    m.lParam = lParam & 0xdfff;
-		    TranslateMessage(&m);
-		} else break; /* pass to Windows for default processing */
-	    } else {
-		len = TranslateKey(message, wParam, lParam, buf);
-		if (len == -1)
-		    return DefWindowProc(hwnd, message, wParam, lParam);
-
-		if (len != 0) {
-		    /*
-		     * Interrupt an ongoing paste. I'm not sure
-		     * this is sensible, but for the moment it's
-		     * preferable to having to faff about buffering
-		     * things.
-		     */
-		    term_nopaste(term);
-
-		    /*
-		     * We need not bother about stdin backlogs
-		     * here, because in GUI PuTTY we can't do
-		     * anything about it anyway; there's no means
-		     * of asking Windows to hold off on KEYDOWN
-		     * messages. We _have_ to buffer everything
-		     * we're sent.
-		     */
-		    term_seen_key_event(term);
-		    if (ldisc)
-			ldisc_send(ldisc, buf, len, 1);
-		    show_mouseptr(wintab_get_active_item(&tab), 0);
-		}
-	    }
-	}
-	net_pending_errors();
-	return 0;
-      case WM_INPUTLANGCHANGE:
-	/* wParam == Font number */
-	/* lParam == Locale */
-	set_input_locale((HKL)lParam);
-	sys_cursor_update(wintab_get_active_item(&tab));
-	break;
-      case WM_IME_STARTCOMPOSITION:
-	{
-	    HIMC hImc = ImmGetContext(hwnd);
-	    ImmSetCompositionFont(hImc, &lfont);
-	    ImmReleaseContext(hwnd, hImc);
-	}
-	break;
-      case WM_IME_COMPOSITION:
-	{
-	    HIMC hIMC;
-	    int n;
-	    char *buff;
-
-	    if(osVersion.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS || 
-	        osVersion.dwPlatformId == VER_PLATFORM_WIN32s) break; /* no Unicode */
-
-	    if ((lParam & GCS_RESULTSTR) == 0) /* Composition unfinished. */
-		break; /* fall back to DefWindowProc */
-
-	    hIMC = ImmGetContext(hwnd);
-	    n = ImmGetCompositionStringW(hIMC, GCS_RESULTSTR, NULL, 0);
-
-	    if (n > 0) {
-		int i;
-		buff = snewn(n, char);
-		ImmGetCompositionStringW(hIMC, GCS_RESULTSTR, buff, n);
-		/*
-		 * Jaeyoun Chung reports that Korean character
-		 * input doesn't work correctly if we do a single
-		 * luni_send() covering the whole of buff. So
-		 * instead we luni_send the characters one by one.
-		 */
-		term_seen_key_event(term);
-		for (i = 0; i < n; i += 2) {
-		    if (ldisc)
-			luni_send(ldisc, (unsigned short *)(buff+i), 1, 1);
-		}
-		free(buff);
-	    }
-	    ImmReleaseContext(hwnd, hIMC);
-	    return 1;
-	}
-
-      case WM_IME_CHAR:
-	if (wParam & 0xFF00) {
-	    unsigned char buf[2];
-
-	    buf[1] = wParam;
-	    buf[0] = wParam >> 8;
-	    term_seen_key_event(term);
-	    if (ldisc)
-		lpage_send(ldisc, kbd_codepage, buf, 2, 1);
-	} else {
-	    char c = (unsigned char) wParam;
-	    term_seen_key_event(term);
-	    if (ldisc)
-		lpage_send(ldisc, kbd_codepage, &c, 1, 1);
-	}
-	return (0);
-      case WM_CHAR:
-      case WM_SYSCHAR:
-	/*
-	 * Nevertheless, we are prepared to deal with WM_CHAR
-	 * messages, should they crop up. So if someone wants to
-	 * post the things to us as part of a macro manoeuvre,
-	 * we're ready to cope.
-	 */
-	{
-	    char c = (unsigned char)wParam;
-	    term_seen_key_event(term);
-	    if (ldisc)
-		lpage_send(ldisc, CP_ACP, &c, 1, 1);
-	}
-	return 0;
-      case WM_SYSCOLORCHANGE:
-	if (cfg.system_colour) {
-	    /* Refresh palette from system colours. */
-	    /* XXX actually this zaps the entire palette. */
-	    systopalette();
-	    init_palette();
-	    /* Force a repaint of the terminal window. */
-	    term_invalidate(term);
-	}
-	break;
-      case WM_AGENT_CALLBACK:
-	{
-	    struct agent_callback *c = (struct agent_callback *)lParam;
-	    c->callback(c->callback_ctx, c->data, c->len);
-	    sfree(c);
-	}
-	return 0;
-      case WM_GOT_CLIPDATA:
-	if (process_clipdata((HGLOBAL)lParam, wParam))
-	    term_do_paste(term);
-	return 0;
-      default:
-	if (message == wm_mousewheel || message == WM_MOUSEWHEEL) {
-	    int shift_pressed=0, control_pressed=0;
-
-	    if (message == WM_MOUSEWHEEL) {
-		wheel_accumulator += (short)HIWORD(wParam);
-		shift_pressed=LOWORD(wParam) & MK_SHIFT;
-		control_pressed=LOWORD(wParam) & MK_CONTROL;
-	    } else {
-		BYTE keys[256];
-		wheel_accumulator += (int)wParam;
-		if (GetKeyboardState(keys)!=0) {
-		    shift_pressed=keys[VK_SHIFT]&0x80;
-		    control_pressed=keys[VK_CONTROL]&0x80;
-		}
-	    }
-
-	    /* process events when the threshold is reached */
-	    while (abs(wheel_accumulator) >= WHEEL_DELTA) {
-		int b;
-
-		/* reduce amount for next time */
-		if (wheel_accumulator > 0) {
-		    b = MBT_WHEEL_UP;
-		    wheel_accumulator -= WHEEL_DELTA;
-		} else if (wheel_accumulator < 0) {
-		    b = MBT_WHEEL_DOWN;
-		    wheel_accumulator += WHEEL_DELTA;
-		} else
-		    break;
-
-		if (send_raw_mouse &&
-		    !(cfg.mouse_override && shift_pressed)) {
-		    /* Mouse wheel position is in screen coordinates for
-		     * some reason */
-		    POINT p;
-		    p.x = X_POS(lParam); p.y = Y_POS(lParam);
-		    if (ScreenToClient(hwnd, &p)) {
-			/* send a mouse-down followed by a mouse up */
-			term_mouse(term, b, translate_button(tabitem, b),
-				   MA_CLICK,
-				   TO_CHR_X(p.x),
-				   TO_CHR_Y(p.y), shift_pressed,
-				   control_pressed, is_alt_pressed());
-			term_mouse(term, b, translate_button(tabitem, b),
-				   MA_RELEASE, TO_CHR_X(p.x),
-				   TO_CHR_Y(p.y), shift_pressed,
-				   control_pressed, is_alt_pressed());
-		    } /* else: not sure when this can fail */
-		} else {
-		    /* trigger a scroll */
-		    int scrollLines = cfg.scrolllines == -1 ? term->rows/2
-		            : cfg.scrolllines == -2          ? term->rows
-		            : cfg.scrolllines < -2            ? 3
-		            : cfg.scrolllines;
-		    term_scroll(term, 0,
-				b == MBT_WHEEL_UP ?
-				-scrollLines : scrollLines);
-		}
-	    }
-	    return 0;
-	}
+        case WM_IME_CHAR:
+            on_ime_char(tabitem, hwnd, message,wParam, lParam);
+            return (0);
+        case WM_CHAR:
+        case WM_SYSCHAR:
+	        on_char(tabitem, hwnd, message,wParam, lParam);
+        	return 0;
+        case WM_SYSCOLORCHANGE:
+	        on_sys_color_change(tabitem, hwnd, message,wParam, lParam);
+        	break;
+        case WM_AGENT_CALLBACK:
+        	{
+        	    struct agent_callback *c = (struct agent_callback *)lParam;
+        	    c->callback(c->callback_ctx, c->data, c->len);
+        	    sfree(c);
+        	}
+        	return 0;
+        case WM_GOT_CLIPDATA:
+        	if (process_clipdata((HGLOBAL)lParam, wParam))
+    	    term_do_paste(tabitem->term);
+        	return 0;
+        default:
+        	on_default(tabitem, hwnd, message,wParam, lParam);
+            break;
     }
 
     /*
@@ -3731,7 +3780,7 @@ int char_width(Context ctx, int uc) {
  * -1 to forward the message to Windows, or another negative number
  * to indicate a NUL-terminated "special" string.
  */
-static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
+static int TranslateKey(wintabitem* tabitem, UINT message, WPARAM wParam, LPARAM lParam,
 			unsigned char *output)
 {
     BYTE keystate[256];
@@ -3832,9 +3881,9 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 
 
 	/* Nastyness with NUMLock - Shift-NUMLock is left alone though */
-	if ((cfg.funky_type == FUNKY_VT400 ||
-	     (cfg.funky_type <= FUNKY_LINUX && term->app_keypad_keys &&
-	      !cfg.no_applic_k))
+	if ((tabitem->cfg.funky_type == FUNKY_VT400 ||
+	     (tabitem->cfg.funky_type <= FUNKY_LINUX && tabitem->term->app_keypad_keys &&
+	      !tabitem->cfg.no_applic_k))
 	    && wParam == VK_NUMLOCK && !(keystate[VK_SHIFT] & 0x80)) {
 
 	    wParam = VK_EXECUTE;
@@ -3849,7 +3898,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
     }
 
     /* Disable Auto repeat if required */
-    if (term->repeat_off &&
+    if (tabitem->term->repeat_off &&
 	(HIWORD(lParam) & (KF_UP | KF_REPEAT)) == KF_REPEAT)
 	return 0;
 
@@ -3860,7 +3909,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 
     /* Make sure Ctrl-ALT is not the same as AltGr for ToAscii unless told. */
     if (left_alt && (keystate[VK_CONTROL] & 0x80)) {
-	if (cfg.ctrlaltkeys)
+	if (tabitem->cfg.ctrlaltkeys)
 	    keystate[VK_MENU] = 0;
 	else {
 	    keystate[VK_RMENU] = 0x80;
@@ -3873,9 +3922,9 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	+ ((keystate[VK_CONTROL] & 0x80) != 0) * 2;
 
     /* Note if AltGr was pressed and if it was used as a compose key */
-    if (!compose_state) {
+    if (!tabitem->compose_state) {
 	compose_key = 0x100;
-	if (cfg.compose_key) {
+	if (tabitem->cfg.compose_key) {
 	    if (wParam == VK_MENU && (HIWORD(lParam) & KF_EXTENDED))
 		compose_key = wParam;
 	}
@@ -3884,23 +3933,23 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
     }
 
     if (wParam == compose_key) {
-	if (compose_state == 0
-	    && (HIWORD(lParam) & (KF_UP | KF_REPEAT)) == 0) compose_state =
+	if (tabitem->compose_state == 0
+	    && (HIWORD(lParam) & (KF_UP | KF_REPEAT)) == 0) tabitem->compose_state =
 		1;
-	else if (compose_state == 1 && (HIWORD(lParam) & KF_UP))
-	    compose_state = 2;
+	else if (tabitem->compose_state == 1 && (HIWORD(lParam) & KF_UP))
+	    tabitem->compose_state = 2;
 	else
-	    compose_state = 0;
-    } else if (compose_state == 1 && wParam != VK_CONTROL)
-	compose_state = 0;
+	    tabitem->compose_state = 0;
+    } else if (tabitem->compose_state == 1 && wParam != VK_CONTROL)
+	tabitem->compose_state = 0;
 
-    if (compose_state > 1 && left_alt)
-	compose_state = 0;
+    if (tabitem->compose_state > 1 && left_alt)
+	tabitem->compose_state = 0;
 
     /* Sanitize the number pad if not using a PC NumPad */
-    if (left_alt || (term->app_keypad_keys && !cfg.no_applic_k
-		     && cfg.funky_type != FUNKY_XTERM)
-	|| cfg.funky_type == FUNKY_VT400 || cfg.nethack_keypad || compose_state) {
+    if (left_alt || (tabitem->term->app_keypad_keys && !tabitem->cfg.no_applic_k
+		     && tabitem->cfg.funky_type != FUNKY_XTERM)
+	|| tabitem->cfg.funky_type == FUNKY_VT400 || tabitem->cfg.nethack_keypad || tabitem->compose_state) {
 	if ((HIWORD(lParam) & KF_EXTENDED) == 0) {
 	    int nParam = 0;
 	    switch (wParam) {
@@ -3954,50 +4003,50 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 
 	/* Lets see if it's a pattern we know all about ... */
 	if (wParam == VK_PRIOR && shift_state == 1) {
-	    SendMessage(hwnd, WM_VSCROLL, SB_PAGEUP, 0);
+	    SendMessage(tabitem->page.hwndCtrl, WM_VSCROLL, SB_PAGEUP, 0);
 	    return 0;
 	}
 	if (wParam == VK_PRIOR && shift_state == 2) {
-	    SendMessage(hwnd, WM_VSCROLL, SB_LINEUP, 0);
+	    SendMessage(tabitem->page.hwndCtrl, WM_VSCROLL, SB_LINEUP, 0);
 	    return 0;
 	}
 	if (wParam == VK_NEXT && shift_state == 1) {
-	    SendMessage(hwnd, WM_VSCROLL, SB_PAGEDOWN, 0);
+	    SendMessage(tabitem->page.hwndCtrl, WM_VSCROLL, SB_PAGEDOWN, 0);
 	    return 0;
 	}
 	if (wParam == VK_NEXT && shift_state == 2) {
-	    SendMessage(hwnd, WM_VSCROLL, SB_LINEDOWN, 0);
+	    SendMessage(tabitem->page.hwndCtrl, WM_VSCROLL, SB_LINEDOWN, 0);
 	    return 0;
 	}
 	if ((wParam == VK_PRIOR || wParam == VK_NEXT) && shift_state == 3) {
-	    term_scroll_to_selection(term, (wParam == VK_PRIOR ? 0 : 1));
+	    term_scroll_to_selection(tabitem->term, (wParam == VK_PRIOR ? 0 : 1));
 	    return 0;
 	}
 	if (wParam == VK_INSERT && shift_state == 1) {
 	    request_paste(NULL);
 	    return 0;
 	}
-	if (left_alt && wParam == VK_F4 && cfg.alt_f4) {
+	if (left_alt && wParam == VK_F4 && tabitem->cfg.alt_f4) {
 	    return -1;
 	}
-	if (left_alt && wParam == VK_SPACE && cfg.alt_space) {
-	    SendMessage(hwnd, WM_SYSCOMMAND, SC_KEYMENU, 0);
+	if (left_alt && wParam == VK_SPACE && tabitem->cfg.alt_space) {
+	    SendMessage(tabitem->page.hwndCtrl, WM_SYSCOMMAND, SC_KEYMENU, 0);
 	    return -1;
 	}
-	if (left_alt && wParam == VK_RETURN && cfg.fullscreenonaltenter &&
-	    (cfg.resize_action != RESIZE_DISABLED)) {
+	if (left_alt && wParam == VK_RETURN && tabitem->cfg.fullscreenonaltenter &&
+	    (tabitem->cfg.resize_action != RESIZE_DISABLED)) {
  	    if ((HIWORD(lParam) & (KF_UP | KF_REPEAT)) != KF_REPEAT)
  		flip_full_screen();
 	    return -1;
 	}
 	/* Control-Numlock for app-keypad mode switch */
 	if (wParam == VK_PAUSE && shift_state == 2) {
-	    term->app_keypad_keys ^= 1;
+	    tabitem->term->app_keypad_keys ^= 1;
 	    return 0;
 	}
 
 	/* Nethack keypad */
-	if (cfg.nethack_keypad && !left_alt) {
+	if (tabitem->cfg.nethack_keypad && !left_alt) {
 	    switch (wParam) {
 	      case VK_NUMPAD1:
 		*p++ = "bB\002\002"[shift_state & 3];
@@ -4033,9 +4082,9 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	if (!left_alt) {
 	    int xkey = 0;
 
-	    if (cfg.funky_type == FUNKY_VT400 ||
-		(cfg.funky_type <= FUNKY_LINUX &&
-		 term->app_keypad_keys && !cfg.no_applic_k)) switch (wParam) {
+	    if (tabitem->cfg.funky_type == FUNKY_VT400 ||
+		(tabitem->cfg.funky_type <= FUNKY_LINUX &&
+		 tabitem->term->app_keypad_keys && !tabitem->cfg.no_applic_k)) switch (wParam) {
 		  case VK_EXECUTE:
 		    xkey = 'P';
 		    break;
@@ -4049,7 +4098,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 		    xkey = 'S';
 		    break;
 		}
-	    if (term->app_keypad_keys && !cfg.no_applic_k)
+	    if (tabitem->term->app_keypad_keys && !tabitem->cfg.no_applic_k)
 		switch (wParam) {
 		  case VK_NUMPAD0:
 		    xkey = 'p';
@@ -4086,7 +4135,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 		    xkey = 'n';
 		    break;
 		  case VK_ADD:
-		    if (cfg.funky_type == FUNKY_XTERM) {
+		    if (tabitem->cfg.funky_type == FUNKY_XTERM) {
 			if (shift_state)
 			    xkey = 'l';
 			else
@@ -4098,15 +4147,15 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 		    break;
 
 		  case VK_DIVIDE:
-		    if (cfg.funky_type == FUNKY_XTERM)
+		    if (tabitem->cfg.funky_type == FUNKY_XTERM)
 			xkey = 'o';
 		    break;
 		  case VK_MULTIPLY:
-		    if (cfg.funky_type == FUNKY_XTERM)
+		    if (tabitem->cfg.funky_type == FUNKY_XTERM)
 			xkey = 'j';
 		    break;
 		  case VK_SUBTRACT:
-		    if (cfg.funky_type == FUNKY_XTERM)
+		    if (tabitem->cfg.funky_type == FUNKY_XTERM)
 			xkey = 'm';
 		    break;
 
@@ -4116,7 +4165,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 		    break;
 		}
 	    if (xkey) {
-		if (term->vt52_mode) {
+		if (tabitem->term->vt52_mode) {
 		    if (xkey >= 'P' && xkey <= 'S')
 			p += sprintf((char *) p, "\x1B%c", xkey);
 		    else
@@ -4128,13 +4177,13 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	}
 
 	if (wParam == VK_BACK && shift_state == 0) {	/* Backspace */
-	    *p++ = (cfg.bksp_is_delete ? 0x7F : 0x08);
+	    *p++ = (tabitem->cfg.bksp_is_delete ? 0x7F : 0x08);
 	    *p++ = 0;
 	    return -2;
 	}
 	if (wParam == VK_BACK && shift_state == 1) {	/* Shift Backspace */
 	    /* We do the opposite of what is configured */
-	    *p++ = (cfg.bksp_is_delete ? 0x08 : 0x7F);
+	    *p++ = (tabitem->cfg.bksp_is_delete ? 0x08 : 0x7F);
 	    *p++ = 0;
 	    return -2;
 	}
@@ -4153,8 +4202,8 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	    return p - output;
 	}
 	if (wParam == VK_CANCEL && shift_state == 2) {	/* Ctrl-Break */
-	    if (back)
-		back->special(backhandle, TS_BRK);
+	    if (tabitem->back)
+		tabitem->back->special(tabitem->backhandle, TS_BRK);
 	    return 0;
 	}
 	if (wParam == VK_PAUSE) {      /* Break/Pause */
@@ -4179,7 +4228,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	    *p++ = 0x1E;	       /* Ctrl-~ == Ctrl-^ in xterm at least */
 	    return p - output;
 	}
-	if (shift_state == 0 && wParam == VK_RETURN && term->cr_lf_return) {
+	if (shift_state == 0 && wParam == VK_RETURN && tabitem->term->cr_lf_return) {
 	    *p++ = '\r';
 	    *p++ = '\n';
 	    return p - output;
@@ -4278,15 +4327,15 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	    break;
 	}
 	/* Reorder edit keys to physical order */
-	if (cfg.funky_type == FUNKY_VT400 && code <= 6)
+	if (tabitem->cfg.funky_type == FUNKY_VT400 && code <= 6)
 	    code = "\0\2\1\4\5\3\6"[code];
 
-	if (term->vt52_mode && code > 0 && code <= 6) {
+	if (tabitem->term->vt52_mode && code > 0 && code <= 6) {
 	    p += sprintf((char *) p, "\x1B%c", " HLMEIG"[code]);
 	    return p - output;
 	}
 
-	if (cfg.funky_type == FUNKY_SCO &&     /* SCO function keys */
+	if (tabitem->cfg.funky_type == FUNKY_SCO &&     /* SCO function keys */
 	    code >= 11 && code <= 34) {
 	    char codes[] = "MNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@[\\]^_`{";
 	    int index = 0;
@@ -4309,7 +4358,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	    p += sprintf((char *) p, "\x1B[%c", codes[index]);
 	    return p - output;
 	}
-	if (cfg.funky_type == FUNKY_SCO &&     /* SCO small keypad */
+	if (tabitem->cfg.funky_type == FUNKY_SCO &&     /* SCO small keypad */
 	    code >= 1 && code <= 6) {
 	    char codes[] = "HL.FIG";
 	    if (code == 3) {
@@ -4319,31 +4368,31 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	    }
 	    return p - output;
 	}
-	if ((term->vt52_mode || cfg.funky_type == FUNKY_VT100P) && code >= 11 && code <= 24) {
+	if ((tabitem->term->vt52_mode || tabitem->cfg.funky_type == FUNKY_VT100P) && code >= 11 && code <= 24) {
 	    int offt = 0;
 	    if (code > 15)
 		offt++;
 	    if (code > 21)
 		offt++;
-	    if (term->vt52_mode)
+	    if (tabitem->term->vt52_mode)
 		p += sprintf((char *) p, "\x1B%c", code + 'P' - 11 - offt);
 	    else
 		p +=
 		    sprintf((char *) p, "\x1BO%c", code + 'P' - 11 - offt);
 	    return p - output;
 	}
-	if (cfg.funky_type == FUNKY_LINUX && code >= 11 && code <= 15) {
+	if (tabitem->cfg.funky_type == FUNKY_LINUX && code >= 11 && code <= 15) {
 	    p += sprintf((char *) p, "\x1B[[%c", code + 'A' - 11);
 	    return p - output;
 	}
-	if (cfg.funky_type == FUNKY_XTERM && code >= 11 && code <= 14) {
-	    if (term->vt52_mode)
+	if (tabitem->cfg.funky_type == FUNKY_XTERM && code >= 11 && code <= 14) {
+	    if (tabitem->term->vt52_mode)
 		p += sprintf((char *) p, "\x1B%c", code + 'P' - 11);
 	    else
 		p += sprintf((char *) p, "\x1BO%c", code + 'P' - 11);
 	    return p - output;
 	}
-	if (cfg.rxvt_homeend && (code == 1 || code == 4)) {
+	if (tabitem->cfg.rxvt_homeend && (code == 1 || code == 4)) {
 	    p += sprintf((char *) p, code == 1 ? "\x1B[H" : "\x1BOw");
 	    return p - output;
 	}
@@ -4376,7 +4425,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 		break;
 	    }
 	    if (xkey) {
-		p += format_arrow_key(p, term, xkey, shift_state);
+		p += format_arrow_key(p, tabitem->term, xkey, shift_state);
 		return p - output;
 	    }
 	}
@@ -4403,7 +4452,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	BOOL capsOn=0;
 
 	/* helg: clear CAPS LOCK state if caps lock switches to cyrillic */
-	if(cfg.xlat_capslockcyr && keystate[VK_CAPITAL] != 0) {
+	if(tabitem->cfg.xlat_capslockcyr && keystate[VK_CAPITAL] != 0) {
 	    capsOn= !left_alt;
 	    keystate[VK_CAPITAL] = 0;
 	}
@@ -4432,7 +4481,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 #ifdef SHOW_TOASCII_RESULT
 	if (r == 1 && !key_down) {
 	    if (alt_sum) {
-		if (in_utf(term) || ucsdata.dbcs_screenfont)
+		if (in_utf(tabitem->term) || tabitem->ucsdata.dbcs_screenfont)
 		    debug((", (U+%04x)", alt_sum));
 		else
 		    debug((", LCH(%d)", alt_sum));
@@ -4456,41 +4505,41 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	     * sensible, but for the moment it's preferable to
 	     * having to faff about buffering things.
 	     */
-	    term_nopaste(term);
+	    term_nopaste(tabitem->term);
 
 	    p = output;
 	    for (i = 0; i < r; i++) {
 		unsigned char ch = (unsigned char) keys[i];
 
-		if (compose_state == 2 && (ch & 0x80) == 0 && ch > ' ') {
+		if (tabitem->compose_state == 2 && (ch & 0x80) == 0 && ch > ' ') {
 		    compose_char = ch;
-		    compose_state++;
+		    tabitem->compose_state++;
 		    continue;
 		}
-		if (compose_state == 3 && (ch & 0x80) == 0 && ch > ' ') {
+		if (tabitem->compose_state == 3 && (ch & 0x80) == 0 && ch > ' ') {
 		    int nc;
-		    compose_state = 0;
+		    tabitem->compose_state = 0;
 
 		    if ((nc = check_compose(compose_char, ch)) == -1) {
 			MessageBeep(MB_ICONHAND);
 			return 0;
 		    }
 		    keybuf = nc;
-		    term_seen_key_event(term);
-		    if (ldisc)
-			luni_send(ldisc, &keybuf, 1, 1);
+		    term_seen_key_event(tabitem->term);
+		    if (tabitem->ldisc)
+			luni_send(tabitem->ldisc, &keybuf, 1, 1);
 		    continue;
 		}
 
-		compose_state = 0;
+		tabitem->compose_state = 0;
 
 		if (!key_down) {
 		    if (alt_sum) {
-			if (in_utf(term) || ucsdata.dbcs_screenfont) {
+			if (in_utf(tabitem->term) || tabitem->ucsdata.dbcs_screenfont) {
 			    keybuf = alt_sum;
-			    term_seen_key_event(term);
-			    if (ldisc)
-				luni_send(ldisc, &keybuf, 1, 1);
+			    term_seen_key_event(tabitem->term);
+			    if (tabitem->ldisc)
+				luni_send(tabitem->ldisc, &keybuf, 1, 1);
 			} else {
 			    ch = (char) alt_sum;
 			    /*
@@ -4502,35 +4551,35 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 			     * messages. We _have_ to buffer
 			     * everything we're sent.
 			     */
-			    term_seen_key_event(term);
-			    if (ldisc)
-				ldisc_send(ldisc, &ch, 1, 1);
+			    term_seen_key_event(tabitem->term);
+			    if (tabitem->ldisc)
+				ldisc_send(tabitem->ldisc, &ch, 1, 1);
 			}
 			alt_sum = 0;
 		    } else {
-			term_seen_key_event(term);
-			if (ldisc)
-			    lpage_send(ldisc, kbd_codepage, &ch, 1, 1);
+			term_seen_key_event(tabitem->term);
+			if (tabitem->ldisc)
+			    lpage_send(tabitem->ldisc, kbd_codepage, &ch, 1, 1);
 		    }
 		} else {
 		    if(capsOn && ch < 0x80) {
 			WCHAR cbuf[2];
 			cbuf[0] = 27;
 			cbuf[1] = xlat_uskbd2cyrllic(ch);
-			term_seen_key_event(term);
-			if (ldisc)
-			    luni_send(ldisc, cbuf+!left_alt, 1+!!left_alt, 1);
+			term_seen_key_event(tabitem->term);
+			if (tabitem->ldisc)
+			    luni_send(tabitem->ldisc, cbuf+!left_alt, 1+!!left_alt, 1);
 		    } else {
 			char cbuf[2];
 			cbuf[0] = '\033';
 			cbuf[1] = ch;
-			term_seen_key_event(term);
-			if (ldisc)
-			    lpage_send(ldisc, kbd_codepage,
+			term_seen_key_event(tabitem->term);
+			if (tabitem->ldisc)
+			    lpage_send(tabitem->ldisc, kbd_codepage,
 				       cbuf+!left_alt, 1+!!left_alt, 1);
 		    }
 		}
-		show_mouseptr(wintab_get_active_item(&tab), 0);
+		show_mouseptr(tabitem, 0);
 	    }
 
 	    /* This is so the ALT-Numpad and dead keys work correctly. */
@@ -4542,7 +4591,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	if (!left_alt)
 	    keys[0] = 0;
 	/* If we will be using alt_sum fix the 256s */
-	else if (keys[0] && (in_utf(term) || ucsdata.dbcs_screenfont))
+	else if (keys[0] && (in_utf(tabitem->term) || tabitem->ucsdata.dbcs_screenfont))
 	    keys[0] = 10;
     }
 
@@ -4553,7 +4602,7 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
      * we return -1, which means Windows will give the keystroke
      * its default handling (i.e. bring up the System menu).
      */
-    if (wParam == VK_MENU && !cfg.alt_only)
+    if (wParam == VK_MENU && !tabitem->cfg.alt_only)
 	return 0;
 
     return -1;
@@ -5533,11 +5582,11 @@ static void make_full_screen(wintabitem* tabitem)
 	style |= WS_VSCROLL;
     else
 	style &= ~WS_VSCROLL;
-    SetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE, style);
+    SetWindowLongPtr(hwnd, GWL_STYLE, style);
 
     /* Resize ourselves to exactly cover the nearest monitor. */
 	get_fullscreen_rect(&ss);
-    SetWindowPos(tabitem->page.hwndCtrl, HWND_TOP, ss.left, ss.top,
+    SetWindowPos(hwnd, HWND_TOP, ss.left, ss.top,
 			ss.right - ss.left,
 			ss.bottom - ss.top,
 			SWP_FRAMECHANGED);
@@ -5573,8 +5622,8 @@ static void clear_full_screen(wintabitem* tabitem)
     else
 	style &= ~WS_VSCROLL;
     if (style != oldstyle) {
-	SetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE, style);
-	SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, 0, 0,
+	SetWindowLongPtr(hwnd, GWL_STYLE, style);
+	SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
 		     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
 		     SWP_FRAMECHANGED);
     }
