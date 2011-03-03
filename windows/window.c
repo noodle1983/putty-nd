@@ -5567,7 +5567,8 @@ static int get_fullscreen_rect(RECT * ss)
  */
 static void make_full_screen(wintabitem* tabitem)
 {
-    DWORD style;
+    DWORD win_style;
+    DWORD page_style;
 	RECT ss;
 
     assert(IsZoomed(hwnd));
@@ -5576,13 +5577,17 @@ static void make_full_screen(wintabitem* tabitem)
 		return;
 	
     /* Remove the window furniture. */
-    style = GetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE);
-    style &= ~(WS_CAPTION | WS_BORDER | WS_THICKFRAME);
+    win_style = GetWindowLongPtr(hwnd, GWL_STYLE);
+    win_style &= ~(WS_CAPTION | WS_BORDER | WS_THICKFRAME);
+    SetWindowLongPtr(hwnd, GWL_STYLE, win_style);
+
+    /* remove the page scroll bar */
+    page_style = GetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE);
     if (tabitem->cfg.scrollbar_in_fullscreen)
-	style |= WS_VSCROLL;
+    	page_style |= WS_VSCROLL;
     else
-	style &= ~WS_VSCROLL;
-    SetWindowLongPtr(hwnd, GWL_STYLE, style);
+    	page_style &= ~WS_VSCROLL; 
+    SetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE, page_style);
 
     /* Resize ourselves to exactly cover the nearest monitor. */
 	get_fullscreen_rect(&ss);
@@ -5590,7 +5595,10 @@ static void make_full_screen(wintabitem* tabitem)
 			ss.right - ss.left,
 			ss.bottom - ss.top,
 			SWP_FRAMECHANGED);
-
+    SetWindowPos(tabitem->page.hwndCtrl, HWND_TOPMOST, ss.left, ss.top,
+			ss.right - ss.left,
+			ss.bottom - ss.top,
+			SWP_FRAMECHANGED);
     /* We may have changed size as a result */
 
     reset_window(0);
@@ -5609,24 +5617,34 @@ static void make_full_screen(wintabitem* tabitem)
 static void clear_full_screen(wintabitem* tabitem)
 {
     DWORD oldstyle, style;
+    DWORD page_oldstyle, page_style;
 
     /* Reinstate the window furniture. */
-    style = oldstyle = GetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE);
+    style = oldstyle = GetWindowLongPtr(hwnd, GWL_STYLE);
     style |= WS_CAPTION | WS_BORDER;
     if (tabitem->cfg.resize_action == RESIZE_DISABLED)
         style &= ~WS_THICKFRAME;
     else
-        style |= WS_THICKFRAME;
-    if (tabitem->cfg.scrollbar)
-	style |= WS_VSCROLL;
-    else
-	style &= ~WS_VSCROLL;
+        style |= WS_THICKFRAME;   
     if (style != oldstyle) {
-	SetWindowLongPtr(hwnd, GWL_STYLE, style);
-	SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
-		     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-		     SWP_FRAMECHANGED);
+    	SetWindowLongPtr(hwnd, GWL_STYLE, style);
+    	SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
+    		     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+    		     SWP_FRAMECHANGED);
     }
+
+    /* page resize */
+    page_style = page_oldstyle = GetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE);
+    if (tabitem->cfg.scrollbar)
+    	page_style |= WS_VSCROLL;
+    else
+    	page_style &= ~WS_VSCROLL;
+    if (page_style != page_oldstyle) {
+    	SetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE, page_style);	
+    }
+    RECT rc;
+    GetClientRect(hwnd, &rc);
+    wintab_resize(&tab, &rc);
 
     /* Untick the menu item in the System and context menus. */
     {
