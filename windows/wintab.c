@@ -79,9 +79,10 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     wintabpage_resize(&wintab->items[0].page, &rcPage);
 
     hdwp = BeginDeferWindowPos(1);  
-    DeferWindowPos(hdwp, wintab->hwndTab, NULL, rc->left, rc->top, rc->right, 
-        rc->bottom, SWP_NOZORDER);     
+    DeferWindowPos(hdwp, wintab->hwndTab, HWND_BOTTOM, rc->left, rc->top, rc->right, 
+        rc->bottom, SWP_NOMOVE);     
     EndDeferWindowPos(hdwp); 
+    
     return 0;
 }
 
@@ -246,7 +247,7 @@ void wintabitem_creat(wintab *wintab, Config *cfg)
     wintab->items[0].specials = NULL;
     wintab->items[0].specials_menu = NULL;
     
-    wintabpage_init(&wintab->items[0].page, cfg, wintab->hwndTab);
+    wintabpage_init(&wintab->items[0].page, cfg, wintab->hwndParent);
     
     adjust_host(cfg);
     wintab->items[0].cfg = *cfg;
