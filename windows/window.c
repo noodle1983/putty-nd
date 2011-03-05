@@ -707,6 +707,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     term = tab.items[0].term;
     logctx = tab.items[0].logctx;
     ucsdata = tab.items[0].ucsdata;
+    pal = tab.items[0].pal;
+    logpal = tab.items[0].logpal;
 
     resizeWindows();
 
@@ -805,9 +807,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
             /*
              * Set the palette up.
              */
-            pal = NULL;
-            logpal = NULL;
-            init_palette();
+
+            //init_palette();
 
             //term_set_focus(term, GetForegroundWindow() == hwnd);
     UpdateWindow(hwnd);
@@ -832,8 +833,9 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     	    if (msg.message == WM_QUIT)
     		goto finished;	       /* two-level break */
 
-    	    if (!(IsWindow(logbox) && IsDialogMessage(logbox, &msg)))
-    		DispatchMessage(&msg);
+    	    if (!(IsWindow(logbox) && IsDialogMessage(logbox, &msg))){ 
+                DispatchMessage(&msg);
+    	    }
     	    /* Send the paste buffer if there's anything to send */
     	    wintab_term_paste(&tab);
     	    /* If there's nothing new in the queue then we can do everything
@@ -1133,6 +1135,7 @@ static void enact_pending_netevent(void)
  * Copy the colour palette from the configuration data into defpal.
  * This is non-trivial because the colour indices are different.
  */
+#if 0
 static void cfgtopalette(void)
 {
     int i;
@@ -1238,7 +1241,7 @@ static void init_palette(void)
 	    colours[i] = RGB(defpal[i].rgbtRed,
 			     defpal[i].rgbtGreen, defpal[i].rgbtBlue);
 }
-
+#endif
 /*
  * This is a wrapper to ExtTextOut() to force Windows to display
  * the precise glyphs we give it. Otherwise it would do its own
@@ -3115,7 +3118,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
         	return 0;
         case WM_PAINT:
             wintab_on_paint(&tab, hwnd, message,wParam, lParam);
-    		return 0;
+    		break;
         case WM_NETEVENT:
             on_net_event(tabitem, hwnd, message,wParam, lParam);
         	return 0;
@@ -3303,7 +3306,7 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
     static int lpDx_len = 0;
     int *lpDx_maybe;
 
-    if (hdc == NULL) return;
+    assert (hdc != NULL);
 
     lattr &= LATTR_MODE;
 
@@ -3639,7 +3642,7 @@ void do_cursor(Context ctx, int x, int y, wchar_t *text, int len,
     HDC hdc = tabitem->hdc;
     int ctype = cfg.cursor_type;
 
-    if (hdc == NULL) return;
+    assert (hdc != NULL);
 
     lattr &= LATTR_MODE;
 
@@ -3717,7 +3720,7 @@ int char_width(Context ctx, int uc) {
     HDC hdc = tabitem->hdc;
     int ibuf = 0;
 
-    if (hdc == NULL) return 0;
+    assert (hdc != NULL);
 
     /* If the font max is the same as the font ave width then this
      * function is a no-op.
@@ -4655,13 +4658,7 @@ Context get_ctx(void *frontend)
     	tabitem->hdc = GetDC(tabitem->page.hwndCtrl);
     	if (tabitem->hdc && tabitem->pal){
     	    SelectPalette(tabitem->hdc, tabitem->pal, FALSE);
-        } else if (tabitem->hdc){
-            ReleaseDC(tabitem->page.hwndCtrl, tabitem->hdc);
-        	tabitem->hdc = NULL;
-        }else{
-            tabitem->hdc = NULL;
-        }
-        
+        }         
     }
     return tabitem;
 }
@@ -4708,7 +4705,7 @@ void palette_set(void *frontend, int n, int r, int g, int b)
         wintabitem *tabitem = get_ctx(frontend);
         assert(tabitem != NULL);
     	HDC hdc = tabitem->hdc;
-        if (hdc == NULL) return;
+        assert (hdc != NULL);
     	UnrealizeObject(tabitem->pal);
     	RealizePalette(hdc);
     	free_ctx(tabitem, tabitem);
@@ -4749,7 +4746,7 @@ void palette_reset(void *frontend)
 	wintabitem *tabitem = get_ctx(frontend);
     assert(tabitem != NULL);
     hdc = tabitem->hdc;
-    if (hdc == NULL) return;
+    assert (hdc != NULL);
 	RealizePalette(hdc);
 	free_ctx(tabitem, tabitem);
     } else {
