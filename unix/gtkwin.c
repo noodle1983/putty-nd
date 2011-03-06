@@ -200,7 +200,7 @@ int from_backend_untrusted(void *frontend, const char *data, int len)
     return term_data_untrusted(inst->term, data, len);
 }
 
-int get_userpass_input(Config *cfg, prompts_t *p, unsigned char *in, int inlen)
+int get_userpass_input(void *frontend, Config *cfg, prompts_t *p, unsigned char *in, int inlen)
 {
     struct gui_data *inst = (struct gui_data *)p->frontend;
     int ret;

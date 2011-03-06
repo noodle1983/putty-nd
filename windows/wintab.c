@@ -67,15 +67,16 @@ int wintab_init(wintab *wintab, HWND hwndParent)
 
 int wintab_fini(wintab *wintab)
 {
+    wintabitem_fini(&wintab->items[0]);
     return 0;
 }
 
 int wintab_resize(wintab *wintab, const RECT *rc)
 {
-    RECT rcPage = *rc;
+    RECT rcPage;
     HDWP hdwp;
     
-    TabCtrl_AdjustRect(wintab->hwndTab, FALSE, &rcPage);
+    wintab_get_page_rect(wintab, &rcPage);
     wintabpage_resize(&wintab->items[0].page, &rcPage);
 
     hdwp = BeginDeferWindowPos(1);  
@@ -84,6 +85,12 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     EndDeferWindowPos(hdwp); 
     
     return 0;
+}
+
+void wintab_get_page_rect(wintab *wintab, RECT *rc)
+{
+    GetClientRect(wintab->hwndTab, rc);  
+    TabCtrl_AdjustRect(wintab->hwndTab, FALSE, rc);
 }
 
 void wintab_onsize(wintab *wintab, HWND hwndParent, LPARAM lParam)
@@ -232,51 +239,79 @@ int wintab_on_paint(wintab *wintab, HWND hwnd, UINT message,
 //tabbar item related
 //-----------------------------------------------------------------------
 
-void wintabitem_creat(wintab *wintab, Config *cfg)
+int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
 {
-    wintab->items[0].hdc = NULL;
-    wintab->items[0].send_raw_mouse = 0;
-    wintab->items[0].wheel_accumulator = 0;
-    wintab->items[0].busy_status = BUSY_NOT;
-    wintab->items[0].compose_state = 0;
-    wintab->items[0].wm_mousewheel = WM_MOUSEWHEEL;
-    wintab->items[0].offset_width = wintab->items[0].offset_height = wintab->items[0].cfg.window_border;
-    wintab->items[0].caret_x = -1; 
-    wintab->items[0].caret_y = -1;
-    wintab->items[0].n_specials = 0;
-    wintab->items[0].specials = NULL;
-    wintab->items[0].specials_menu = NULL;
-    
-    wintabpage_init(&wintab->items[0].page, cfg, wintab->hwndParent);
+    tabitem->hdc = NULL;
+    tabitem->send_raw_mouse = 0;
+    tabitem->wheel_accumulator = 0;
+    tabitem->busy_status = BUSY_NOT;
+    tabitem->compose_state = 0;
+    tabitem->wm_mousewheel = WM_MOUSEWHEEL;
+    tabitem->offset_width = tabitem->offset_height = tabitem->cfg.window_border;
+    tabitem->caret_x = -1; 
+    tabitem->caret_y = -1;
+    tabitem->n_specials = 0;
+    tabitem->specials = NULL;
+    tabitem->specials_menu = NULL;
+
+    tabitem->parentTab = wintab;
+    wintabpage_init(&tabitem->page, cfg, wintab->hwndParent);
+    wintabpage_bind_item(tabitem->page.hwndCtrl, tabitem); 
     
     adjust_host(cfg);
-    wintab->items[0].cfg = *cfg;
-    wintabitem_cfgtopalette(&wintab->items[0]);
+    tabitem->cfg = *cfg;
+    wintabitem_cfgtopalette(tabitem);
 
     
-    memset(&wintab->items[0].ucsdata, 0, sizeof(wintab->items[0].ucsdata));
-    wintab->items[0].term = term_init(&wintab->items[0].cfg, &wintab->items[0].ucsdata, &wintab->items[0]);
-    wintab->items[0].logctx = log_init(NULL, &wintab->items[0].cfg);
-    term_provide_logctx(wintab->items[0].term, wintab->items[0].logctx);
-    term_size(wintab->items[0].term, wintab->items[0].cfg.height, 
-        wintab->items[0].cfg.width, wintab->items[0].cfg.savelines);   
-    wintabitem_init_fonts(&wintab->items[0], 0, 0);
+    memset(&tabitem->ucsdata, 0, sizeof(tabitem->ucsdata));
+    tabitem->term = term_init(&tabitem->cfg, &tabitem->ucsdata, tabitem);
+    tabitem->logctx = log_init(tabitem, &tabitem->cfg);
+    term_provide_logctx(tabitem->term, tabitem->logctx);
+    term_size(tabitem->term, tabitem->cfg.height, 
+        tabitem->cfg.width, tabitem->cfg.savelines);   
+    wintabitem_init_fonts(tabitem, 0, 0);
 
-    wintabitem_CreateCaret(&wintab->items[0]);
-    wintabpage_init_scrollbar(&wintab->items[0].page, wintab->items[0].term);
-    wintabitem_init_mouse(&wintab->items[0]);
-    if (wintabitem_start_backend(&wintab->items[0]) != 0){
-        //todo
-        return;
+    wintabitem_CreateCaret(tabitem);
+    wintabpage_init_scrollbar(&tabitem->page, tabitem->term);
+    wintabitem_init_mouse(tabitem);
+    if (wintabitem_start_backend(tabitem) != 0){
+        return -1;
     }
 
-    ShowWindow(wintab->items[0].page.hwndCtrl, SW_SHOW);
-//    SetForegroundWindow(wintab->items[0].page.hwndCtrl);
+    ShowWindow(tabitem->page.hwndCtrl, SW_SHOW);
+//    SetForegroundWindow(tabitem->page.hwndCtrl);
 
-    wintab->items[0].pal = NULL;
-    wintab->items[0].logpal = NULL;
-    wintabitem_init_palette(&wintab->items[0]);
-    term_set_focus(wintab->items[0].term, TRUE);
+    tabitem->pal = NULL;
+    tabitem->logpal = NULL;
+    wintabitem_init_palette(tabitem);
+    term_set_focus(tabitem->term, TRUE);
+    return 0;
+}
+//-----------------------------------------------------------------------
+
+void wintabitem_fini(wintabitem *tabitem)
+{
+    wintabpage_fini(&tabitem->page);
+    wintabitem_deinit_fonts(tabitem);
+    sfree(tabitem->logpal);
+    if (tabitem->pal)
+    	DeleteObject(tabitem->pal);
+    if (tabitem->cfg.protocol == PROT_SSH) {
+    	random_save_seed();
+#ifdef MSCRYPTOAPI
+    	crypto_wrapup();
+#endif
+    }
+
+}
+//-----------------------------------------------------------------------
+
+void wintabitem_creat(wintab *wintab, Config *cfg)
+{
+    if (wintabitem_init(wintab, &wintab->items[0], cfg) != 0){
+        //todo
+        return ;
+    }
     UpdateWindow(wintab->items[0].page.hwndCtrl);
     
     TCITEM tie; 
@@ -291,7 +326,7 @@ void wintabitem_creat(wintab *wintab, Config *cfg)
 
 //-----------------------------------------------------------------------
 
-void wintabitem_delete(wintab *wintab, Config *cfg)
+void wintabitem_delete(wintabitem *tabitem)
 {
 // free term
 // free log
@@ -749,6 +784,39 @@ void wintabitem_close_session(wintabitem *tabitem)
 	//	   IDM_RESTART, "&Restart Session");
     //}
 }
+
+//-----------------------------------------------------------------------
+
+int wintabitem_on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    switch (LOWORD(wParam)) {
+	  case SB_BOTTOM:
+	    term_scroll(tabitem->term, -1, 0);
+	    break;
+	  case SB_TOP:
+	    term_scroll(tabitem->term, +1, 0);
+	    break;
+	  case SB_LINEDOWN:
+	    term_scroll(tabitem->term, 0, +1);
+	    break;
+	  case SB_LINEUP:
+	    term_scroll(tabitem->term, 0, -1);
+	    break;
+	  case SB_PAGEDOWN:
+	    term_scroll(tabitem->term, 0, +tabitem->term->rows / 2);
+	    break;
+	  case SB_PAGEUP:
+	    term_scroll(tabitem->term, 0, -tabitem->term->rows / 2);
+	    break;
+	  case SB_THUMBPOSITION:
+	  case SB_THUMBTRACK:
+	    term_scroll(tabitem->term, 1, HIWORD(wParam));
+	    break;
+	}
+    return 0;
+}
+
 //-----------------------------------------------------------------------
 //page related
 //-----------------------------------------------------------------------
@@ -870,10 +938,38 @@ int wintabpage_unregister()
 
 //-----------------------------------------------------------------------
 
+void wintabpage_bind_item(HWND hwndPage, wintabitem *tabitem)
+{
+    SetWindowLongPtr(hwndPage, GWLP_USERDATA, (LONG_PTR)tabitem);
+}
+
+//-----------------------------------------------------------------------
+
+wintabitem * wintabpage_get_item(HWND hwndPage)
+{
+    return (wintabitem *)GetWindowLongPtr(hwndPage, GWLP_USERDATA);
+}
+//-----------------------------------------------------------------------
+
 
 LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
+    extern wintab tab;
+    debug(("[WintabpageWndProc]%s:%s\n", hwnd == tab.items[0].page.hwndCtrl ? "PageMsg"
+                            : "UnknowMsg", TranslateWMessage(message)));
+    wintabitem* tabitem = wintabpage_get_item(hwnd);
+    if (tabitem == NULL){
+        return DefWindowProc(hwnd, message, wParam, lParam);
+    }
+    
+    switch (message) {
+        case WM_VSCROLL:
+	        wintabitem_on_scroll(tabitem, hwnd, message, wParam, lParam);
+        	break;
+        default:
+            break;
+    }
     return DefWindowProc(hwnd, message, wParam, lParam);
 }
 

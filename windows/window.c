@@ -86,7 +86,7 @@ static void systopalette(void);
 static void init_palette(void);
 static void init_fonts(int, int);
 static void another_font(Context,int);
-static void deinit_fonts(void);
+//static void deinit_fonts(void);
 static void set_input_locale(HKL);
 static void update_savedsess_menu(void);
 static void init_flashwindow(void);
@@ -98,7 +98,7 @@ static void flip_full_screen(void);
 static int process_clipdata(HGLOBAL clipdata, int unicode);
 
 /* Window layout information */
-static void reset_window(int);
+static void reset_window(wintabitem* tabitem, int);
 static int extra_width, extra_height;
 static int font_width, font_height, font_dualwidth, font_varpitch;
 static int offset_width, offset_height;
@@ -867,18 +867,9 @@ void cleanup_exit(int code)
     /*
      * Clean up.
      */
-    wintabitem_deinit_fonts(wintab_get_active_item(&tab));
-    sfree(logpal);
-    if (pal)
-	DeleteObject(pal);
+    wintab_fini(&tab);
     sk_cleanup();
 
-    if (cfg.protocol == PROT_SSH) {
-	random_save_seed();
-#ifdef MSCRYPTOAPI
-	crypto_wrapup();
-#endif
-    }
     shutdown_help();
 
     /* Clean up COM. */
@@ -937,8 +928,7 @@ static void update_savedsess_menu(void)
  */
 void update_specials_menu(void *frontend)
 {
-    if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
 
     wintabitem *tabitem = (wintabitem*) frontend;
     HMENU new_menu;
@@ -1008,8 +998,7 @@ void update_specials_menu(void *frontend)
 
 static void update_mouse_pointer(void *frontend)
 {
-    if (!frontend)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem *)frontend;
     
     LPTSTR curstype;
@@ -1050,8 +1039,7 @@ static void update_mouse_pointer(void *frontend)
 
 void set_busy_status(void *frontend, int status)
 {
-    if (!frontend)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem *)frontend;
     tabitem->busy_status = status;
     update_mouse_pointer(frontend);
@@ -1062,8 +1050,7 @@ void set_busy_status(void *frontend, int status)
  */
 void set_raw_mouse_mode(void *frontend, int activate)
 {
-    if (!frontend)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem *)frontend;
     activate = activate && !tabitem->cfg.no_mouse_rep;
     tabitem->send_raw_mouse = activate;
@@ -1075,8 +1062,7 @@ void set_raw_mouse_mode(void *frontend, int activate)
  */
 void connection_fatal(void *frontend, char *fmt, ...)
 {
-    if (!frontend)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem *)frontend;
     
     va_list ap;
@@ -1130,12 +1116,12 @@ static void enact_pending_netevent(void)
     select_result(pend_netevent_wParam, pend_netevent_lParam);
     reentering = 0;
 }
-
+#if 0
 /*
  * Copy the colour palette from the configuration data into defpal.
  * This is non-trivial because the colour indices are different.
  */
-#if 0
+
 static void cfgtopalette(void)
 {
     int i;
@@ -1341,7 +1327,7 @@ static void general_textout(Context ctx, int x, int y, CONST RECT *lprc,
     if (got_bkmode)
         SetBkMode(hdc, bkmode);
 }
-
+#if 0
 static int get_font_width(HDC hdc, const TEXTMETRIC *tm)
 {
     int ret;
@@ -1372,7 +1358,6 @@ static int get_font_width(HDC hdc, const TEXTMETRIC *tm)
     }
     return ret;
 }
-#if 0
 /*
  * Initialise all the fonts we will need initially. There may be as many as
  * three or as few as one.  The other (potentially) twenty-one fonts are done
@@ -1612,7 +1597,7 @@ static void another_font(Context ctx, int fontno)
 
     tabitem->fontflag[fontno] = 1;
 }
-
+#if 0
 static void deinit_fonts(void)
 {
     int i;
@@ -1623,11 +1608,11 @@ static void deinit_fonts(void)
 	fontflag[i] = 0;
     }
 }
+#endif
 //------------------------------------------------------------------------------
 void request_resize(void *frontend, int w, int h)
 {
-    if (!frontend)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem *)frontend;
     
     int width, height;
@@ -1657,8 +1642,8 @@ void request_resize(void *frontend, int w, int h)
 	    }
 	  case 0:
 	    /* Make sure the values are sane */
-	    width = (ss.right - ss.left - extra_width) / 4;
-	    height = (ss.bottom - ss.top - extra_height) / 6;
+	    width = (ss.right - ss.left - tabitem->extra_width) / 4;
+	    height = (ss.bottom - ss.top - tabitem->extra_height) / 6;
 
 	    if (w > width || h > height)
 		return;
@@ -1672,19 +1657,19 @@ void request_resize(void *frontend, int w, int h)
     term_size(tabitem->term, h, w, tabitem->cfg.savelines);
 
     if (tabitem->cfg.resize_action != RESIZE_FONT && !IsZoomed(hwnd)) {
-	width = extra_width + tabitem->font_width * w;
-	height = extra_height + tabitem->font_height * h;
+	width = tabitem->extra_width + tabitem->font_width * w;
+	height = tabitem->extra_height + tabitem->font_height * h;
 
 	SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, width, height,
 	    SWP_NOACTIVATE | SWP_NOCOPYBITS |
 	    SWP_NOMOVE | SWP_NOZORDER);
     } else
-	reset_window(0);
+	reset_window(tabitem, 0);
 
     InvalidateRect(tabitem->page.hwndCtrl, NULL, TRUE);
 }
 
-static void reset_window(int reinit) {
+static void reset_window(wintabitem* tabitem, int reinit) {
     /*
      * This function decides how to resize or redraw when the 
      * user changes something. 
@@ -1694,43 +1679,39 @@ static void reset_window(int reinit) {
      */
     int win_width, win_height;
     RECT cr, wr;
+    assert (tabitem != NULL);
 
 #ifdef RDB_DEBUG_PATCH
     debug((27, "reset_window()"));
 #endif
 
     /* Current window sizes ... */
-    GetWindowRect(hwnd, &wr);
-    GetClientRect(hwnd, &cr);
+    GetWindowRect(tabitem->page.hwndCtrl, &wr);
+    GetClientRect(tabitem->page.hwndCtrl, &cr);
 
     win_width  = cr.right - cr.left;
     win_height = cr.bottom - cr.top;
 
-    if (cfg.resize_action == RESIZE_DISABLED) reinit = 2;
+    if (tabitem->cfg.resize_action == RESIZE_DISABLED) reinit = 2;
 
     /* Are we being forced to reload the fonts ? */
     if (reinit>1) {
-#ifdef RDB_DEBUG_PATCH
-	debug((27, "reset_window() -- Forced deinit"));
-#endif
-	wintabitem_deinit_fonts(wintab_get_active_item(&tab));
-	wintabitem_init_fonts(wintab_get_active_item(&tab), 0,0);
+    	wintabitem_deinit_fonts(tabitem);
+    	wintabitem_init_fonts(tabitem, 0, 0);
     }
 
     /* Oh, looks like we're minimised */
     if (win_width == 0 || win_height == 0)
-	return;
+    	return;
 
     /* Is the window out of position ? */
     if ( !reinit && 
-	    (offset_width != (win_width-font_width*term->cols)/2 ||
-	     offset_height != (win_height-font_height*term->rows)/2) ){
-	offset_width = (win_width-font_width*term->cols)/2;
-	offset_height = (win_height-font_height*term->rows)/2;
-	InvalidateRect(hwnd, NULL, TRUE);
-#ifdef RDB_DEBUG_PATCH
-	debug((27, "reset_window() -> Reposition terminal"));
-#endif
+	    (tabitem->offset_width != (win_width-tabitem->font_width*tabitem->term->cols)/2 ||
+	     tabitem->offset_height != (win_height-tabitem->font_height*tabitem->term->rows)/2) ){
+	     
+        tabitem->offset_width = (win_width-tabitem->font_width*tabitem->term->cols)/2;
+        tabitem->offset_height = (win_height-tabitem->font_height*tabitem->term->rows)/2;
+        InvalidateRect(hwnd, NULL, TRUE);
     }
 
     if (IsZoomed(hwnd)) {
@@ -1738,33 +1719,31 @@ static void reset_window(int reinit) {
 	 * the window so it's the font size or the terminal itself.
 	 */
 
-	extra_width = wr.right - wr.left - cr.right + cr.left;
-	extra_height = wr.bottom - wr.top - cr.bottom + cr.top;
+	tabitem->extra_width = wr.right - wr.left - cr.right + cr.left;
+	tabitem->extra_height = wr.bottom - wr.top - cr.bottom + cr.top;
 
-	if (cfg.resize_action != RESIZE_TERM) {
-	    if (  font_width != win_width/term->cols || 
-		  font_height != win_height/term->rows) {
-		wintabitem_deinit_fonts(wintab_get_active_item(&tab));
-		wintabitem_init_fonts(wintab_get_active_item(&tab), win_width/term->cols, win_height/term->rows);
-		offset_width = (win_width-font_width*term->cols)/2;
-		offset_height = (win_height-font_height*term->rows)/2;
-		InvalidateRect(hwnd, NULL, TRUE);
-#ifdef RDB_DEBUG_PATCH
-		debug((25, "reset_window() -> Z font resize to (%d, %d)",
-			font_width, font_height));
-#endif
+	if (tabitem->cfg.resize_action != RESIZE_TERM) {
+	    if (  tabitem->font_width != win_width/tabitem->term->cols || 
+		  tabitem->font_height != win_height/tabitem->term->rows) {
+		  
+            wintabitem_deinit_fonts(tabitem);
+            wintabitem_init_fonts(tabitem, win_width/tabitem->term->cols, win_height/tabitem->term->rows);
+            tabitem->offset_width = (win_width-tabitem->font_width*tabitem->term->cols)/2;
+            tabitem->offset_height = (win_height-tabitem->font_height*tabitem->term->rows)/2;
+            InvalidateRect(hwnd, NULL, TRUE);
 	    }
 	} else {
-	    if (  font_width * term->cols != win_width || 
-		  font_height * term->rows != win_height) {
-		/* Our only choice at this point is to change the 
-		 * size of the terminal; Oh well.
-		 */
-		term_size(term, win_height/font_height, win_width/font_width,
-			  cfg.savelines);
-		offset_width = (win_width-font_width*term->cols)/2;
-		offset_height = (win_height-font_height*term->rows)/2;
-		InvalidateRect(hwnd, NULL, TRUE);
+	    if (  tabitem->font_width * tabitem->term->cols != win_width || 
+		  tabitem->font_height * tabitem->term->rows != win_height) {
+		  
+            /* Our only choice at this point is to change the 
+             * size of the terminal; Oh well.
+             */
+            term_size(tabitem->term, win_height/tabitem->font_height, win_width/tabitem->font_width,
+            	  tabitem->cfg.savelines);
+            tabitem->offset_width = (win_width-tabitem->font_width*tabitem->term->cols)/2;
+            tabitem->offset_height = (win_height-tabitem->font_height*tabitem->term->rows)/2;
+            InvalidateRect(hwnd, NULL, TRUE);
 #ifdef RDB_DEBUG_PATCH
 		debug((27, "reset_window() -> Zoomed term_size"));
 #endif
@@ -1781,20 +1760,20 @@ static void reset_window(int reinit) {
 	debug((27, "reset_window() -> Forced re-init"));
 #endif
 
-	offset_width = offset_height = cfg.window_border;
-	extra_width = wr.right - wr.left - cr.right + cr.left + offset_width*2;
-	extra_height = wr.bottom - wr.top - cr.bottom + cr.top +offset_height*2;
+	tabitem->offset_width = tabitem->offset_height = tabitem->cfg.window_border;
+	tabitem->extra_width = wr.right - wr.left - cr.right + cr.left + tabitem->offset_width*2;
+	tabitem->extra_height = wr.bottom - wr.top - cr.bottom + cr.top +tabitem->offset_height*2;
 
-	if (win_width != font_width*term->cols + offset_width*2 ||
-	    win_height != font_height*term->rows + offset_height*2) {
+	if (win_width != tabitem->font_width*tabitem->term->cols + tabitem->offset_width*2 ||
+	    win_height != tabitem->font_height*tabitem->term->rows + tabitem->offset_height*2) {
 
 	    /* If this is too large windows will resize it to the maximum
 	     * allowed window size, we will then be back in here and resize
 	     * the font or terminal to fit.
 	     */
-	    SetWindowPos(hwnd, NULL, 0, 0, 
-		         font_width*term->cols + extra_width, 
-			 font_height*term->rows + extra_height,
+	    SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, 
+		         tabitem->font_width*tabitem->term->cols + tabitem->extra_width, 
+			 tabitem->font_height*tabitem->term->rows + tabitem->extra_height,
 			 SWP_NOMOVE | SWP_NOZORDER);
 	}
 
@@ -1806,44 +1785,44 @@ static void reset_window(int reinit) {
      * window. But that may be too big for the screen which forces us
      * to change the terminal.
      */
-    if ((cfg.resize_action == RESIZE_TERM && reinit<=0) ||
-        (cfg.resize_action == RESIZE_EITHER && reinit<0) ||
+    if ((tabitem->cfg.resize_action == RESIZE_TERM && reinit<=0) ||
+        (tabitem->cfg.resize_action == RESIZE_EITHER && reinit<0) ||
 	    reinit>0) {
-	offset_width = offset_height = cfg.window_border;
-	extra_width = wr.right - wr.left - cr.right + cr.left + offset_width*2;
-	extra_height = wr.bottom - wr.top - cr.bottom + cr.top +offset_height*2;
+	tabitem->offset_width = tabitem->offset_height = tabitem->cfg.window_border;
+	tabitem->extra_width = wr.right - wr.left - cr.right + cr.left + tabitem->offset_width*2;
+	tabitem->extra_height = wr.bottom - wr.top - cr.bottom + cr.top +tabitem->offset_height*2;
 
-	if (win_width != font_width*term->cols + offset_width*2 ||
-	    win_height != font_height*term->rows + offset_height*2) {
+	if (win_width != tabitem->font_width*tabitem->term->cols + tabitem->offset_width*2 ||
+	    win_height != tabitem->font_height*tabitem->term->rows + tabitem->offset_height*2) {
 
 	    static RECT ss;
 	    int width, height;
 		
 		get_fullscreen_rect(&ss);
 
-	    width = (ss.right - ss.left - extra_width) / font_width;
-	    height = (ss.bottom - ss.top - extra_height) / font_height;
+	    width = (ss.right - ss.left - tabitem->extra_width) / tabitem->font_width;
+	    height = (ss.bottom - ss.top - tabitem->extra_height) / tabitem->font_height;
 
 	    /* Grrr too big */
-	    if ( term->rows > height || term->cols > width ) {
-		if (cfg.resize_action == RESIZE_EITHER) {
+	    if ( tabitem->term->rows > height || tabitem->term->cols > width ) {
+		if (tabitem->cfg.resize_action == RESIZE_EITHER) {
 		    /* Make the font the biggest we can */
-		    if (term->cols > width)
-			font_width = (ss.right - ss.left - extra_width)
-			    / term->cols;
-		    if (term->rows > height)
-			font_height = (ss.bottom - ss.top - extra_height)
-			    / term->rows;
+		    if (tabitem->term->cols > width)
+			tabitem->font_width = (ss.right - ss.left - tabitem->extra_width)
+			    / tabitem->term->cols;
+		    if (tabitem->term->rows > height)
+			tabitem->font_height = (ss.bottom - ss.top - tabitem->extra_height)
+			    / tabitem->term->rows;
 
-		    wintabitem_deinit_fonts(wintab_get_active_item(&tab));
-		    wintabitem_init_fonts(wintab_get_active_item(&tab), font_width, font_height);
+		    wintabitem_deinit_fonts(tabitem);
+		    wintabitem_init_fonts(tabitem, tabitem->font_width, tabitem->font_height);
 
-		    width = (ss.right - ss.left - extra_width) / font_width;
-		    height = (ss.bottom - ss.top - extra_height) / font_height;
+		    width = (ss.right - ss.left - tabitem->extra_width) / tabitem->font_width;
+		    height = (ss.bottom - ss.top - tabitem->extra_height) / tabitem->font_height;
 		} else {
-		    if ( height > term->rows ) height = term->rows;
-		    if ( width > term->cols )  width = term->cols;
-		    term_size(term, height, width, cfg.savelines);
+		    if ( height > tabitem->term->rows ) height = tabitem->term->rows;
+		    if ( width > tabitem->term->cols )  width = tabitem->term->cols;
+		    term_size(tabitem->term, height, width, tabitem->cfg.savelines);
 #ifdef RDB_DEBUG_PATCH
 		    debug((27, "reset_window() -> term resize to (%d,%d)",
 			       height, width));
@@ -1851,16 +1830,16 @@ static void reset_window(int reinit) {
 		}
 	    }
 	    
-	    SetWindowPos(hwnd, NULL, 0, 0, 
-		         font_width*term->cols + extra_width, 
-			 font_height*term->rows + extra_height,
+	    SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, 
+		         tabitem->font_width*tabitem->term->cols + tabitem->extra_width, 
+			 tabitem->font_height*tabitem->term->rows + tabitem->extra_height,
 			 SWP_NOMOVE | SWP_NOZORDER);
 
 	    InvalidateRect(hwnd, NULL, TRUE);
 #ifdef RDB_DEBUG_PATCH
 	    debug((27, "reset_window() -> window resize to (%d,%d)",
-			font_width*term->cols + extra_width,
-			font_height*term->rows + extra_height));
+			tabitem->font_width*tabitem->term->cols + tabitem->extra_width,
+			tabitem->font_height*tabitem->term->rows + tabitem->extra_height));
 #endif
 	}
 	return;
@@ -1868,22 +1847,22 @@ static void reset_window(int reinit) {
 
     /* We're allowed to or must change the font but do we want to ?  */
 
-    if (font_width != (win_width-cfg.window_border*2)/term->cols || 
-	font_height != (win_height-cfg.window_border*2)/term->rows) {
+    if (tabitem->font_width != (win_width-tabitem->cfg.window_border*2)/tabitem->term->cols || 
+	tabitem->font_height != (win_height-tabitem->cfg.window_border*2)/tabitem->term->rows) {
 
-	wintabitem_deinit_fonts(wintab_get_active_item(&tab));
-	wintabitem_init_fonts(wintab_get_active_item(&tab), (win_width-cfg.window_border*2)/term->cols, 
-		   (win_height-cfg.window_border*2)/term->rows);
-	offset_width = (win_width-font_width*term->cols)/2;
-	offset_height = (win_height-font_height*term->rows)/2;
+	wintabitem_deinit_fonts(tabitem);
+	wintabitem_init_fonts(tabitem, (win_width-tabitem->cfg.window_border*2)/tabitem->term->cols, 
+		   (win_height-tabitem->cfg.window_border*2)/tabitem->term->rows);
+	tabitem->offset_width = (win_width-tabitem->font_width*tabitem->term->cols)/2;
+	tabitem->offset_height = (win_height-tabitem->font_height*tabitem->term->rows)/2;
 
-	extra_width = wr.right - wr.left - cr.right + cr.left +offset_width*2;
-	extra_height = wr.bottom - wr.top - cr.bottom + cr.top+offset_height*2;
+	tabitem->extra_width = wr.right - wr.left - cr.right + cr.left +tabitem->offset_width*2;
+	tabitem->extra_height = wr.bottom - wr.top - cr.bottom + cr.top+tabitem->offset_height*2;
 
 	InvalidateRect(hwnd, NULL, TRUE);
 #ifdef RDB_DEBUG_PATCH
 	debug((25, "reset_window() -> font resize to (%d,%d)", 
-		   font_width, font_height));
+		   tabitem->font_width, tabitem->font_height));
 #endif
     }
 }
@@ -1918,7 +1897,7 @@ static void click(wintabitem* tabitem, Mouse_Button b, int x, int y, int shift, 
 	tabitem->lastact = MA_CLICK;
     }
     if (tabitem->lastact != MA_NOTHING)
-	term_mouse(tabitem->term, b, translate_button(tabitem, b), lastact,
+	term_mouse(tabitem->term, b, translate_button(tabitem, b), tabitem->lastact,
 		   x, y, shift, ctrl, alt);
     tabitem->lasttime = thistime;
 }
@@ -1967,20 +1946,23 @@ static int is_alt_pressed(void)
 
 static int resizing;
 
-void notify_remote_exit(void *fe)
+void notify_remote_exit(void *frontend)
 {
     int exitcode;
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem *)frontend;
 
-    if (!session_closed &&
-        (exitcode = back->exitcode(backhandle)) >= 0) {
+    if (!tabitem->session_closed &&
+        (exitcode = tabitem->back->exitcode(tabitem->backhandle)) >= 0) {
 	/* Abnormal exits will already have set session_closed and taken
 	 * appropriate action. */
-	if (cfg.close_on_exit == FORCE_ON ||
-	    (cfg.close_on_exit == AUTO && exitcode != INT_MAX)) {
-	    PostQuitMessage(0);
+	if (tabitem->cfg.close_on_exit == FORCE_ON ||
+	    (tabitem->cfg.close_on_exit == AUTO && exitcode != INT_MAX)) {
+	    wintabitem_delete(tabitem);
+	    //PostQuitMessage(0);
 	} else {
-	    must_close_session = TRUE;
-	    session_closed = TRUE;
+	    tabitem->must_close_session = TRUE;
+	    tabitem->session_closed = TRUE;
 	    /* exitcode == INT_MAX indicates that the connection was closed
 	     * by a fatal error, so an error box will be coming our way and
 	     * we should not generate this informational one. */
@@ -2212,13 +2194,6 @@ int on_reconfig(wintabitem* tabitem, HWND hwnd, UINT message,
 	    else
 		nexflag &= ~(WS_EX_CLIENTEDGE);
 
-	    nflg = flag;
-	    if (is_full_screen() ?
-    		tabitem->cfg.scrollbar_in_fullscreen : tabitem->cfg.scrollbar)
-		nflg |= WS_VSCROLL;
-	    else
-		nflg &= ~WS_VSCROLL;
-
 	    if (tabitem->cfg.resize_action == RESIZE_DISABLED ||
                     is_full_screen())
 		nflg &= ~WS_THICKFRAME;
@@ -2235,6 +2210,16 @@ int on_reconfig(wintabitem* tabitem, HWND hwnd, UINT message,
 		    SetWindowLongPtr(hwnd, GWL_STYLE, nflg);
 		if (nexflag != exflag)
 		    SetWindowLongPtr(hwnd, GWL_EXSTYLE, nexflag);
+
+        LONG npflg, pflag = GetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE);
+        npflg = pflag;
+	    if (is_full_screen() ?
+    		tabitem->cfg.scrollbar_in_fullscreen : tabitem->cfg.scrollbar)
+		npflg |= WS_VSCROLL;
+	    else
+		npflg &= ~WS_VSCROLL;
+        if (npflg != pflag)
+		    SetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE, nflg);
 
 		SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
 			     SWP_NOACTIVATE | SWP_NOCOPYBITS |
@@ -2272,7 +2257,7 @@ int on_reconfig(wintabitem* tabitem, HWND hwnd, UINT message,
 	    init_lvl = 2;
 
 	InvalidateRect(hwnd, NULL, TRUE);
-	reset_window(init_lvl);
+	reset_window(tabitem, init_lvl);
 	net_pending_errors();
 	    
 
@@ -2618,8 +2603,8 @@ int on_sizing(wintabitem* tabitem, HWND hwnd, UINT message,
 		need_backend_resize = TRUE;
 	    }
 
-	    width = r->right - r->left - extra_width;
-	    height = r->bottom - r->top - extra_height;
+	    width = r->right - r->left - tabitem->extra_width;
+	    height = r->bottom - r->top - tabitem->extra_height;
 	    w = (width + tabitem->font_width / 2) / tabitem->font_width;
 	    if (w < 1)
 		w = 1;
@@ -2649,8 +2634,8 @@ int on_sizing(wintabitem* tabitem, HWND hwnd, UINT message,
 		return 0;
 	} else {
 	    int width, height, w, h, rv = 0;
-	    int ex_width = extra_width + (tabitem->cfg.window_border - tabitem->offset_width) * 2;
-	    int ex_height = extra_height + (tabitem->cfg.window_border - tabitem->offset_height) * 2;
+	    int ex_width = tabitem->extra_width + (tabitem->cfg.window_border - tabitem->offset_width) * 2;
+	    int ex_height = tabitem->extra_height + (tabitem->cfg.window_border - tabitem->offset_height) * 2;
 	    LPRECT r = (LPRECT) lParam;
 
 	    width = r->right - r->left - ex_width;
@@ -2722,7 +2707,7 @@ int on_size(wintabitem* tabitem, HWND hwnd, UINT message,
 
 	if (tabitem->cfg.resize_action == RESIZE_DISABLED) {
 	    /* A resize, well it better be a minimize. */
-	    reset_window(-1);
+	    reset_window(tabitem, -1);
 	} else {
 
 	    int width, height, w, h;
@@ -2742,7 +2727,7 @@ int on_size(wintabitem* tabitem, HWND hwnd, UINT message,
 
                     term_size(tabitem->term, h, w, tabitem->cfg.savelines);
                 }
-                reset_window(0);
+                reset_window(tabitem, 0);
             } else if (wParam == SIZE_RESTORED && was_zoomed) {
                 was_zoomed = 0;
                 if (tabitem->cfg.resize_action == RESIZE_TERM) {
@@ -2751,11 +2736,11 @@ int on_size(wintabitem* tabitem, HWND hwnd, UINT message,
                     h = (height-tabitem->cfg.window_border*2) / tabitem->font_height;
                     if (h < 1) h = 1;
                     term_size(tabitem->term, h, w, tabitem->cfg.savelines);
-                    reset_window(2);
+                    reset_window(tabitem, 2);
                 } else if (tabitem->cfg.resize_action != RESIZE_FONT)
-                    reset_window(2);
+                    reset_window(tabitem, 2);
                 else
-                    reset_window(0);
+                    reset_window(tabitem, 0);
             } else if (wParam == SIZE_MINIMIZED) {
                 /* do nothing */
 	    } else if (tabitem->cfg.resize_action == RESIZE_TERM ||
@@ -2780,43 +2765,12 @@ int on_size(wintabitem* tabitem, HWND hwnd, UINT message,
                     term_size(tabitem->term, h, w, tabitem->cfg.savelines);
                 }
             } else {
-                reset_window(0);
+                reset_window(tabitem, 0);
 	    }
 	}
 	sys_cursor_update(tabitem);
     return 0;
 
-}
-
-
-int on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
-				WPARAM wParam, LPARAM lParam)
-{
-    switch (LOWORD(wParam)) {
-	  case SB_BOTTOM:
-	    term_scroll(tabitem->term, -1, 0);
-	    break;
-	  case SB_TOP:
-	    term_scroll(tabitem->term, +1, 0);
-	    break;
-	  case SB_LINEDOWN:
-	    term_scroll(tabitem->term, 0, +1);
-	    break;
-	  case SB_LINEUP:
-	    term_scroll(tabitem->term, 0, -1);
-	    break;
-	  case SB_PAGEDOWN:
-	    term_scroll(tabitem->term, 0, +tabitem->term->rows / 2);
-	    break;
-	  case SB_PAGEUP:
-	    term_scroll(tabitem->term, 0, -tabitem->term->rows / 2);
-	    break;
-	  case SB_THUMBPOSITION:
-	  case SB_THUMBTRACK:
-	    term_scroll(tabitem->term, 1, HIWORD(wParam));
-	    break;
-	}
-    return 0;
 }
 
 int on_palette_changed(wintabitem* tabitem, HWND hwnd, UINT message,
@@ -3070,6 +3024,10 @@ int on_default(wintabitem* tabitem, HWND hwnd, UINT message,
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
+debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
+                            :hwnd == tab.hwndTab ? "TabBarMsg"
+                            :hwnd == tab.items[0].page.hwndCtrl ? "PageMsg"
+                            : "UnknowMsg", TranslateWMessage(message)));
 
     wintabitem *tabitem = wintab_get_active_item(&tab);
 
@@ -3159,9 +3117,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
         case WM_SIZE:
             on_size(tabitem, hwnd, message,wParam, lParam);
         	return 0;
-        case WM_VSCROLL:
-	        on_scroll(tabitem, hwnd, message,wParam, lParam);
-        	break;
         case WM_PALETTECHANGED:
 	        on_palette_changed(tabitem, hwnd, message,wParam, lParam);
         	break;
@@ -4631,8 +4586,7 @@ void set_icon(void *frontend, char *title)
 
 void set_sbar(void *frontend, int total, int start, int page)
 {
-    if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
 
     wintabitem *tabitem = (wintabitem*) frontend;
     SCROLLINFO si;
@@ -4676,8 +4630,7 @@ void free_ctx(void *frontend, Context ctx)
 
 static void real_palette_set(void *frontend, int n, int r, int g, int b)
 {
-    if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
     if (tabitem->pal) {
     	tabitem->logpal->palPalEntry[n].peRed = r;
@@ -4692,8 +4645,7 @@ static void real_palette_set(void *frontend, int n, int r, int g, int b)
 
 void palette_set(void *frontend, int n, int r, int g, int b)
 {
-    if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
     
     if (n >= 16)
@@ -4720,8 +4672,7 @@ void palette_set(void *frontend, int n, int r, int g, int b)
 
 void palette_reset(void *frontend)
 {
-    if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
     int i;
 
@@ -4758,8 +4709,7 @@ void palette_reset(void *frontend)
 
 void write_aclip(void *frontend, char *data, int len, int must_deselect)
 {
-if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
     HGLOBAL clipdata;
     void *lock;
@@ -4793,8 +4743,7 @@ if (frontend == NULL)
  */
 void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_deselect)
 {
-if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
     HGLOBAL clipdata, clipdata2, clipdata3;
     int len2;
@@ -5172,8 +5121,7 @@ static int process_clipdata(HGLOBAL clipdata, int unicode)
 
 void request_paste(void *frontend)
 {
-    if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
     /*
      * I always thought pasting was synchronous in Windows; the
@@ -5349,8 +5297,7 @@ static void flash_window(int mode)
  */
 void do_beep(void *frontend, int mode)
 {
-    if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
     if (mode == BELL_DEFAULT) {
 	/*
@@ -5413,8 +5360,7 @@ void do_beep(void *frontend, int mode)
  */
 void set_iconic(void *frontend, int iconic)
 {
-    if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
     if (IsIconic(tabitem->page.hwndCtrl)) {
 	if (!iconic)
@@ -5430,8 +5376,7 @@ void set_iconic(void *frontend, int iconic)
  */
 void move_window(void *frontend, int x, int y)
 {
-    if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
     if (tabitem->cfg.resize_action == RESIZE_DISABLED || 
         tabitem->cfg.resize_action == RESIZE_FONT ||
@@ -5447,8 +5392,7 @@ void move_window(void *frontend, int x, int y)
  */
 void set_zorder(void *frontend, int top)
 {
-    if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
     if (tabitem->cfg.alwaysontop)
 	return;			       /* ignore */
@@ -5461,8 +5405,7 @@ void set_zorder(void *frontend, int top)
  */
 void refresh_window(void *frontend)
 {
-if (frontend == NULL)
-        return;
+    assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
     InvalidateRect(tabitem->page.hwndCtrl, NULL, TRUE);
 }
@@ -5487,7 +5430,9 @@ void set_zoomed(void *frontend, int zoomed)
  */
 int is_iconic(void *frontend)
 {
-    return IsIconic(hwnd);
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
+    return IsIconic(tabitem->page.hwndCtrl);
 }
 
 /*
@@ -5495,8 +5440,10 @@ int is_iconic(void *frontend)
  */
 void get_window_pos(void *frontend, int *x, int *y)
 {
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
     RECT r;
-    GetWindowRect(hwnd, &r);
+    GetWindowRect(tabitem->page.hwndCtrl, &r);
     *x = r.left;
     *y = r.top;
 }
@@ -5506,8 +5453,10 @@ void get_window_pos(void *frontend, int *x, int *y)
  */
 void get_window_pixels(void *frontend, int *x, int *y)
 {
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
     RECT r;
-    GetWindowRect(hwnd, &r);
+    GetWindowRect(tabitem->page.hwndCtrl, &r);
     *x = r.right - r.left;
     *y = r.bottom - r.top;
 }
@@ -5598,7 +5547,7 @@ static void make_full_screen(wintabitem* tabitem)
 			SWP_FRAMECHANGED);
     /* We may have changed size as a result */
 
-    reset_window(0);
+    reset_window(tabitem, 0);
 
     /* Tick the menu item in the System and context menus. */
     {
@@ -5679,22 +5628,28 @@ void frontend_keypress(void *handle)
 
 int from_backend(void *frontend, int is_stderr, const char *data, int len)
 {
-    return term_data(term, is_stderr, data, len);
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
+    return term_data(tabitem->term, is_stderr, data, len);
 }
 
 int from_backend_untrusted(void *frontend, const char *data, int len)
 {
-    return term_data_untrusted(term, data, len);
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
+    return term_data_untrusted(tabitem->term, data, len);
 }
 
-int get_userpass_input(Config *cfg, prompts_t *p, unsigned char *in, int inlen)
+int get_userpass_input(void *frontend, Config *cfg, prompts_t *p, unsigned char *in, int inlen)
 {
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
     int ret;
     ret = autocmd_get_passwd_input(p, cfg);
     if (ret == -1)
         ret = cmdline_get_passwd_input(p, in, inlen);
     if (ret == -1)
-    	ret = term_get_userpass_input(term, p, in, inlen);
+    	ret = term_get_userpass_input(tabitem->term, p, in, inlen);
     return ret;
 }
 

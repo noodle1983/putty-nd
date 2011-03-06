@@ -3492,11 +3492,11 @@ static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
 	    s->cur_prompt->name = dupstr("SSH login name");
 	    add_prompt(s->cur_prompt, dupstr("login: "), TRUE,
 		       lenof(s->username)); 
-	    ret = get_userpass_input(&ssh->cfg, s->cur_prompt, NULL, 0);
+	    ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, NULL, 0);
 	    while (ret < 0) {
 		ssh->send_ok = 1;
 		crWaitUntil(!pktin);
-		ret = get_userpass_input(&ssh->cfg, s->cur_prompt, in, inlen);
+		ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, in, inlen);
 		ssh->send_ok = 0;
 	    }
 	    if (!ret) {
@@ -3783,11 +3783,11 @@ static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
 			       dupprintf("Passphrase for key \"%.100s\": ",
 					 s->publickey_comment),
 			       FALSE, SSH_MAX_PASSWORD_LEN);
-		    ret = get_userpass_input(&ssh->cfg, s->cur_prompt, NULL, 0);
+		    ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, NULL, 0);
 		    while (ret < 0) {
 			ssh->send_ok = 1;
 			crWaitUntil(!pktin);
-			ret = get_userpass_input(&ssh->cfg, s->cur_prompt, in, inlen);
+			ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, in, inlen);
 			ssh->send_ok = 0;
 		    }
 		    if (!ret) {
@@ -4002,11 +4002,11 @@ static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
 	 */
 	{
 	    int ret; /* need not be kept over crReturn */
-	    ret = get_userpass_input(&ssh->cfg, s->cur_prompt, NULL, 0);
+	    ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, NULL, 0);
 	    while (ret < 0) {
 		ssh->send_ok = 1;
 		crWaitUntil(!pktin);
-		ret = get_userpass_input(&ssh->cfg, s->cur_prompt, in, inlen);
+		ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, in, inlen);
 		ssh->send_ok = 0;
 	    }
 	    if (!ret) {
@@ -7493,11 +7493,11 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 	    s->cur_prompt->name = dupstr("SSH login name");
 	    add_prompt(s->cur_prompt, dupstr("login: "), TRUE,
 		       lenof(s->username)); 
-	    ret = get_userpass_input(&ssh->cfg, s->cur_prompt, NULL, 0);
+	    ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, NULL, 0);
 	    while (ret < 0) {
 		ssh->send_ok = 1;
 		crWaitUntilV(!pktin);
-		ret = get_userpass_input(&ssh->cfg, s->cur_prompt, in, inlen);
+		ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, in, inlen);
 		ssh->send_ok = 0;
 	    }
 	    if (!ret) {
@@ -7882,11 +7882,11 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 				   dupprintf("Passphrase for key \"%.100s\": ",
 					     s->publickey_comment),
 				   FALSE, SSH_MAX_PASSWORD_LEN);
-			ret = get_userpass_input(&ssh->cfg, s->cur_prompt, NULL, 0);
+			ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, NULL, 0);
 			while (ret < 0) {
 			    ssh->send_ok = 1;
 			    crWaitUntilV(!pktin);
-			    ret = get_userpass_input(&ssh->cfg, s->cur_prompt,
+			    ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt,
 						     in, inlen);
 			    ssh->send_ok = 0;
 			}
@@ -8294,11 +8294,11 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 		     */
 		    {
 			int ret; /* not live over crReturn */
-			ret = get_userpass_input(&ssh->cfg, s->cur_prompt, NULL, 0);
+			ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, NULL, 0);
 			while (ret < 0) {
 			    ssh->send_ok = 1;
 			    crWaitUntilV(!pktin);
-			    ret = get_userpass_input(&ssh->cfg, s->cur_prompt, in, inlen);
+			    ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, in, inlen);
 			    ssh->send_ok = 0;
 			}
 			if (!ret) {
@@ -8357,11 +8357,11 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 						    ssh->savedhost),
 			   FALSE, SSH_MAX_PASSWORD_LEN);
 
-		ret = get_userpass_input(&ssh->cfg, s->cur_prompt, NULL, 0);
+		ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, NULL, 0);
 		while (ret < 0) {
 		    ssh->send_ok = 1;
 		    crWaitUntilV(!pktin);
-		    ret = get_userpass_input(&ssh->cfg, s->cur_prompt, in, inlen);
+		    ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, in, inlen);
 		    ssh->send_ok = 0;
 		}
 		if (!ret) {
@@ -8469,11 +8469,11 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 		     */
 		    while (!got_new) {
 
-			ret = get_userpass_input(&ssh->cfg, s->cur_prompt, NULL, 0);
+			ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, NULL, 0);
 			while (ret < 0) {
 			    ssh->send_ok = 1;
 			    crWaitUntilV(!pktin);
-			    ret = get_userpass_input(&ssh->cfg, s->cur_prompt, in, inlen);
+			    ret = get_userpass_input(ssh->frontend, &ssh->cfg, s->cur_prompt, in, inlen);
 			    ssh->send_ok = 0;
 			}
 			if (!ret) {

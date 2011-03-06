@@ -72,7 +72,7 @@ Filename platform_default_filename(const char *name)
 
 char *get_ttymode(void *frontend, const char *mode) { return NULL; }
 
-int get_userpass_input(Config *cfg, prompts_t *p, unsigned char *in, int inlen)
+int get_userpass_input(void* frontend, Config *cfg, prompts_t *p, unsigned char *in, int inlen)
 {
     int ret;
     ret = autocmd_get_passwd_input(p, cfg);
