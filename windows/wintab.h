@@ -105,6 +105,7 @@ int wintab_init(wintab *wintab, HWND hwndParent);
 int wintab_fini(wintab *wintab);
 int wintab_resize(wintab *wintab, const RECT *rc);
 void wintab_onsize(wintab *wintab, HWND hwndParent, LPARAM lParam);
+int  wintab_can_close(wintab *wintab);
 void wintab_check_closed_session(wintab *wintab);
 void wintab_term_paste(wintab *wintab);
 void wintab_term_set_focus(wintab *wintab, int has_focus);

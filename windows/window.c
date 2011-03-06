@@ -81,12 +81,7 @@ static Mouse_Button translate_button(wintabitem* tabitem, Mouse_Button button);
 static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 static int TranslateKey(wintabitem* tabitem, UINT message, WPARAM wParam, LPARAM lParam,
 			unsigned char *output);
-static void cfgtopalette(void);
-static void systopalette(void);
-static void init_palette(void);
-static void init_fonts(int, int);
 static void another_font(Context,int);
-//static void deinit_fonts(void);
 static void set_input_locale(HKL);
 static void update_savedsess_menu(void);
 static void init_flashwindow(void);
@@ -99,11 +94,8 @@ static int process_clipdata(HGLOBAL clipdata, int unicode);
 
 /* Window layout information */
 static void reset_window(wintabitem* tabitem, int);
-static int extra_width, extra_height;
-static int font_width, font_height, font_dualwidth, font_varpitch;
-static int offset_width, offset_height;
+
 static int was_zoomed = 0;
-static int prev_rows, prev_cols;
   
 static int pending_netevent = 0;
 static WPARAM pend_netevent_wParam = 0;
@@ -113,21 +105,9 @@ static void flash_window(int mode);
 static void sys_cursor_update(wintabitem *tabitem);
 static int get_fullscreen_rect(RECT * ss);
 
-static int caret_x = -1, caret_y = -1;
-
 static int kbd_codepage;
-
-void *ldisc;
-static Backend *back;
-static void *backhandle;
-
-static struct unicode_data ucsdata;
-static int must_close_session, session_closed;
 static int reconfiguring = FALSE;
-
-static const struct telnet_special *specials = NULL;
 static HMENU specials_menu = NULL;
-static int n_specials = 0;
 
 static wchar_t *clipboard_contents;
 static size_t clipboard_length;
@@ -150,7 +130,6 @@ static HMENU savedsess_menu;
 
 Config cfg;			       /* exported to windlg.c */
 wintab tab;
-#define HWNDDC tab.items[0].page.hwndCtrl
 
 static struct sesslist sesslist;       /* for saved-session menu */
 
@@ -176,31 +155,10 @@ struct agent_callback {
 
 #define FONT_MAXNO 	0x2F
 #define FONT_SHIFT	5
-static HFONT fonts[FONT_MAXNO];
-static LOGFONT lfont;
-static int fontflag[FONT_MAXNO];
-static bold_mode_t bold_mode;
-static und_mode_t und_mode;
-static int descent;
 
 #define NCFGCOLOURS 22
 #define NEXTCOLOURS 240
 #define NALLCOLOURS (NCFGCOLOURS + NEXTCOLOURS)
-COLORREF colours[NALLCOLOURS];
-HPALETTE pal;
-static LPLOGPALETTE logpal;
-static RGBTRIPLE defpal[NALLCOLOURS];
-
-static HBITMAP caretbm;
-
-static int dbltime, lasttime, lastact;
-static Mouse_Button lastbtn;
-
-/* this allows xterm-style mouse handling. */
-static int send_raw_mouse = 0;
-static int wheel_accumulator = 0;
-
-static int busy_status = BUSY_NOT;
 
 static char *window_name, *icon_name;
 
@@ -565,6 +523,8 @@ int registerClass(HINSTANCE inst)
 void guessSize(int *width, int *height)
 {
     int guess_width, guess_height;
+    int extra_width, extra_height;
+    int font_width, font_height;
     /*
      * Guess some defaults for the window size. This all gets
      * updated later, so we don't really care too much. However, we
@@ -607,6 +567,10 @@ void creatMainWindow(HINSTANCE inst, int width, int height)
 void resizeWindows()
 {
     int guess_width, guess_height;
+    int extra_width, extra_height;
+    int font_width, font_height;
+    int offset_width, offset_height;
+    Terminal* term = wintab_get_active_item(&tab)->term;
      /*
      * Correct the guesses for extra_{width,height}.
      */
@@ -615,12 +579,14 @@ void resizeWindows()
 	GetClientRect(hwnd, &cr);
 	offset_width = offset_height = cfg.window_border;
 	extra_width = wr.right - wr.left - cr.right + cr.left + offset_width*2;
-	extra_height = wr.bottom - wr.top - cr.bottom + cr.top +offset_height*2;
+	extra_height = wr.bottom - wr.top - cr.bottom + cr.top +offset_height*2 + 20;
 
     /*
      * Resize the window, now we know what size we _really_ want it
      * to be.
      */
+    font_width = 10;
+    font_height = 20;
     guess_width = extra_width + font_width * term->cols;
     guess_height = extra_height + font_height * term->rows;
     SetWindowPos(hwnd, NULL, 0, 0, guess_width, guess_height,
@@ -704,14 +670,10 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     }
 #endif
     wintab_init(&tab, hwnd);
-    term = tab.items[0].term;
     logctx = tab.items[0].logctx;
-    ucsdata = tab.items[0].ucsdata;
-    pal = tab.items[0].pal;
-    logpal = tab.items[0].logpal;
 
     resizeWindows();
-
+#if 0
             /*
              * Set up a caret bitmap, with no content.
              */
@@ -725,7 +687,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
             }
             CreateCaret(hwnd, caretbm, font_width, font_height);
 
-#if 0
+
             /*
              * Initialise the scroll bar.
              */
@@ -744,9 +706,9 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
             /*
              * Prepare the mouse handler.
              */
-            lastact = MA_NOTHING;
-            lastbtn = MBT_NOTHING;
-            dbltime = GetDoubleClickTime();
+            //lastact = MA_NOTHING;
+            //lastbtn = MBT_NOTHING;
+            //dbltime = GetDoubleClickTime();
 
     /*
      * Set up the session-control options on the system menu.
@@ -2004,7 +1966,7 @@ int on_close(HWND hwnd, UINT message,
     char *str;
     show_mouseptr(wintab_get_active_item(&tab), 1);
     str = dupprintf("%s Exit Confirmation", appname);
-    if (!cfg.warn_on_close || session_closed ||
+    if ( wintab_can_close(&tab)||
             MessageBox(hwnd,
             	   "Are you sure you want to close this session?",
             	   str, MB_ICONWARNING | MB_OKCANCEL | MB_DEFBUTTON1)

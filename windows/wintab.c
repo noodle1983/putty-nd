@@ -16,19 +16,8 @@
 #include "win_res.h"
 #include "wintab.h"
 
-#define TIMING_TIMER_ID 1235
-
-#define X_POS(l) ((int)(short)LOWORD(l))
-#define Y_POS(l) ((int)(short)HIWORD(l))
-#define TO_CHR_X(x) ((((x)<0 ? (x)-font_width+1 : (x))-offset_width) / font_width)
-#define TO_CHR_Y(y) ((((y)<0 ? (y)-font_height+1: (y))-offset_height) / font_height)
-
 extern HINSTANCE hinst;
 extern Config cfg;
-extern Terminal *term;
-extern HPALETTE pal;
-extern COLORREF colours[NALLCOLOURS];
-extern void *ldisc;
 
 const char* const WINTAB_PAGE_CLASS = "WintabPage";
 int wintabpage_registed = 0;
@@ -65,11 +54,15 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     return 0; 
 }
 
+//-----------------------------------------------------------------------
+
 int wintab_fini(wintab *wintab)
 {
     wintabitem_fini(&wintab->items[0]);
     return 0;
 }
+
+//-----------------------------------------------------------------------
 
 int wintab_resize(wintab *wintab, const RECT *rc)
 {
@@ -87,11 +80,15 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     return 0;
 }
 
+//-----------------------------------------------------------------------
+
 void wintab_get_page_rect(wintab *wintab, RECT *rc)
 {
     GetClientRect(wintab->hwndTab, rc);  
     TabCtrl_AdjustRect(wintab->hwndTab, FALSE, rc);
 }
+
+//-----------------------------------------------------------------------
 
 void wintab_onsize(wintab *wintab, HWND hwndParent, LPARAM lParam)
 {
@@ -100,6 +97,12 @@ void wintab_onsize(wintab *wintab, HWND hwndParent, LPARAM lParam)
     SetRect(&rc, 0, 0, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); 
     wintab_resize(wintab, &rc);
     return;
+}
+//-----------------------------------------------------------------------
+
+int  wintab_can_close(wintab *wintab)
+{
+    return (!wintab->items[0].cfg.warn_on_close || wintab->items[0].session_closed);
 }
 
 //-----------------------------------------------------------------------
@@ -253,7 +256,15 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->n_specials = 0;
     tabitem->specials = NULL;
     tabitem->specials_menu = NULL;
-
+    tabitem->extra_width = 25;
+    tabitem->extra_height = 28;
+    tabitem->font_width = 10;
+    tabitem->font_height = 20;
+    tabitem->offset_width = tabitem->offset_height = cfg->window_border;
+    tabitem->lastact = MA_NOTHING;
+    tabitem->lastbtn = MBT_NOTHING;
+    tabitem->dbltime = GetDoubleClickTime();
+    
     tabitem->parentTab = wintab;
     wintabpage_init(&tabitem->page, cfg, wintab->hwndParent);
     wintabpage_bind_item(tabitem->page.hwndCtrl, tabitem); 
