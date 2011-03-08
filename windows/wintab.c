@@ -67,15 +67,12 @@ int wintab_fini(wintab *wintab)
 int wintab_resize(wintab *wintab, const RECT *rc)
 {
     RECT rcPage;
-    HDWP hdwp;
     
     wintab_get_page_rect(wintab, &rcPage);
     wintabpage_resize(&wintab->items[0].page, &rcPage);
 
-    hdwp = BeginDeferWindowPos(1);  
-    DeferWindowPos(hdwp, wintab->hwndTab, HWND_BOTTOM, rc->left, rc->top, rc->right, 
+    SetWindowPos(wintab->hwndTab, HWND_BOTTOM, rc->left, rc->top, rc->right, 
         rc->bottom, SWP_NOMOVE);     
-    EndDeferWindowPos(hdwp); 
     
     return 0;
 }
@@ -86,6 +83,10 @@ void wintab_get_page_rect(wintab *wintab, RECT *rc)
 {
     GetClientRect(wintab->hwndTab, rc);  
     TabCtrl_AdjustRect(wintab->hwndTab, FALSE, rc);
+    //rc->left += 3;
+    //rc->top  += 23;
+    //rc->right -= 3;
+    //rc->bottom -= 3;
 }
 
 //-----------------------------------------------------------------------
@@ -886,12 +887,9 @@ int wintabpage_resize(wintabpage *page, const RECT *rc)
 {
     HDWP hdwp;
  
-    MoveWindow(page->hwndCtrl, rc->left, rc->top, rc->right, rc->bottom, TRUE);
-    
-    hdwp = BeginDeferWindowPos(1); 
-    DeferWindowPos(hdwp, page->hwndCtrl, HWND_TOPMOST, rc->left, rc->top,
-        rc->right - rc->left, rc->bottom - rc->top, SWP_NOMOVE);   
-    EndDeferWindowPos(hdwp); 
+    MoveWindow(page->hwndCtrl, rc->left, rc->top, 
+        rc->right - rc->left, 
+        rc->bottom - rc->top, TRUE);
     return 0;
 }
 
