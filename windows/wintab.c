@@ -71,8 +71,9 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     wintab_get_page_rect(wintab, &rcPage);
     wintabpage_resize(&wintab->items[0].page, &rcPage);
 
-    SetWindowPos(wintab->hwndTab, HWND_BOTTOM, rc->left, rc->top, rc->right, 
-        rc->bottom, SWP_NOMOVE);     
+    SetWindowPos(wintab->hwndTab, HWND_BOTTOM, rc->left, rc->top, 
+        rc->right - rc->left, 
+        rc->bottom - rc->top, SWP_NOMOVE);     
     
     return 0;
 }
@@ -239,6 +240,22 @@ int wintab_on_paint(wintab *wintab, HWND hwnd, UINT message,
 
     return 0;
 }
+
+//-----------------------------------------------------------------------
+
+void wintab_require_resize(wintab *wintab, int tab_width, int tab_height)
+{
+    int pwidth = tab_width + wintab->extra_width;
+    int pheight = tab_height + wintab->extra_height;
+    
+    SetWindowPos(hwnd, NULL, 0, 0, 
+        pwidth, pheight, SWP_NOMOVE | SWP_NOZORDER); 
+
+    SetWindowPos(wintab->hwndTab, NULL, 0, 0, 
+        tab_width, tab_height, SWP_NOMOVE | SWP_NOZORDER); 
+}
+
+
 //-----------------------------------------------------------------------
 //tabbar item related
 //-----------------------------------------------------------------------
@@ -764,6 +781,8 @@ void wintabitem_check_closed_session(wintabitem *tabitem)
     
 }
 
+//-----------------------------------------------------------------------
+
 void wintabitem_close_session(wintabitem *tabitem)
 {
     //char morestuff[100];
@@ -795,6 +814,22 @@ void wintabitem_close_session(wintabitem *tabitem)
 	//InsertMenu(popup_menus[i].menu, IDM_DUPSESS, MF_BYCOMMAND | MF_ENABLED,
 	//	   IDM_RESTART, "&Restart Session");
     //}
+}
+
+//-----------------------------------------------------------------------
+
+void wintabitem_require_resize(wintabitem *tabitem, int page_width, int page_height)
+{
+    int pwidth = page_width + tabitem->extra_width;
+    int pheight = page_height + tabitem->extra_height;
+    
+    wintab_require_resize(tabitem->parentTab, pwidth, pheight); 
+
+    SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, 
+        page_width, page_height, SWP_NOMOVE | SWP_NOZORDER); 
+    //MoveWindow(tabitem->page.hwndCtrl, rc->left, rc->top, 
+    //    rc->right - rc->left, 
+    //    rc->bottom - rc->top, TRUE);
 }
 
 //-----------------------------------------------------------------------
@@ -885,8 +920,6 @@ int wintabpage_fini(wintabpage *page)
 
 int wintabpage_resize(wintabpage *page, const RECT *rc)
 {
-    HDWP hdwp;
- 
     MoveWindow(page->hwndCtrl, rc->left, rc->top, 
         rc->right - rc->left, 
         rc->bottom - rc->top, TRUE);
