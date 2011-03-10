@@ -50,7 +50,14 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     wintab->hwndParent = hwndParent;
  
     wintabitem_creat(wintab, &cfg);
+    
+    //init the extra size
     wintab_resize(wintab, &rc);
+    
+    //resize according to term
+    int term_width = wintab->items[0].font_width * wintab->items[0].term->cols;
+    int term_height = wintab->items[0].font_height * wintab->items[0].term->rows;
+    wintabitem_require_resize(&wintab->items[0], term_width, term_height);
     return 0; 
 }
 
@@ -66,14 +73,18 @@ int wintab_fini(wintab *wintab)
 
 int wintab_resize(wintab *wintab, const RECT *rc)
 {
-    RECT rcPage;
+    RECT rcPage, wr;
+    int tab_width = rc->right - rc->left;
+    int tab_height = rc->bottom - rc->top;
+    SetWindowPos(wintab->hwndTab, HWND_BOTTOM, rc->left, rc->top, 
+        tab_width, tab_height, SWP_NOMOVE);
+    
+	GetWindowRect(wintab->hwndParent, &wr);
+    wintab->extra_width = wr.right - wr.left - tab_width;
+    wintab->extra_height = wr.bottom - wr.top - tab_height;
     
     wintab_get_page_rect(wintab, &rcPage);
     wintabpage_resize(&wintab->items[0].page, &rcPage);
-
-    SetWindowPos(wintab->hwndTab, HWND_BOTTOM, rc->left, rc->top, rc->right, 
-        rc->bottom, SWP_NOMOVE);     
-    
     return 0;
 }
 
@@ -239,6 +250,22 @@ int wintab_on_paint(wintab *wintab, HWND hwnd, UINT message,
 
     return 0;
 }
+
+//-----------------------------------------------------------------------
+
+void wintab_require_resize(wintab *wintab, int tab_width, int tab_height)
+{
+    int parent_width = tab_width + wintab->extra_width;
+    int parent_height = tab_height + wintab->extra_height;
+    
+    SetWindowPos(wintab->hwndParent, NULL, 0, 0, 
+        parent_width, parent_height, SWP_NOMOVE | SWP_NOZORDER); 
+
+    SetWindowPos(wintab->hwndTab, NULL, 0, 0, 
+        tab_width, tab_height, SWP_NOMOVE | SWP_NOZORDER); 
+}
+
+
 //-----------------------------------------------------------------------
 //tabbar item related
 //-----------------------------------------------------------------------
@@ -268,6 +295,7 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     
     tabitem->parentTab = wintab;
     wintabpage_init(&tabitem->page, cfg, wintab->hwndParent);
+    tabitem->page.hwndTab = wintab->hwndTab;
     wintabpage_bind_item(tabitem->page.hwndCtrl, tabitem); 
     
     adjust_host(cfg);
@@ -764,6 +792,8 @@ void wintabitem_check_closed_session(wintabitem *tabitem)
     
 }
 
+//-----------------------------------------------------------------------
+
 void wintabitem_close_session(wintabitem *tabitem)
 {
     //char morestuff[100];
@@ -795,6 +825,24 @@ void wintabitem_close_session(wintabitem *tabitem)
 	//InsertMenu(popup_menus[i].menu, IDM_DUPSESS, MF_BYCOMMAND | MF_ENABLED,
 	//	   IDM_RESTART, "&Restart Session");
     //}
+}
+
+//-----------------------------------------------------------------------
+
+void wintabitem_require_resize(wintabitem *tabitem, int term_width, int term_height)
+{
+    int page_width = term_width + tabitem->page.extra_page_width;
+    int page_height = term_height + tabitem->page.extra_page_height;
+    int parent_width = page_width + tabitem->page.extra_width;
+    int parent_height = page_height + tabitem->page.extra_height;
+    
+    wintab_require_resize(tabitem->parentTab, parent_width, parent_height); 
+
+    SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, 
+        page_width, page_height, SWP_NOMOVE | SWP_NOZORDER); 
+    //MoveWindow(tabitem->page.hwndCtrl, rc->left, rc->top, 
+    //    rc->right - rc->left, 
+    //    rc->bottom - rc->top, TRUE);
 }
 
 //-----------------------------------------------------------------------
@@ -885,11 +933,20 @@ int wintabpage_fini(wintabpage *page)
 
 int wintabpage_resize(wintabpage *page, const RECT *rc)
 {
-    HDWP hdwp;
- 
+    RECT tc, pc;
+    int page_width = rc->right - rc->left;
+    int page_height = rc->bottom - rc->top;
     MoveWindow(page->hwndCtrl, rc->left, rc->top, 
-        rc->right - rc->left, 
-        rc->bottom - rc->top, TRUE);
+        page_width, 
+        page_height, TRUE);
+    
+    GetWindowRect(page->hwndTab, &tc);
+    page->extra_width = tc.right - tc.left - page_width;
+    page->extra_height = tc.bottom - tc.top - page_height;
+
+    GetClientRect(page->hwndCtrl, &pc);
+    page->extra_page_width = page_width - (pc.right - pc.left);
+    page->extra_page_height = page_height - (pc.bottom - pc.top);
     return 0;
 }
 

@@ -39,6 +39,9 @@ typedef enum {
 
 typedef struct {
     HWND hwndCtrl;
+    HWND hwndTab;
+    int extra_page_width, extra_page_height; //gaps from term to page
+    int extra_width, extra_height; //gaps from page to tab
 }wintabpage;
 
 typedef struct {
@@ -96,6 +99,8 @@ typedef struct {
     HWND hwndTab;
     HWND hwndParent;
     wintabitem items[64];
+
+    int extra_width, extra_height; //gaps from win to tab
 }wintab;
 
 //-----------------------------------------------------------------------
@@ -111,6 +116,7 @@ void wintab_term_paste(wintab *wintab);
 void wintab_term_set_focus(wintab *wintab, int has_focus);
 wintabitem* wintab_get_active_item(wintab *wintab);
 void wintab_get_page_rect(wintab *wintab, RECT *rc);
+void wintab_require_resize(wintab *wintab, int tab_width, int tab_height);
 
 int wintab_on_paint(wintab *wintab, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
@@ -132,6 +138,7 @@ int wintabitem_start_backend(wintabitem *tabitem);
 void wintabitem_init_palette(wintabitem *tabitem);
 void wintabitem_check_closed_session(wintabitem *tabitem);
 void wintabitem_close_session(wintabitem *tabitem);
+void wintabitem_require_resize(wintabitem *tabitem, int page_width, int page_height);
 
 int wintabitem_on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);

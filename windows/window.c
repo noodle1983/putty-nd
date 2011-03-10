@@ -579,7 +579,7 @@ void resizeWindows()
 	GetClientRect(hwnd, &cr);
 	offset_width = offset_height = cfg.window_border;
 	extra_width = wr.right - wr.left - cr.right + cr.left + offset_width*2;
-	extra_height = wr.bottom - wr.top - cr.bottom + cr.top +offset_height*2 + 20;
+	extra_height = wr.bottom - wr.top - cr.bottom + cr.top +offset_height*2;
 
     /*
      * Resize the window, now we know what size we _really_ want it
@@ -672,47 +672,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     wintab_init(&tab, hwnd);
     logctx = tab.items[0].logctx;
 
-    resizeWindows();
-#if 0
-            /*
-             * Set up a caret bitmap, with no content.
-             */
-            {
-        	char *bits;
-        	int size = (font_width + 15) / 16 * 2 * font_height;
-        	bits = snewn(size, char);
-        	memset(bits, 0, size);
-        	caretbm = CreateBitmap(font_width, font_height, 1, 1, bits);
-        	sfree(bits);
-            }
-            CreateCaret(hwnd, caretbm, font_width, font_height);
+    //resizeWindows();
 
-
-            /*
-             * Initialise the scroll bar.
-             */
-            {
-        	SCROLLINFO si;
-
-        	si.cbSize = sizeof(si);
-        	si.fMask = SIF_ALL | SIF_DISABLENOSCROLL;
-        	si.nMin = 0;
-        	si.nMax = term->rows - 1;
-        	si.nPage = term->rows;
-        	si.nPos = 0;
-        	SetScrollInfo(HWNDDC, SB_VERT, &si, FALSE);
-            }
-#endif
-            /*
-             * Prepare the mouse handler.
-             */
-            //lastact = MA_NOTHING;
-            //lastbtn = MBT_NOTHING;
-            //dbltime = GetDoubleClickTime();
-
-    /*
-     * Set up the session-control options on the system menu.
-     */
     {
 	HMENU m;
 	int j;
@@ -3037,7 +2998,7 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
         	ignore_clip = FALSE;
         	return 0;
         case WM_PAINT:
-            wintab_on_paint(&tab, hwnd, message,wParam, lParam);
+            //wintab_on_paint(&tab, hwnd, message,wParam, lParam);
     		break;
         case WM_NETEVENT:
             on_net_event(tabitem, hwnd, message,wParam, lParam);
@@ -3049,9 +3010,6 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
         	on_kill_focus(tabitem, hwnd, message,wParam, lParam);
         	break;
         case WM_ENTERSIZEMOVE:
-#ifdef RDB_DEBUG_PATCH
-        	debug((27, "WM_ENTERSIZEMOVE"));
-#endif
         	EnableSizeTip(1);
         	resizing = TRUE;
         	need_backend_resize = FALSE;
@@ -3059,25 +3017,23 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
         case WM_EXITSIZEMOVE:
         	EnableSizeTip(0);
         	resizing = FALSE;
-#ifdef RDB_DEBUG_PATCH
-        	debug((27, "WM_EXITSIZEMOVE"));
-#endif
         	if (need_backend_resize) {
-        	    term_size(tabitem->term, tabitem->cfg.height, tabitem->cfg.width, tabitem->cfg.savelines);
-        	    InvalidateRect(hwnd, NULL, TRUE);
+        	    //term_size(tabitem->term, tabitem->cfg.height, tabitem->cfg.width, tabitem->cfg.savelines);
+        	    //nvalidateRect(hwnd, NULL, TRUE);
         	}
         	break;
         case WM_SIZING:
-            return on_sizing(tabitem, hwnd, message,wParam, lParam);
+            break;
+            //return on_sizing(tabitem, hwnd, message,wParam, lParam);
         	/* break;  (never reached) */
         case WM_FULLSCR_ON_MAX:
         	fullscr_on_max = TRUE;
         	break;
         case WM_MOVE:
-        	sys_cursor_update(tabitem);
+        	//sys_cursor_update(tabitem);
         	break;
         case WM_SIZE:
-            on_size(tabitem, hwnd, message,wParam, lParam);
+            //on_size(tabitem, hwnd, message,wParam, lParam);
         	return 0;
         case WM_PALETTECHANGED:
 	        on_palette_changed(tabitem, hwnd, message,wParam, lParam);
