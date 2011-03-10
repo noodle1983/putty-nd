@@ -39,6 +39,9 @@ typedef enum {
 
 typedef struct {
     HWND hwndCtrl;
+    HWND hwndTab;
+    int extra_page_width, extra_page_height; //gaps from term to page
+    int extra_width, extra_height; //gaps from page to tab
 }wintabpage;
 
 typedef struct {
