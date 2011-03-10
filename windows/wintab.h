@@ -118,8 +118,6 @@ wintabitem* wintab_get_active_item(wintab *wintab);
 void wintab_get_page_rect(wintab *wintab, RECT *rc);
 void wintab_require_resize(wintab *wintab, int tab_width, int tab_height);
 
-int wintab_on_paint(wintab *wintab, HWND hwnd, UINT message,
-				WPARAM wParam, LPARAM lParam);
 //-----------------------------------------------------------------------
 // tabbar item related
 //-----------------------------------------------------------------------
@@ -142,13 +140,15 @@ void wintabitem_require_resize(wintabitem *tabitem, int page_width, int page_hei
 
 int wintabitem_on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
+int wintabitem_on_paint(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
 //-----------------------------------------------------------------------
 //page related
 //-----------------------------------------------------------------------
 int wintabpage_init(wintabpage *page, const Config *cfg, HWND hwndParent);
 void wintabpage_init_scrollbar(wintabpage *page, Terminal *term);
 int wintabpage_fini(wintabpage *page);
-int wintabpage_resize(wintabpage *page, const RECT *rc);
+int wintabpage_resize(wintabpage *page, const RECT *rc, const int cfg_winborder);
 void wintabpage_bind_item(HWND hwndPage, wintabitem *tabitem);
 wintabitem * wintabpage_get_item(HWND hwndPage);
 

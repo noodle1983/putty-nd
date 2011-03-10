@@ -84,7 +84,7 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     wintab->extra_height = wr.bottom - wr.top - tab_height;
     
     wintab_get_page_rect(wintab, &rcPage);
-    wintabpage_resize(&wintab->items[0].page, &rcPage);
+    wintabpage_resize(&wintab->items[0].page, &rcPage, wintab->items[0].cfg.window_border);
     return 0;
 }
 
@@ -146,109 +146,6 @@ wintabitem* wintab_get_active_item(wintab *wintab)
 {
     //get select ...
     return &wintab->items[0];
-}
-
-//-----------------------------------------------------------------------
-
-int wintab_on_paint(wintab *wintab, HWND hwnd, UINT message,
-				WPARAM wParam, LPARAM lParam)
-{
-    wintabitem tabitem = wintab->items[0];
-    PAINTSTRUCT p;
-
-    HideCaret(tabitem.page.hwndCtrl);
-    tabitem.hdc = BeginPaint(tabitem.page.hwndCtrl, &p);
-    if (tabitem.pal) {
-    	SelectPalette(tabitem.hdc, tabitem.pal, TRUE);
-    	RealizePalette(tabitem.hdc);
-    }
-
-    /*
-     * We have to be careful about term_paint(). It will
-     * set a bunch of character cells to INVALID and then
-     * call do_paint(), which will redraw those cells and
-     * _then mark them as done_. This may not be accurate:
-     * when painting in WM_PAINT context we are restricted
-     * to the rectangle which has just been exposed - so if
-     * that only covers _part_ of a character cell and the
-     * rest of it was already visible, that remainder will
-     * not be redrawn at all. Accordingly, we must not
-     * paint any character cell in a WM_PAINT context which
-     * already has a pending update due to terminal output.
-     * The simplest solution to this - and many, many
-     * thanks to Hung-Te Lin for working all this out - is
-     * not to do any actual painting at _all_ if there's a
-     * pending terminal update: just mark the relevant
-     * character cells as INVALID and wait for the
-     * scheduled full update to sort it out.
-     * 
-     * I have a suspicion this isn't the _right_ solution.
-     * An alternative approach would be to have terminal.c
-     * separately track what _should_ be on the terminal
-     * screen and what _is_ on the terminal screen, and
-     * have two completely different types of redraw (one
-     * for full updates, which syncs the former with the
-     * terminal itself, and one for WM_PAINT which syncs
-     * the latter with the former); yet another possibility
-     * would be to have the Windows front end do what the
-     * GTK one already does, and maintain a bitmap of the
-     * current terminal appearance so that WM_PAINT becomes
-     * completely trivial. However, this should do for now.
-     */
-    term_paint(tabitem.term, (Context)&tabitem, 
-	       (p.rcPaint.left-tabitem.offset_width)/tabitem.font_width,
-	       (p.rcPaint.top-tabitem.offset_height)/tabitem.font_height,
-	       (p.rcPaint.right-tabitem.offset_width-1)/tabitem.font_width,
-	       (p.rcPaint.bottom-tabitem.offset_height-1)/tabitem.font_height,
-	       !tabitem.term->window_update_pending);
-
-    if (p.fErase ||
-        p.rcPaint.left  < tabitem.offset_width  ||
-	p.rcPaint.top   < tabitem.offset_height ||
-	p.rcPaint.right >= tabitem.offset_width + tabitem.font_width*tabitem.term->cols ||
-	p.rcPaint.bottom>= tabitem.offset_height + tabitem.font_height*tabitem.term->rows)
-    {
-    	HBRUSH fillcolour, oldbrush;
-    	HPEN   edge, oldpen;
-    	fillcolour = CreateSolidBrush (
-    			    tabitem.colours[ATTR_DEFBG>>ATTR_BGSHIFT]);
-    	oldbrush = SelectObject(tabitem.hdc, fillcolour);
-    	edge = CreatePen(PS_SOLID, 0, 
-    			    tabitem.colours[ATTR_DEFBG>>ATTR_BGSHIFT]);
-    	oldpen = SelectObject(tabitem.hdc, edge);
-
-    	/*
-    	 * Jordan Russell reports that this apparently
-    	 * ineffectual IntersectClipRect() call masks a
-    	 * Windows NT/2K bug causing strange display
-    	 * problems when the PuTTY window is taller than
-    	 * the primary monitor. It seems harmless enough...
-    	 */
-    	IntersectClipRect(tabitem.hdc,
-    		p.rcPaint.left, p.rcPaint.top,
-    		p.rcPaint.right, p.rcPaint.bottom);
-
-    	ExcludeClipRect(tabitem.hdc, 
-    		tabitem.offset_width, tabitem.offset_height,
-    		tabitem.offset_width+tabitem.font_width*tabitem.term->cols,
-    		tabitem.offset_height+tabitem.font_height*tabitem.term->rows);
-
-    	Rectangle(tabitem.hdc, p.rcPaint.left, p.rcPaint.top, 
-    		  p.rcPaint.right, p.rcPaint.bottom);
-
-    	/* SelectClipRgn(hdc, NULL); */
-
-    	SelectObject(tabitem.hdc, oldbrush);
-    	DeleteObject(fillcolour);
-    	SelectObject(tabitem.hdc, oldpen);
-    	DeleteObject(edge);
-    }
-    SelectObject(tabitem.hdc, GetStockObject(SYSTEM_FONT));
-    SelectObject(tabitem.hdc, GetStockObject(WHITE_PEN));
-    EndPaint(tabitem.page.hwndCtrl, &p);
-    ShowCaret(tabitem.page.hwndCtrl);
-
-    return 0;
 }
 
 //-----------------------------------------------------------------------
@@ -878,6 +775,109 @@ int wintabitem_on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
 }
 
 //-----------------------------------------------------------------------
+
+int wintabitem_on_paint(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    wintabitem tmp_tabitem = *tabitem;
+    PAINTSTRUCT p;
+
+    HideCaret(tmp_tabitem.page.hwndCtrl);
+    tmp_tabitem.hdc = BeginPaint(tmp_tabitem.page.hwndCtrl, &p);
+    if (tmp_tabitem.pal) {
+    	SelectPalette(tmp_tabitem.hdc, tmp_tabitem.pal, TRUE);
+    	RealizePalette(tmp_tabitem.hdc);
+    }
+
+    /*
+     * We have to be careful about term_paint(). It will
+     * set a bunch of character cells to INVALID and then
+     * call do_paint(), which will redraw those cells and
+     * _then mark them as done_. This may not be accurate:
+     * when painting in WM_PAINT context we are restricted
+     * to the rectangle which has just been exposed - so if
+     * that only covers _part_ of a character cell and the
+     * rest of it was already visible, that remainder will
+     * not be redrawn at all. Accordingly, we must not
+     * paint any character cell in a WM_PAINT context which
+     * already has a pending update due to terminal output.
+     * The simplest solution to this - and many, many
+     * thanks to Hung-Te Lin for working all this out - is
+     * not to do any actual painting at _all_ if there's a
+     * pending terminal update: just mark the relevant
+     * character cells as INVALID and wait for the
+     * scheduled full update to sort it out.
+     * 
+     * I have a suspicion this isn't the _right_ solution.
+     * An alternative approach would be to have terminal.c
+     * separately track what _should_ be on the terminal
+     * screen and what _is_ on the terminal screen, and
+     * have two completely different types of redraw (one
+     * for full updates, which syncs the former with the
+     * terminal itself, and one for WM_PAINT which syncs
+     * the latter with the former); yet another possibility
+     * would be to have the Windows front end do what the
+     * GTK one already does, and maintain a bitmap of the
+     * current terminal appearance so that WM_PAINT becomes
+     * completely trivial. However, this should do for now.
+     */
+    term_paint(tmp_tabitem.term, (Context)&tmp_tabitem, 
+	       (p.rcPaint.left-tmp_tabitem.offset_width)/tmp_tabitem.font_width,
+	       (p.rcPaint.top-tmp_tabitem.offset_height)/tmp_tabitem.font_height,
+	       (p.rcPaint.right-tmp_tabitem.offset_width-1)/tmp_tabitem.font_width,
+	       (p.rcPaint.bottom-tmp_tabitem.offset_height-1)/tmp_tabitem.font_height,
+	       !tmp_tabitem.term->window_update_pending);
+
+    if (p.fErase ||
+        p.rcPaint.left  < tmp_tabitem.offset_width  ||
+	p.rcPaint.top   < tmp_tabitem.offset_height ||
+	p.rcPaint.right >= tmp_tabitem.offset_width + tmp_tabitem.font_width*tmp_tabitem.term->cols ||
+	p.rcPaint.bottom>= tmp_tabitem.offset_height + tmp_tabitem.font_height*tmp_tabitem.term->rows)
+    {
+    	HBRUSH fillcolour, oldbrush;
+    	HPEN   edge, oldpen;
+    	fillcolour = CreateSolidBrush (
+    			    tmp_tabitem.colours[ATTR_DEFBG>>ATTR_BGSHIFT]);
+    	oldbrush = SelectObject(tmp_tabitem.hdc, fillcolour);
+    	edge = CreatePen(PS_SOLID, 0, 
+    			    tmp_tabitem.colours[ATTR_DEFBG>>ATTR_BGSHIFT]);
+    	oldpen = SelectObject(tmp_tabitem.hdc, edge);
+
+    	/*
+    	 * Jordan Russell reports that this apparently
+    	 * ineffectual IntersectClipRect() call masks a
+    	 * Windows NT/2K bug causing strange display
+    	 * problems when the PuTTY window is taller than
+    	 * the primary monitor. It seems harmless enough...
+    	 */
+    	IntersectClipRect(tmp_tabitem.hdc,
+    		p.rcPaint.left, p.rcPaint.top,
+    		p.rcPaint.right, p.rcPaint.bottom);
+
+    	ExcludeClipRect(tmp_tabitem.hdc, 
+    		tmp_tabitem.offset_width, tmp_tabitem.offset_height,
+    		tmp_tabitem.offset_width+tmp_tabitem.font_width*tmp_tabitem.term->cols,
+    		tmp_tabitem.offset_height+tmp_tabitem.font_height*tmp_tabitem.term->rows);
+
+    	Rectangle(tmp_tabitem.hdc, p.rcPaint.left, p.rcPaint.top, 
+    		  p.rcPaint.right, p.rcPaint.bottom);
+
+    	/* SelectClipRgn(hdc, NULL); */
+
+    	SelectObject(tmp_tabitem.hdc, oldbrush);
+    	DeleteObject(fillcolour);
+    	SelectObject(tmp_tabitem.hdc, oldpen);
+    	DeleteObject(edge);
+    }
+    SelectObject(tmp_tabitem.hdc, GetStockObject(SYSTEM_FONT));
+    SelectObject(tmp_tabitem.hdc, GetStockObject(WHITE_PEN));
+    EndPaint(tmp_tabitem.page.hwndCtrl, &p);
+    ShowCaret(tmp_tabitem.page.hwndCtrl);
+
+    return 0;
+}
+
+//-----------------------------------------------------------------------
 //page related
 //-----------------------------------------------------------------------
 int wintabpage_init(wintabpage *page, const Config *cfg, HWND hwndParent)
@@ -931,7 +931,7 @@ int wintabpage_fini(wintabpage *page)
 
 //-----------------------------------------------------------------------
 
-int wintabpage_resize(wintabpage *page, const RECT *rc)
+int wintabpage_resize(wintabpage *page, const RECT *rc, const int cfg_winborder)
 {
     RECT tc, pc;
     int page_width = rc->right - rc->left;
@@ -945,8 +945,8 @@ int wintabpage_resize(wintabpage *page, const RECT *rc)
     page->extra_height = tc.bottom - tc.top - page_height;
 
     GetClientRect(page->hwndCtrl, &pc);
-    page->extra_page_width = page_width - (pc.right - pc.left);
-    page->extra_page_height = page_height - (pc.bottom - pc.top);
+    page->extra_page_width = page_width - (pc.right - pc.left) + cfg_winborder*2;
+    page->extra_page_height = page_height - (pc.bottom - pc.top) + cfg_winborder*2;
     return 0;
 }
 
@@ -1033,6 +1033,10 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
         case WM_VSCROLL:
 	        wintabitem_on_scroll(tabitem, hwnd, message, wParam, lParam);
         	break;
+        case WM_NCPAINT:
+        case WM_PAINT:
+            wintabitem_on_paint(tabitem, hwnd, message,wParam, lParam);
+    		break;
         default:
             break;
     }

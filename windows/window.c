@@ -2998,7 +2998,7 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
         	ignore_clip = FALSE;
         	return 0;
         case WM_PAINT:
-            //wintab_on_paint(&tab, hwnd, message,wParam, lParam);
+            //wintabitem_on_paint(tabitem, hwnd, message,wParam, lParam);
     		break;
         case WM_NETEVENT:
             on_net_event(tabitem, hwnd, message,wParam, lParam);
