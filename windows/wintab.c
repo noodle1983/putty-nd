@@ -1033,6 +1033,18 @@ wintabitem * wintabpage_get_item(HWND hwndPage)
 {
     return (wintabitem *)GetWindowLongPtr(hwndPage, GWLP_USERDATA);
 }
+
+//-----------------------------------------------------------------------
+
+void wintabpage_get_term_size(wintabpage *page, int *term_width, int *term_height)
+{
+    RECT rc;
+    GetWindowRect(page->hwndCtrl, &rc);
+    
+    *term_width = rc.right - rc.left - page->extra_page_width;
+    *term_height = rc.bottom - rc.top - page->extra_page_height;
+}
+
 //-----------------------------------------------------------------------
 
 

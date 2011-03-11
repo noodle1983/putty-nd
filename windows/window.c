@@ -1539,11 +1539,13 @@ void request_resize(void *frontend, int w, int h)
     wintabitem *tabitem = (wintabitem *)frontend;
     
     int width, height;
+    int extra_width, extra_height;
+    wintabitem_get_extra_size(tabitem, &extra_width, &extra_height);
 
     /* If the window is maximized supress resizing attempts */
     if (IsZoomed(hwnd)) {
-	if (tabitem->cfg.resize_action == RESIZE_TERM)
-	    return;
+    	if (tabitem->cfg.resize_action == RESIZE_TERM)
+    	    return;
     }
 
     if (tabitem->cfg.resize_action == RESIZE_DISABLED) return;
@@ -1551,45 +1553,43 @@ void request_resize(void *frontend, int w, int h)
 
     /* Sanity checks ... */
     {
-	static int first_time = 1;
-	static RECT ss;
+    	static int first_time = 1;
+    	static RECT ss;
 
-	switch (first_time) {
-	  case 1:
-	    /* Get the size of the screen */
-	    if (get_fullscreen_rect(&ss))
-		/* first_time = 0 */ ;
-	    else {
-		first_time = 2;
-		break;
-	    }
-	  case 0:
-	    /* Make sure the values are sane */
-	    width = (ss.right - ss.left - tabitem->extra_width) / 4;
-	    height = (ss.bottom - ss.top - tabitem->extra_height) / 6;
+    	switch (first_time) {
+    	  case 1:
+    	    /* Get the size of the screen */
+    	    if (get_fullscreen_rect(&ss))
+    		/* first_time = 0 */ ;
+    	    else {
+    		first_time = 2;
+    		break;
+    	    }
+    	  case 0:
+    	    /* Make sure the values are sane */
+    	    width = (ss.right - ss.left - extra_width) / 4;
+    	    height = (ss.bottom - ss.top - extra_height) / 6;
 
-	    if (w > width || h > height)
-		return;
-	    if (w < 15)
-		w = 15;
-	    if (h < 1)
-		h = 1;
-	}
+    	    if (w > width || h > height)
+    		return;
+    	    if (w < 15)
+    		w = 15;
+    	    if (h < 1)
+    		h = 1;
+    	}
     }
 
     term_size(tabitem->term, h, w, tabitem->cfg.savelines);
 
     if (tabitem->cfg.resize_action != RESIZE_FONT && !IsZoomed(hwnd)) {
-	width = tabitem->extra_width + tabitem->font_width * w;
-	height = tabitem->extra_height + tabitem->font_height * h;
+	width = tabitem->font_width * w;
+	height = tabitem->font_height * h;
 
-	SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, width, height,
-	    SWP_NOACTIVATE | SWP_NOCOPYBITS |
-	    SWP_NOMOVE | SWP_NOZORDER);
+	wintabitem_require_resize(tabitem, width, height);
     } else
 	reset_window(tabitem, 0);
 
-    InvalidateRect(tabitem->page.hwndCtrl, NULL, TRUE);
+    InvalidateRect(hwnd, NULL, TRUE);
 }
 
 static void reset_window(wintabitem* tabitem, int reinit) {
@@ -1638,41 +1638,38 @@ static void reset_window(wintabitem* tabitem, int reinit) {
     }
 
     if (IsZoomed(hwnd)) {
-	/* We're fullscreen, this means we must not change the size of
-	 * the window so it's the font size or the terminal itself.
-	 */
+    	/* We're fullscreen, this means we must not change the size of
+    	 * the window so it's the font size or the terminal itself.
+    	 */
 
-	tabitem->extra_width = wr.right - wr.left - cr.right + cr.left;
-	tabitem->extra_height = wr.bottom - wr.top - cr.bottom + cr.top;
-
-	if (tabitem->cfg.resize_action != RESIZE_TERM) {
-	    if (  tabitem->font_width != win_width/tabitem->term->cols || 
-		  tabitem->font_height != win_height/tabitem->term->rows) {
-		  
-            wintabitem_deinit_fonts(tabitem);
-            wintabitem_init_fonts(tabitem, win_width/tabitem->term->cols, win_height/tabitem->term->rows);
-            tabitem->offset_width = (win_width-tabitem->font_width*tabitem->term->cols)/2;
-            tabitem->offset_height = (win_height-tabitem->font_height*tabitem->term->rows)/2;
-            InvalidateRect(hwnd, NULL, TRUE);
-	    }
-	} else {
-	    if (  tabitem->font_width * tabitem->term->cols != win_width || 
-		  tabitem->font_height * tabitem->term->rows != win_height) {
-		  
-            /* Our only choice at this point is to change the 
-             * size of the terminal; Oh well.
-             */
-            term_size(tabitem->term, win_height/tabitem->font_height, win_width/tabitem->font_width,
-            	  tabitem->cfg.savelines);
-            tabitem->offset_width = (win_width-tabitem->font_width*tabitem->term->cols)/2;
-            tabitem->offset_height = (win_height-tabitem->font_height*tabitem->term->rows)/2;
-            InvalidateRect(hwnd, NULL, TRUE);
+    	if (tabitem->cfg.resize_action != RESIZE_TERM) {
+    	    if (  tabitem->font_width != win_width/tabitem->term->cols || 
+    		  tabitem->font_height != win_height/tabitem->term->rows) {
+    		  
+                wintabitem_deinit_fonts(tabitem);
+                wintabitem_init_fonts(tabitem, win_width/tabitem->term->cols, win_height/tabitem->term->rows);
+                tabitem->offset_width = (win_width-tabitem->font_width*tabitem->term->cols)/2;
+                tabitem->offset_height = (win_height-tabitem->font_height*tabitem->term->rows)/2;
+                InvalidateRect(hwnd, NULL, TRUE);
+    	    }
+    	} else {
+    	    if (  tabitem->font_width * tabitem->term->cols != win_width || 
+    		  tabitem->font_height * tabitem->term->rows != win_height) {
+    		  
+                /* Our only choice at this point is to change the 
+                 * size of the terminal; Oh well.
+                 */
+                term_size(tabitem->term, win_height/tabitem->font_height, win_width/tabitem->font_width,
+                	  tabitem->cfg.savelines);
+                tabitem->offset_width = (win_width-tabitem->font_width*tabitem->term->cols)/2;
+                tabitem->offset_height = (win_height-tabitem->font_height*tabitem->term->rows)/2;
+                InvalidateRect(hwnd, NULL, TRUE);
 #ifdef RDB_DEBUG_PATCH
-		debug((27, "reset_window() -> Zoomed term_size"));
+    		debug((27, "reset_window() -> Zoomed term_size"));
 #endif
-	    }
-	}
-	return;
+    	    }
+    	}
+    	return;
     }
 
     /* Hmm, a force re-init means we should ignore the current window
@@ -1680,28 +1677,25 @@ static void reset_window(wintabitem* tabitem, int reinit) {
      */
     if (reinit>0) {
 #ifdef RDB_DEBUG_PATCH
-	debug((27, "reset_window() -> Forced re-init"));
+    	debug((27, "reset_window() -> Forced re-init"));
 #endif
 
-	tabitem->offset_width = tabitem->offset_height = tabitem->cfg.window_border;
-	tabitem->extra_width = wr.right - wr.left - cr.right + cr.left + tabitem->offset_width*2;
-	tabitem->extra_height = wr.bottom - wr.top - cr.bottom + cr.top +tabitem->offset_height*2;
+    	tabitem->offset_width = tabitem->offset_height = tabitem->cfg.window_border;
 
-	if (win_width != tabitem->font_width*tabitem->term->cols + tabitem->offset_width*2 ||
-	    win_height != tabitem->font_height*tabitem->term->rows + tabitem->offset_height*2) {
+    	if (win_width != tabitem->font_width*tabitem->term->cols + tabitem->offset_width*2 ||
+    	    win_height != tabitem->font_height*tabitem->term->rows + tabitem->offset_height*2) {
 
-	    /* If this is too large windows will resize it to the maximum
-	     * allowed window size, we will then be back in here and resize
-	     * the font or terminal to fit.
-	     */
-	    SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, 
-		         tabitem->font_width*tabitem->term->cols + tabitem->extra_width, 
-			 tabitem->font_height*tabitem->term->rows + tabitem->extra_height,
-			 SWP_NOMOVE | SWP_NOZORDER);
-	}
+    	    /* If this is too large windows will resize it to the maximum
+    	     * allowed window size, we will then be back in here and resize
+    	     * the font or terminal to fit.
+    	     */
+    	    wintabitem_require_resize(tabitem,
+    	         tabitem->font_width*tabitem->term->cols , 
+    			 tabitem->font_height*tabitem->term->rows);
+    	}
 
-	InvalidateRect(hwnd, NULL, TRUE);
-	return;
+    	InvalidateRect(hwnd, NULL, TRUE);
+    	return;
     }
 
     /* Okay the user doesn't want us to change the font so we try the 
@@ -1710,62 +1704,61 @@ static void reset_window(wintabitem* tabitem, int reinit) {
      */
     if ((tabitem->cfg.resize_action == RESIZE_TERM && reinit<=0) ||
         (tabitem->cfg.resize_action == RESIZE_EITHER && reinit<0) ||
-	    reinit>0) {
-	tabitem->offset_width = tabitem->offset_height = tabitem->cfg.window_border;
-	tabitem->extra_width = wr.right - wr.left - cr.right + cr.left + tabitem->offset_width*2;
-	tabitem->extra_height = wr.bottom - wr.top - cr.bottom + cr.top +tabitem->offset_height*2;
+            	reinit>0) {
+        tabitem->offset_width = tabitem->offset_height = tabitem->cfg.window_border;
 
-	if (win_width != tabitem->font_width*tabitem->term->cols + tabitem->offset_width*2 ||
-	    win_height != tabitem->font_height*tabitem->term->rows + tabitem->offset_height*2) {
+    	if (win_width != tabitem->font_width*tabitem->term->cols + tabitem->offset_width*2 ||
+    	    win_height != tabitem->font_height*tabitem->term->rows + tabitem->offset_height*2) {
 
-	    static RECT ss;
-	    int width, height;
-		
-		get_fullscreen_rect(&ss);
+    	    static RECT ss;
+    	    int width, height;
+            int extra_width, extra_height;
+            wintabitem_get_extra_size(tabitem, &extra_width, &extra_height);
+    		
+    		get_fullscreen_rect(&ss);
 
-	    width = (ss.right - ss.left - tabitem->extra_width) / tabitem->font_width;
-	    height = (ss.bottom - ss.top - tabitem->extra_height) / tabitem->font_height;
+    	    width = (ss.right - ss.left - extra_width) / tabitem->font_width;
+    	    height = (ss.bottom - ss.top - extra_height) / tabitem->font_height;
 
-	    /* Grrr too big */
-	    if ( tabitem->term->rows > height || tabitem->term->cols > width ) {
-		if (tabitem->cfg.resize_action == RESIZE_EITHER) {
-		    /* Make the font the biggest we can */
-		    if (tabitem->term->cols > width)
-			tabitem->font_width = (ss.right - ss.left - tabitem->extra_width)
-			    / tabitem->term->cols;
-		    if (tabitem->term->rows > height)
-			tabitem->font_height = (ss.bottom - ss.top - tabitem->extra_height)
-			    / tabitem->term->rows;
+    	    /* Grrr too big */
+    	    if ( tabitem->term->rows > height || tabitem->term->cols > width ) {
+    		if (tabitem->cfg.resize_action == RESIZE_EITHER) {
+    		    /* Make the font the biggest we can */
+    		    if (tabitem->term->cols > width)
+    			tabitem->font_width = (ss.right - ss.left - extra_width)
+    			    / tabitem->term->cols;
+    		    if (tabitem->term->rows > height)
+    			tabitem->font_height = (ss.bottom - ss.top - extra_height)
+    			    / tabitem->term->rows;
 
-		    wintabitem_deinit_fonts(tabitem);
-		    wintabitem_init_fonts(tabitem, tabitem->font_width, tabitem->font_height);
+    		    wintabitem_deinit_fonts(tabitem);
+    		    wintabitem_init_fonts(tabitem, tabitem->font_width, tabitem->font_height);
 
-		    width = (ss.right - ss.left - tabitem->extra_width) / tabitem->font_width;
-		    height = (ss.bottom - ss.top - tabitem->extra_height) / tabitem->font_height;
-		} else {
-		    if ( height > tabitem->term->rows ) height = tabitem->term->rows;
-		    if ( width > tabitem->term->cols )  width = tabitem->term->cols;
-		    term_size(tabitem->term, height, width, tabitem->cfg.savelines);
+    		    width = (ss.right - ss.left - extra_width) / tabitem->font_width;
+    		    height = (ss.bottom - ss.top - extra_height) / tabitem->font_height;
+    		} else {
+    		    if ( height > tabitem->term->rows ) height = tabitem->term->rows;
+    		    if ( width > tabitem->term->cols )  width = tabitem->term->cols;
+    		    term_size(tabitem->term, height, width, tabitem->cfg.savelines);
 #ifdef RDB_DEBUG_PATCH
-		    debug((27, "reset_window() -> term resize to (%d,%d)",
-			       height, width));
+    		    debug((27, "reset_window() -> term resize to (%d,%d)",
+    			       height, width));
 #endif
-		}
-	    }
-	    
-	    SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, 
-		         tabitem->font_width*tabitem->term->cols + tabitem->extra_width, 
-			 tabitem->font_height*tabitem->term->rows + tabitem->extra_height,
-			 SWP_NOMOVE | SWP_NOZORDER);
+    		}
+    	    }
+    	    
+    	    wintabitem_require_resize(tabitem,
+    	         tabitem->font_width*tabitem->term->cols, 
+    			 tabitem->font_height*tabitem->term->rows);
 
-	    InvalidateRect(hwnd, NULL, TRUE);
+    	    InvalidateRect(hwnd, NULL, TRUE);
 #ifdef RDB_DEBUG_PATCH
-	    debug((27, "reset_window() -> window resize to (%d,%d)",
-			tabitem->font_width*tabitem->term->cols + tabitem->extra_width,
-			tabitem->font_height*tabitem->term->rows + tabitem->extra_height));
+    	    debug((27, "reset_window() -> window resize to (%d,%d)",
+    			tabitem->font_width*tabitem->term->cols + extra_width,
+    			tabitem->font_height*tabitem->term->rows + extra_height));
 #endif
-	}
-	return;
+    	}
+    	return;
     }
 
     /* We're allowed to or must change the font but do we want to ?  */
@@ -1778,9 +1771,6 @@ static void reset_window(wintabitem* tabitem, int reinit) {
 		   (win_height-tabitem->cfg.window_border*2)/tabitem->term->rows);
 	tabitem->offset_width = (win_width-tabitem->font_width*tabitem->term->cols)/2;
 	tabitem->offset_height = (win_height-tabitem->font_height*tabitem->term->rows)/2;
-
-	tabitem->extra_width = wr.right - wr.left - cr.right + cr.left +tabitem->offset_width*2;
-	tabitem->extra_height = wr.bottom - wr.top - cr.bottom + cr.top+tabitem->offset_height*2;
 
 	InvalidateRect(hwnd, NULL, TRUE);
 #ifdef RDB_DEBUG_PATCH
@@ -2641,10 +2631,9 @@ int on_size(wintabitem* tabitem, HWND hwnd, UINT message,
 
 	    int width, height, w, h;
 
-	    width = LOWORD(lParam);
-	    height = HIWORD(lParam);
+	    wintabpage_get_term_size(&tabitem->page, &width, &height);
 
-            if (wParam == SIZE_MAXIMIZED && !was_zoomed) {
+        if (wParam == SIZE_MAXIMIZED && !was_zoomed) {
                 was_zoomed = 1;
                 tabitem->prev_rows = tabitem->term->rows;
                 tabitem->prev_cols = tabitem->term->cols;
@@ -2657,12 +2646,12 @@ int on_size(wintabitem* tabitem, HWND hwnd, UINT message,
                     term_size(tabitem->term, h, w, tabitem->cfg.savelines);
                 }
                 reset_window(tabitem, 0);
-            } else if (wParam == SIZE_RESTORED && was_zoomed) {
+        } else if (wParam == SIZE_RESTORED && was_zoomed) {
                 was_zoomed = 0;
                 if (tabitem->cfg.resize_action == RESIZE_TERM) {
-                    w = (width-tabitem->cfg.window_border*2) / tabitem->font_width;
+                    w = width/ tabitem->font_width;
                     if (w < 1) w = 1;
-                    h = (height-tabitem->cfg.window_border*2) / tabitem->font_height;
+                    h = height / tabitem->font_height;
                     if (h < 1) h = 1;
                     term_size(tabitem->term, h, w, tabitem->cfg.savelines);
                     reset_window(tabitem, 2);
@@ -2670,14 +2659,14 @@ int on_size(wintabitem* tabitem, HWND hwnd, UINT message,
                     reset_window(tabitem, 2);
                 else
                     reset_window(tabitem, 0);
-            } else if (wParam == SIZE_MINIMIZED) {
+        } else if (wParam == SIZE_MINIMIZED) {
                 /* do nothing */
 	    } else if (tabitem->cfg.resize_action == RESIZE_TERM ||
                        (tabitem->cfg.resize_action == RESIZE_EITHER &&
                         !is_alt_pressed())) {
-                w = (width-tabitem->cfg.window_border*2) / tabitem->font_width;
+                w = width / tabitem->font_width;
                 if (w < 1) w = 1;
-                h = (height-tabitem->cfg.window_border*2) / tabitem->font_height;
+                h = height / tabitem->font_height;
                 if (h < 1) h = 1;
 
                 if (resizing) {
@@ -3038,7 +3027,7 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
         	sys_cursor_update(tabitem);
         	break;
         case WM_SIZE:
-            //on_size(tabitem, hwnd, message,wParam, lParam);
+            on_size(tabitem, hwnd, message,wParam, lParam);
         	return 0;
         case WM_PALETTECHANGED:
 	        on_palette_changed(tabitem, hwnd, message,wParam, lParam);

@@ -153,6 +153,7 @@ int wintabpage_fini(wintabpage *page);
 int wintabpage_resize(wintabpage *page, const RECT *rc, const int cfg_winborder);
 void wintabpage_bind_item(HWND hwndPage, wintabitem *tabitem);
 wintabitem * wintabpage_get_item(HWND hwndPage);
+void wintabpage_get_term_size(wintabpage *page, int *term_width, int *term_height);
 
 int wintabpage_register();
 int wintabpage_unregister();
