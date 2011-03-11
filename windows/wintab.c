@@ -76,10 +76,10 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     RECT rcPage, wr;
     int tab_width = rc->right - rc->left;
     int tab_height = rc->bottom - rc->top;
-    SetWindowPos(wintab->hwndTab, HWND_BOTTOM, rc->left, rc->top, 
+    SetWindowPos(wintab->hwndTab, HWND_BOTTOM, 0, 0, 
         tab_width, tab_height, SWP_NOMOVE);
     
-	GetWindowRect(wintab->hwndParent, &wr);
+    GetWindowRect(wintab->hwndParent, &wr);
     wintab->extra_width = wr.right - wr.left - tab_width;
     wintab->extra_height = wr.bottom - wr.top - tab_height;
     
@@ -162,6 +162,13 @@ void wintab_require_resize(wintab *wintab, int tab_width, int tab_height)
         tab_width, tab_height, SWP_NOMOVE | SWP_NOZORDER); 
 }
 
+//-----------------------------------------------------------------------
+
+void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height)
+{
+    *extra_width = wintab->extra_width;
+    *extra_height = wintab->extra_height;
+}
 
 //-----------------------------------------------------------------------
 //tabbar item related
@@ -189,6 +196,8 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->lastact = MA_NOTHING;
     tabitem->lastbtn = MBT_NOTHING;
     tabitem->dbltime = GetDoubleClickTime();
+    tabitem->offset_width = cfg->window_border;
+    tabitem->offset_height = cfg->window_border;
     
     tabitem->parentTab = wintab;
     wintabpage_init(&tabitem->page, cfg, wintab->hwndParent);
@@ -740,6 +749,15 @@ void wintabitem_require_resize(wintabitem *tabitem, int term_width, int term_hei
     //MoveWindow(tabitem->page.hwndCtrl, rc->left, rc->top, 
     //    rc->right - rc->left, 
     //    rc->bottom - rc->top, TRUE);
+}
+
+//-----------------------------------------------------------------------
+
+void wintabitem_get_extra_size(wintabitem *tabitem, int *extra_width, int *extra_height)
+{
+    wintab_get_extra_size(tabitem->parentTab, extra_width, extra_height);
+    *extra_width += tabitem->page.extra_page_width + tabitem->page.extra_width;
+    *extra_height += tabitem->page.extra_page_height + tabitem->page.extra_height;
 }
 
 //-----------------------------------------------------------------------

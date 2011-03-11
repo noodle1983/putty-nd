@@ -117,6 +117,7 @@ void wintab_term_set_focus(wintab *wintab, int has_focus);
 wintabitem* wintab_get_active_item(wintab *wintab);
 void wintab_get_page_rect(wintab *wintab, RECT *rc);
 void wintab_require_resize(wintab *wintab, int tab_width, int tab_height);
+void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height);
 
 //-----------------------------------------------------------------------
 // tabbar item related
@@ -137,6 +138,7 @@ void wintabitem_init_palette(wintabitem *tabitem);
 void wintabitem_check_closed_session(wintabitem *tabitem);
 void wintabitem_close_session(wintabitem *tabitem);
 void wintabitem_require_resize(wintabitem *tabitem, int page_width, int page_height);
+void wintabitem_get_extra_size(wintabitem *tabitem, int *extra_width, int *extra_height);
 
 int wintabitem_on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);

@@ -2496,45 +2496,53 @@ int on_kill_focus(wintabitem* tabitem, HWND hwnd, UINT message,
 int on_sizing(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
+    int ex_width, ex_height;
+    wintabitem_get_extra_size(tabitem, &ex_width, &ex_height);
     /*
 	 * This does two jobs:
 	 * 1) Keep the sizetip uptodate
 	 * 2) Make sure the window size is _stepped_ in units of the font size.
 	 */
-        if (tabitem->cfg.resize_action == RESIZE_TERM ||
-            (tabitem->cfg.resize_action == RESIZE_EITHER && !is_alt_pressed())) {
+    if (tabitem->cfg.resize_action == RESIZE_TERM ||
+        (tabitem->cfg.resize_action == RESIZE_EITHER && !is_alt_pressed())) {
 	    int width, height, w, h, ew, eh;
 	    LPRECT r = (LPRECT) lParam;
+        RECT rc;
+        GetClientRect(hwnd, &rc); 
+        wintab_resize(tabitem->parentTab, &rc);
 
 	    if ( !need_backend_resize && tabitem->cfg.resize_action == RESIZE_EITHER &&
 		    (tabitem->cfg.height != tabitem->term->rows || tabitem->cfg.width != tabitem->term->cols )) {
-		/* 
-		 * Great! It seems that both the terminal size and the
-		 * font size have been changed and the user is now dragging.
-		 * 
-		 * It will now be difficult to get back to the configured
-		 * font size!
-		 *
-		 * This would be easier but it seems to be too confusing.
+    		/* 
+    		 * Great! It seems that both the terminal size and the
+    		 * font size have been changed and the user is now dragging.
+    		 * 
+    		 * It will now be difficult to get back to the configured
+    		 * font size!
+    		 *
+    		 * This would be easier but it seems to be too confusing.
 
-		term_size(term, cfg.height, cfg.width, cfg.savelines);
-		reset_window(2);
-		 */
+    		term_size(term, cfg.height, cfg.width, cfg.savelines);
+    		reset_window(2);
+    		 */
 	        tabitem->cfg.height=tabitem->term->rows; tabitem->cfg.width=tabitem->term->cols;
 
-		InvalidateRect(hwnd, NULL, TRUE);
-		need_backend_resize = TRUE;
+    		InvalidateRect(hwnd, NULL, TRUE);
+    		need_backend_resize = TRUE;
 	    }
 
-	    width = r->right - r->left - tabitem->extra_width;
-	    height = r->bottom - r->top - tabitem->extra_height;
+        //calc term size
+	    width = r->right - r->left - ex_width;
+	    height = r->bottom - r->top - ex_height;
 	    w = (width + tabitem->font_width / 2) / tabitem->font_width;
 	    if (w < 1)
-		w = 1;
+    		w = 1;
 	    h = (height + tabitem->font_height / 2) / tabitem->font_height;
 	    if (h < 1)
-		h = 1;
+    		h = 1;
 	    UpdateSizeTip(hwnd, w, h);
+        
+        //calc the grap if any
 	    ew = width - w * tabitem->font_width;
 	    eh = height - h * tabitem->font_height;
 	    if (ew != 0) {
@@ -2557,8 +2565,6 @@ int on_sizing(wintabitem* tabitem, HWND hwnd, UINT message,
 		return 0;
 	} else {
 	    int width, height, w, h, rv = 0;
-	    int ex_width = tabitem->extra_width + (tabitem->cfg.window_border - tabitem->offset_width) * 2;
-	    int ex_height = tabitem->extra_height + (tabitem->cfg.window_border - tabitem->offset_height) * 2;
 	    LPRECT r = (LPRECT) lParam;
 
 	    width = r->right - r->left - ex_width;
@@ -3018,19 +3024,18 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
         	EnableSizeTip(0);
         	resizing = FALSE;
         	if (need_backend_resize) {
-        	    //term_size(tabitem->term, tabitem->cfg.height, tabitem->cfg.width, tabitem->cfg.savelines);
-        	    //nvalidateRect(hwnd, NULL, TRUE);
+        	    term_size(tabitem->term, tabitem->cfg.height, tabitem->cfg.width, tabitem->cfg.savelines);
+        	    InvalidateRect(hwnd, NULL, TRUE);
         	}
         	break;
         case WM_SIZING:
-            break;
-            //return on_sizing(tabitem, hwnd, message,wParam, lParam);
+            return on_sizing(tabitem, hwnd, message,wParam, lParam);
         	/* break;  (never reached) */
         case WM_FULLSCR_ON_MAX:
         	fullscr_on_max = TRUE;
         	break;
         case WM_MOVE:
-        	//sys_cursor_update(tabitem);
+        	sys_cursor_update(tabitem);
         	break;
         case WM_SIZE:
             //on_size(tabitem, hwnd, message,wParam, lParam);
