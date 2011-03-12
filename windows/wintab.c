@@ -198,6 +198,7 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->dbltime = GetDoubleClickTime();
     tabitem->offset_width = cfg->window_border;
     tabitem->offset_height = cfg->window_border;
+    tabitem->ignore_clip = FALSE;
     
     tabitem->parentTab = wintab;
     wintabpage_init(&tabitem->page, cfg, wintab->hwndParent);
@@ -1067,6 +1068,36 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
         case WM_PAINT:
             wintabitem_on_paint(tabitem, hwnd, message,wParam, lParam);
     		break;
+
+        //mouse button
+        case WM_LBUTTONDOWN:
+        case WM_MBUTTONDOWN:
+        case WM_RBUTTONDOWN:
+        case WM_LBUTTONUP:
+        case WM_MBUTTONUP:
+        case WM_RBUTTONUP:
+	        on_button(tabitem, hwnd, message, wParam, lParam);
+            return 0;
+        case WM_MOUSEMOVE:
+            on_mouse_move(tabitem, hwnd, message, wParam, lParam);
+        	return 0;
+        case WM_NCMOUSEMOVE:
+        	on_nc_mouse_move(tabitem, hwnd, message, wParam, lParam);
+        	break;
+
+        //paste       
+        case WM_GOT_CLIPDATA:
+        	if (process_clipdata((HGLOBAL)lParam, wParam))
+    	        term_do_paste(tabitem->term);
+        	return 0;
+        case WM_IGNORE_CLIP:
+        	tabitem->ignore_clip = wParam;	       /* don't panic on DESTROYCLIPBOARD */
+        	break;
+        case WM_DESTROYCLIPBOARD:
+        	if (!tabitem->ignore_clip)
+        	    term_deselect(tabitem->term);
+        	tabitem->ignore_clip = FALSE;
+        	return 0;
         default:
             break;
     }

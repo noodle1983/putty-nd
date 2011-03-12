@@ -25,6 +25,12 @@
 
 #define FONT_MAXNO 	0x2F
 #define FONT_SHIFT	5
+
+
+#define WM_IGNORE_CLIP (WM_APP + 2)
+#define WM_FULLSCR_ON_MAX (WM_APP + 3)
+#define WM_AGENT_CALLBACK (WM_APP + 4)
+#define WM_GOT_CLIPDATA (WM_APP + 6)
 //-----------------------------------------------------------------------
 // struct
 //-----------------------------------------------------------------------
@@ -93,6 +99,8 @@ typedef struct {
     int n_specials;
 
     int prev_rows, prev_cols;
+
+    int ignore_clip;
 }wintabitem;
 
 typedef struct {
@@ -230,7 +238,12 @@ const static WMArray waWMArray[] = {
 {0x030E, "WM_HSCROLLCLIPBOARD"},{0x030F, "WM_QUERYNEWPALETTE"},{0x0310, "WM_PALETTEISCHANGING"},{0x0311, "WM_PALETTECHANGED"},
 {0x0312, "WM_HOTKEY"},{0x0317, "WM_PRINT"},{0x0318, "WM_PRINTCLIENT"},{0x0358, "WM_HANDHELDFIRST"},
 {0x035F, "WM_HANDHELDLAST"},{0x0360, "WM_AFXFIRST"},{0x037F, "WM_AFXLAST"},{0x0380, "WM_PENWINFIRST"},
-{0x038F, "WM_PENWINLAST"},{0x8000, "WM_APP"},{0x0400, "WM_USER"}
+{0x038F, "WM_PENWINLAST"},{0x8000, "WM_APP"},{0x0400, "WM_USER"},
+{WM_IGNORE_CLIP, "WM_IGNORE_CLIP"},
+{WM_FULLSCR_ON_MAX, "WM_FULLSCR_ON_MAX"},
+{WM_AGENT_CALLBACK, "WM_AGENT_CALLBACK"},
+{WM_NETEVENT, "WM_NETEVENT"},
+{WM_GOT_CLIPDATA, "WM_GOT_CLIPDATA"}
 };
 // 203 number of elemts...
 static const char* TranslateWMessage(UINT uMsg)

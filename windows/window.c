@@ -59,10 +59,6 @@
 /* Maximum number of sessions on saved-session submenu */
 #define MENU_SAVED_MAX ((IDM_SAVED_MAX-IDM_SAVED_MIN) / MENU_SAVED_STEP)
 
-#define WM_IGNORE_CLIP (WM_APP + 2)
-#define WM_FULLSCR_ON_MAX (WM_APP + 3)
-#define WM_AGENT_CALLBACK (WM_APP + 4)
-#define WM_GOT_CLIPDATA (WM_APP + 6)
 
 /* Needed for Chinese support and apparently not always defined. */
 #ifndef VK_PROCESSKEY
@@ -90,7 +86,7 @@ static int is_full_screen(void);
 static void make_full_screen(wintabitem* tabitem);
 static void clear_full_screen(wintabitem* tabitem);
 static void flip_full_screen(void);
-static int process_clipdata(HGLOBAL clipdata, int unicode);
+int process_clipdata(HGLOBAL clipdata, int unicode);
 
 /* Window layout information */
 static void reset_window(wintabitem* tabitem, int);
@@ -118,7 +114,7 @@ static UINT last_mousemove = 0;
 static long timing_next_time;
 
 static int need_backend_resize = FALSE;
-static int ignore_clip = FALSE;
+int ignore_clip = FALSE;
 static int fullscr_on_max = FALSE;
 static int processed_resize = FALSE;
 
@@ -2976,21 +2972,22 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
         case WM_LBUTTONUP:
         case WM_MBUTTONUP:
         case WM_RBUTTONUP:
-	        on_button(tabitem, hwnd, message, wParam, lParam);
-    		return 0;
+            break;
+	        //on_button(tabitem, hwnd, message, wParam, lParam);
+    		//return 0;
         case WM_MOUSEMOVE:
-            on_mouse_move(tabitem, hwnd, message, wParam, lParam);
-        	return 0;
+            //on_mouse_move(tabitem, hwnd, message, wParam, lParam);
+        	//return 0;
         case WM_NCMOUSEMOVE:
-        	on_nc_mouse_move(tabitem, hwnd, message, wParam, lParam);
+        	//on_nc_mouse_move(tabitem, hwnd, message, wParam, lParam);
         	break;
         case WM_IGNORE_CLIP:
-        	ignore_clip = wParam;	       /* don't panic on DESTROYCLIPBOARD */
+        	//ignore_clip = wParam;	       /* don't panic on DESTROYCLIPBOARD */
         	break;
         case WM_DESTROYCLIPBOARD:
-        	if (!ignore_clip)
-        	    term_deselect(tabitem->term);
-        	ignore_clip = FALSE;
+        	//if (!ignore_clip)
+        	//    term_deselect(tabitem->term);
+        	//ignore_clip = FALSE;
         	return 0;
         case WM_PAINT:
             //wintabitem_on_paint(tabitem, hwnd, message,wParam, lParam);
@@ -3077,8 +3074,8 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
         	}
         	return 0;
         case WM_GOT_CLIPDATA:
-        	if (process_clipdata((HGLOBAL)lParam, wParam))
-    	    term_do_paste(tabitem->term);
+        	//if (process_clipdata((HGLOBAL)lParam, wParam))
+    	    //term_do_paste(tabitem->term);
         	return 0;
         default:
         	on_default(tabitem, hwnd, message,wParam, lParam);
@@ -4994,7 +4991,7 @@ static DWORD WINAPI clipboard_read_threadfunc(void *param)
     return 0;
 }
 
-static int process_clipdata(HGLOBAL clipdata, int unicode)
+int process_clipdata(HGLOBAL clipdata, int unicode)
 {
     sfree(clipboard_contents);
     clipboard_contents = NULL;
