@@ -2087,39 +2087,47 @@ int on_reconfig(wintabitem* tabitem, HWND hwnd, UINT message,
 		GetWindowLongPtr(hwnd, GWL_EXSTYLE);
 
 	    nexflag = exflag;
+        nflg = flag;
 	    if (tabitem->cfg.alwaysontop != prev_cfg.alwaysontop) {
-		if (tabitem->cfg.alwaysontop) {
-		    nexflag |= WS_EX_TOPMOST;
-		    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
-				 SWP_NOMOVE | SWP_NOSIZE);
-		} else {
-		    nexflag &= ~(WS_EX_TOPMOST);
-		    SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
-				 SWP_NOMOVE | SWP_NOSIZE);
-		}
+    		if (tabitem->cfg.alwaysontop) {
+    		    nexflag |= WS_EX_TOPMOST;
+    		    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+    				 SWP_NOMOVE | SWP_NOSIZE);
+    		} else {
+    		    nexflag &= ~(WS_EX_TOPMOST);
+    		    SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+    				 SWP_NOMOVE | SWP_NOSIZE);
+    		}
 	    }
 	    if (tabitem->cfg.sunken_edge)
-		nexflag |= WS_EX_CLIENTEDGE;
+    		nexflag |= WS_EX_CLIENTEDGE;
 	    else
-		nexflag &= ~(WS_EX_CLIENTEDGE);
+    		nexflag &= ~(WS_EX_CLIENTEDGE);
 
 	    if (tabitem->cfg.resize_action == RESIZE_DISABLED ||
                     is_full_screen())
-		nflg &= ~WS_THICKFRAME;
+    		nflg &= ~WS_THICKFRAME;
 	    else
-		nflg |= WS_THICKFRAME;
+    		nflg |= WS_THICKFRAME;
 
 	    if (tabitem->cfg.resize_action == RESIZE_DISABLED)
-		nflg &= ~WS_MAXIMIZEBOX;
+    		nflg &= ~WS_MAXIMIZEBOX;
 	    else
-		nflg |= WS_MAXIMIZEBOX;
+    		nflg |= WS_MAXIMIZEBOX;
 
 	    if (nflg != flag || nexflag != exflag) {
-		if (nflg != flag)
-		    SetWindowLongPtr(hwnd, GWL_STYLE, nflg);
-		if (nexflag != exflag)
-		    SetWindowLongPtr(hwnd, GWL_EXSTYLE, nexflag);
+    		if (nflg != flag)
+    		    SetWindowLongPtr(hwnd, GWL_STYLE, nflg);
+    		if (nexflag != exflag)
+    		    SetWindowLongPtr(hwnd, GWL_EXSTYLE, nexflag);
 
+    		SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
+    			     SWP_NOACTIVATE | SWP_NOCOPYBITS |
+    			     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+    			     SWP_FRAMECHANGED);
+
+    		init_lvl = 2;
+	    }
         LONG npflg, pflag = GetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE);
         npflg = pflag;
 	    if (is_full_screen() ?
@@ -2129,14 +2137,6 @@ int on_reconfig(wintabitem* tabitem, HWND hwnd, UINT message,
 		npflg &= ~WS_VSCROLL;
         if (npflg != pflag)
 		    SetWindowLongPtr(tabitem->page.hwndCtrl, GWL_STYLE, nflg);
-
-		SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
-			     SWP_NOACTIVATE | SWP_NOCOPYBITS |
-			     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-			     SWP_FRAMECHANGED);
-
-		init_lvl = 2;
-	    }
 	}
 
 	/* Oops */
