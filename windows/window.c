@@ -1987,8 +1987,12 @@ int on_session_menu(HWND hwnd, UINT message,
         } else
     	return 0;
     } else /* IDM_NEWSESS */ {
-        cl = NULL;
-        inherit_handles = FALSE;
+        //cl = NULL;
+        //inherit_handles = FALSE;
+        if (!do_config())
+            return -1;
+        wintab_create_tab(&tab, &cfg);
+        return 0;
     }
 
     GetModuleFileName(NULL, b, sizeof(b) - 1);

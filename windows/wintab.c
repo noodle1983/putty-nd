@@ -77,6 +77,23 @@ int wintab_fini(wintab *wintab)
 
 //-----------------------------------------------------------------------
 
+int wintab_create_tab(wintab *wintab, Config *cfg)
+{ 
+    if (wintab->cur >= 0 && wintab->cur < wintab->end){
+        ShowWindow(wintab->items[wintab->cur].page.hwndCtrl, SW_HIDE);
+    }
+    wintabitem_creat(wintab, cfg);
+    
+    //init the extra size
+    RECT rc;
+    GetClientRect(wintab->hwndParent, &rc);    
+    wintab_resize(wintab, &rc);
+    
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+
 int wintab_resize(wintab *wintab, const RECT *rc)
 {
     RECT rcPage, wr;
@@ -272,6 +289,7 @@ int wintabitem_creat(wintab *wintab, Config *cfg)
         MessageBox(NULL, "reach max tab size", TEXT("Error"), MB_OK); 
         return -1;
     }
+
     if (wintabitem_init(wintab, &wintab->items[index], cfg) != 0){
         wintabitem_fini(&wintab->items[index]);
         return -1;
@@ -286,6 +304,7 @@ int wintabitem_creat(wintab *wintab, Config *cfg)
         wintabitem_fini(&wintab->items[index]);
         return -1; 
     } 
+    TabCtrl_SetCurFocus(wintab->hwndTab, index);
     wintab->end++;
     wintab->old = wintab->cur;
     wintab->cur = index;
