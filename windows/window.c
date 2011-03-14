@@ -3081,6 +3081,15 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
         	//if (process_clipdata((HGLOBAL)lParam, wParam))
     	    //term_do_paste(tabitem->term);
         	return 0;
+        case WM_NOTIFY:
+            if (((LPNMHDR) lParam)->hwndFrom != tab.hwndTab)
+                break;
+            switch(((LPNMHDR) lParam)->code){
+        		case TCN_SELCHANGE:
+                	wintab_swith_tab(&tab);
+        			break;
+            }
+            break; 
         default:
         	on_default(tabitem, hwnd, message,wParam, lParam);
             break;

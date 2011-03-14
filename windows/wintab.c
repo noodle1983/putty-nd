@@ -50,7 +50,6 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     wintab->hwndParent = hwndParent;
     wintab->end = 0;
     wintab->cur = 0;
-    wintab->old = -1;
  
     wintabitem_creat(wintab, &cfg);
     
@@ -79,19 +78,28 @@ int wintab_fini(wintab *wintab)
 
 int wintab_create_tab(wintab *wintab, Config *cfg)
 { 
-    if (wintab->cur >= 0 && wintab->cur < wintab->end){
-        ShowWindow(wintab->items[wintab->cur].page.hwndCtrl, SW_HIDE);
-    }
-    wintabitem_creat(wintab, cfg);
+    wintabitem_creat(wintab, cfg);  
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+
+int wintab_swith_tab(wintab *wintab)
+{
+    int index = TabCtrl_GetCurSel(wintab->hwndTab);
+    if (index == -1)
+        return -1;
+
+    ShowWindow(wintab->items[wintab->cur].page.hwndCtrl, SW_HIDE);
+    wintab->cur = index;
+    ShowWindow(wintab->items[wintab->cur].page.hwndCtrl, SW_SHOW);
     
     //init the extra size
     RECT rc;
     GetClientRect(wintab->hwndParent, &rc);    
     wintab_resize(wintab, &rc);
-    
     return 0;
 }
-
 //-----------------------------------------------------------------------
 
 int wintab_resize(wintab *wintab, const RECT *rc)
@@ -305,9 +313,8 @@ int wintabitem_creat(wintab *wintab, Config *cfg)
         return -1; 
     } 
     TabCtrl_SetCurFocus(wintab->hwndTab, index);
+    wintab_swith_tab(wintab);
     wintab->end++;
-    wintab->old = wintab->cur;
-    wintab->cur = index;
     return 0;
 }
 
@@ -943,7 +950,7 @@ int wintabpage_init(wintabpage *page, const Config *cfg, HWND hwndParent)
 {
     wintabpage_register();
 
-    int winmode = WS_CHILD | WS_VSCROLL | WS_VISIBLE;
+    int winmode = WS_CHILD | WS_VSCROLL ;
 	if (!cfg->scrollbar)
 	    winmode &= ~(WS_VSCROLL);
 	page->hwndCtrl = CreateWindowEx(
