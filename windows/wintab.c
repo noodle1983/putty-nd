@@ -1061,6 +1061,10 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
     }
     
     switch (message) {
+        case WM_COMMAND:
+            on_menu(tabitem, hwnd, message, wParam, lParam);
+            break;
+        
         case WM_VSCROLL:
 	        wintabitem_on_scroll(tabitem, hwnd, message, wParam, lParam);
         	break;

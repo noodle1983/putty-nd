@@ -2009,7 +2009,7 @@ int on_session_menu(HWND hwnd, UINT message,
     return 0;
 }
 
-int on_reconfig(wintabitem* tabitem, HWND hwnd, UINT message,
+int on_reconfig(wintabitem* tabitem, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
 	Config prev_cfg;
@@ -2194,7 +2194,7 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
             }
             break;
         case IDM_RECONF:
-            on_reconfig(tabitem, hwnd, message, wParam, lParam);
+            on_reconfig(tabitem, message, wParam, lParam);
             break;
         case IDM_COPYALL:
             term_copyall(tabitem->term);
