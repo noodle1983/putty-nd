@@ -107,6 +107,7 @@ typedef struct {
     HWND hwndTab;
     HWND hwndParent;
     wintabitem items[64];
+    int end, cur, old;
 
     int extra_width, extra_height; //gaps from win to tab
 }wintab;
@@ -130,7 +131,7 @@ void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height);
 //-----------------------------------------------------------------------
 // tabbar item related
 //-----------------------------------------------------------------------
-void wintabitem_creat(wintab *wintab, Config *cfg);
+int wintabitem_creat(wintab *wintab, Config *cfg);
 void wintabitem_delete(wintabitem *tabitem);
 int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg);
 void wintabitem_fini(wintabitem *tabitem);
