@@ -47,8 +47,6 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     if (wintab->hwndTab == NULL){
         ErrorExit("CreateWindow(WC_TABCONTROL...)"); 
     }
-    //SetWindowLong( wintab->hwndTab, GWL_STYLE, 
-    //    GetWindowLong(wintab->hwndTab, GWL_STYLE ) | BS_OWNERDRAW );
 
     wintab->hwndParent = hwndParent;
     wintab->end = 0;
@@ -221,8 +219,9 @@ int wintab_drawitem(wintab *wintab)
         const char* name = wintab->items[index].cfg.host;
         int name_len = strlen(name);
         
-        DrawHalfRoundFrame(hdc, &rc, SIDE_TOP ,2, GetSysColor(COLOR_BTNSHADOW), GetSysColor(COLOR_WINDOW));
-        DrawText(hdc, name, name_len, &rc, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS);
+        //DrawHalfRoundFrame(hdc, &rc, SIDE_TOP ,2, GetSysColor(COLOR_BTNSHADOW), GetSysColor(COLOR_WINDOW));
+        DrawChromeFrame(hdc, &rc,  GetSysColor(COLOR_BTNSHADOW), GetSysColor(COLOR_WINDOW));
+        //DrawText(hdc, name, name_len, &rc, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS);
     }
     ReleaseDC(wintab->hwndTab, hdc);
     return 0;

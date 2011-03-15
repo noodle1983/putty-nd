@@ -16,6 +16,44 @@
 #include "win_res.h"
 #include "wintabdraw.h"
 
+void DrawChromeFrame(HDC hdc, RECT const *pRect, COLORREF clrBorder, COLORREF clrBack)
+{
+    POINT pts[4];
+    int spread, eigth, sixth, quarter;
+    int width = pRect->right - pRect->left;
+    int height = pRect->bottom - pRect->top;
+
+    if (1){//bottom
+        spread = ((float)height) * 2/3;
+        eigth = ((float)height) * 1/8;
+        sixth = ((float)height) * 1/6;
+        quarter = ((float)height) * 1/4;    
+    }else{
+        spread = ((float)width) * 2/3;
+        eigth = ((float)width) * 1/8;
+        sixth = ((float)width) * 1/6;
+        quarter = ((float)width) * 1/4;
+    }
+
+    pts[0].x = pRect->left; 
+    pts[0].y = pRect->bottom;
+	pts[1].x = pRect->left + sixth; 
+    pts[1].y = pRect->bottom - eigth;
+	pts[2].x = pRect->left + spread - quarter; 
+    pts[2].y = pRect->top + eigth;
+	pts[3].x = pRect->left + spread; 
+    pts[3].y = pRect->top;
+    PolyBezier(hdc, pts, sizeof(pts)/sizeof(POINT));
+    MoveToEx(hdc, pts[3].x, pts[3].y, NULL);
+
+    pts[0].x = pRect->right - spread;               pts[0].y = pRect->top;
+	pts[1].x = pRect->right - spread + quarter;     pts[1].y = pRect->top + eigth;
+	pts[2].x = pRect->right - sixth;                pts[2].y = pRect->bottom - eigth;
+	pts[3].x = pRect->right;                        pts[3].y = pRect->bottom;
+	LineTo(hdc, pts[0].x, pts[0].y);
+    PolyBezier(hdc, pts, sizeof(pts)/sizeof(POINT));
+}
+
 void DrawHalfRoundFrame(HDC hdc, RECT const *pRect, SIDE side, int radius, COLORREF clrBorder, COLORREF clrBack)
 {	
     POINT pts[6];
