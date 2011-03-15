@@ -130,6 +130,8 @@ void wintab_get_page_rect(wintab *wintab, RECT *rc);
 void wintab_require_resize(wintab *wintab, int tab_width, int tab_height);
 void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height);
 
+int wintab_drawitem(wintab *wintab);
+
 //-----------------------------------------------------------------------
 // tabbar item related
 //-----------------------------------------------------------------------

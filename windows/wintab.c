@@ -15,6 +15,7 @@
 #include "storage.h"
 #include "win_res.h"
 #include "wintab.h"
+#include "wintabdraw.h"
 
 extern HINSTANCE hinst;
 extern Config cfg;
@@ -40,12 +41,14 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     
     GetClientRect(hwndParent, &rc);    
     wintab->hwndTab = CreateWindow(WC_TABCONTROL, "", 
-        WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE, 
+        WS_CHILD | WS_VISIBLE | TCS_FOCUSNEVER | TCS_OWNERDRAWFIXED, 
         0, 0, rc.right, rc.bottom, 
         hwndParent, NULL, hinst, NULL); 
     if (wintab->hwndTab == NULL){
         ErrorExit("CreateWindow(WC_TABCONTROL...)"); 
     }
+    //SetWindowLong( wintab->hwndTab, GWL_STYLE, 
+    //    GetWindowLong(wintab->hwndTab, GWL_STYLE ) | BS_OWNERDRAW );
 
     wintab->hwndParent = hwndParent;
     wintab->end = 0;
@@ -147,7 +150,7 @@ void wintab_onsize(wintab *wintab, HWND hwndParent, LPARAM lParam)
 int  wintab_can_close(wintab *wintab)
 {
     int index = 0;
-    for (; index < wintab->cur; index ++){
+    for (; index < wintab->end; index++){
         if (wintab->items[index].cfg.warn_on_close && !wintab->items[index].session_closed)
             return FALSE;
     }
@@ -204,6 +207,25 @@ void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height)
 {
     *extra_width = wintab->extra_width;
     *extra_height = wintab->extra_height;
+}
+
+//-----------------------------------------------------------------------
+
+int wintab_drawitem(wintab *wintab)
+{
+    int index = 0;
+    RECT rc;
+    HDC hdc = GetDC(wintab->hwndTab);
+    for (; index < wintab->end; index++){
+        TabCtrl_GetItemRect(wintab->hwndTab, index, &rc);
+        const char* name = wintab->items[index].cfg.host;
+        int name_len = strlen(name);
+        
+        DrawHalfRoundFrame(hdc, &rc, SIDE_TOP ,2, GetSysColor(COLOR_BTNSHADOW), GetSysColor(COLOR_WINDOW));
+        DrawText(hdc, name, name_len, &rc, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS);
+    }
+    ReleaseDC(wintab->hwndTab, hdc);
+    return 0;
 }
 
 //-----------------------------------------------------------------------
@@ -1149,6 +1171,13 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
         	    term_deselect(tabitem->term);
         	tabitem->ignore_clip = FALSE;
         	return 0;
+
+        case WM_KEYDOWN:
+        case WM_SYSKEYDOWN:
+        case WM_KEYUP:
+        case WM_SYSKEYUP:
+	        if (on_key(tabitem, hwnd, message,wParam, lParam))
+                break;
         default:
             break;
     }
