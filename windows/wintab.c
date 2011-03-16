@@ -49,11 +49,15 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     }
 
     win_bind_data(wintab->hwndTab, wintab);
-    wintab->defWndProc = (WNDPROC)SetWindowLongPtr(wintab->hwndTab, GWL_WNDPROC, WintabWndProc);
+    wintab->defWndProc = (WNDPROC)SetWindowLongPtr(wintab->hwndTab, GWL_WNDPROC, (long)WintabWndProc);
     
     wintab->hwndParent = hwndParent;
     wintab->end = 0;
     wintab->cur = 0;
+    wintab->bg_col = RGB(167, 193, 230);
+    wintab->sel_col = RGB(255, 255, 255);
+    wintab->nosel_col = RGB(161, 199, 244);
+    wintab->on_col = RGB(204, 224, 248);
  
     wintabitem_creat(wintab, &cfg);
     
@@ -216,20 +220,49 @@ int wintab_drawitem(wintab *wintab)
 {
     int index = 0;
     RECT rc;
+    COLORREF col, old_col;
     HDC hdc = GetDC(wintab->hwndTab);
     for (; index < wintab->end; index++){
         TabCtrl_GetItemRect(wintab->hwndTab, index, &rc);
         const char* name = wintab->items[index].cfg.host;
         int name_len = strlen(name);
+
+        col = (index == wintab->cur)? wintab->sel_col: wintab->nosel_col;
         
         //DrawHalfRoundFrame(hdc, &rc, SIDE_TOP ,2, GetSysColor(COLOR_BTNSHADOW), GetSysColor(COLOR_WINDOW));
-        DrawChromeFrame(hdc, &rc,  GetSysColor(COLOR_BTNSHADOW), GetSysColor(COLOR_WINDOW));
-        //DrawText(hdc, name, name_len, &rc, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS);
+        HRGN hRgn = DrawChromeFrame(hdc, &rc,  GetSysColor(COLOR_BTNSHADOW), col);
+        wintabitem_set_rgn(&wintab->items[index], hRgn);
+        old_col = SetBkColor(hdc, col);
+        TextOut(hdc, rc.left, rc.top + 2, name, name_len);
+        //DrawText(hdc, name, name_len, &rc, DT_SINGLELINE | DT_CENTER | DT_END_ELLIPSIS);
+        SetBkColor(hdc, old_col);
     }
     ReleaseDC(wintab->hwndTab, hdc);
     return 0;
 }
 
+//-----------------------------------------------------------------------
+int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    HDC hdc;
+    PAINTSTRUCT p;
+    HBRUSH hBrush = NULL;
+    HBRUSH hOldBrush;
+
+    hdc = BeginPaint(hwnd, &p);
+    
+    hBrush = CreateSolidBrush (wintab->bg_col);
+    hOldBrush = SelectObject(hdc, hBrush);
+    FillRect(hdc, &p.rcPaint, hBrush); 
+    SelectObject(hdc, hOldBrush); 
+    DeleteObject(hBrush);
+    
+    wintab_drawitem(wintab);
+    EndPaint(hwnd, &p);
+
+    return 0;
+}
 //-----------------------------------------------------------------------
 
 LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
@@ -240,13 +273,10 @@ LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
     debug(("[WintabWndProc]%s:%s\n", hwnd == tab->hwndTab? "TabMsg"
                             : "UnknowMsg", TranslateWMessage(message))); 
 
-    HDC hdc;
-    PAINTSTRUCT p;
+
     switch (message) {
         case WM_PAINT:
-            hdc = BeginPaint(hwnd, &p);
-            wintab_drawitem(tab);
-            EndPaint(hwnd, &p);
+            wintab_on_paint(tab, hwnd, message, wParam, lParam);
             return 0;
     }
     return( CallWindowProc( tab->defWndProc, hwnd, message, wParam, lParam));
@@ -281,6 +311,7 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->offset_width = cfg->window_border;
     tabitem->offset_height = cfg->window_border;
     tabitem->ignore_clip = FALSE;
+    tabitem->hRgn = NULL;
     
     tabitem->parentTab = wintab;
     wintabpage_init(&tabitem->page, cfg, wintab->hwndParent);
@@ -361,6 +392,7 @@ int wintabitem_creat(wintab *wintab, Config *cfg)
     TabCtrl_SetCurFocus(wintab->hwndTab, index);
     wintab_swith_tab(wintab);
     wintab->end++;
+    //UpdateWindow(wintab->hwndTab);
     return 0;
 }
 
@@ -854,6 +886,13 @@ void wintabitem_get_extra_size(wintabitem *tabitem, int *extra_width, int *extra
     *extra_height += tabitem->page.extra_page_height + tabitem->page.extra_height;
 }
 
+//-----------------------------------------------------------------------
+void wintabitem_set_rgn(wintabitem *tabitem, HRGN hRgn)
+{
+    if (tabitem->hRgn)
+        DeleteObject(tabitem->hRgn);
+    tabitem->hRgn = hRgn;
+}
 //-----------------------------------------------------------------------
 
 int wintabitem_on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,

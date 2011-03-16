@@ -101,6 +101,8 @@ typedef struct {
     int prev_rows, prev_cols;
 
     int ignore_clip;
+  
+    HRGN hRgn;
 }wintabitem;
 
 typedef struct {
@@ -110,6 +112,8 @@ typedef struct {
     int end, cur, old;
 
     int extra_width, extra_height; //gaps from win to tab
+
+    COLORREF bg_col, sel_col, nosel_col, on_col; 
 
     LRESULT CALLBACK (*defWndProc)(HWND,UINT,WPARAM,LPARAM);
 }wintab;
@@ -138,6 +142,8 @@ void wintab_require_resize(wintab *wintab, int tab_width, int tab_height);
 void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height);
 
 int wintab_drawitem(wintab *wintab);
+int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
 
@@ -161,6 +167,7 @@ void wintabitem_check_closed_session(wintabitem *tabitem);
 void wintabitem_close_session(wintabitem *tabitem);
 void wintabitem_require_resize(wintabitem *tabitem, int page_width, int page_height);
 void wintabitem_get_extra_size(wintabitem *tabitem, int *extra_width, int *extra_height);
+void wintabitem_set_rgn(wintabitem *tabitem, HRGN hRgn);
 
 int wintabitem_on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
@@ -262,12 +269,14 @@ const static WMArray waWMArray[] = {
 static const char* TranslateWMessage(UINT uMsg)
 {
     int i;
+    static char buf[16];
     for(i=0; i < sizeof(waWMArray)/ sizeof( WMArray ); i++){
         if(waWMArray[i].Code == uMsg){
          return waWMArray[i].Message;
         }
     }
-    return "unknow";
+    sprintf(buf, "%d", uMsg);
+    return buf;
 }
 void ErrorExit(char * str) ;
 

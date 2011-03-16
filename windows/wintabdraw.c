@@ -16,9 +16,16 @@
 #include "win_res.h"
 #include "wintabdraw.h"
 
-void DrawChromeFrame(HDC hdc, RECT const *pRect, COLORREF clrBorder, COLORREF clrBack)
+HRGN DrawChromeFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack)
 {
-    POINT pts[4];
+    HBRUSH hBackBrush = NULL;
+    HBRUSH hBorderBrush;
+    HRGN hRgn;
+
+    hBorderBrush = CreateSolidBrush(clrBorder);
+    hBackBrush = CreateSolidBrush (clrBack);
+
+    POINT lpts[4], rpts[4];
     int spread, eigth, sixth, quarter;
     int width = pRect->right - pRect->left;
     int height = pRect->bottom - pRect->top;
@@ -34,24 +41,44 @@ void DrawChromeFrame(HDC hdc, RECT const *pRect, COLORREF clrBorder, COLORREF cl
         sixth = ((float)width) * 1/6;
         quarter = ((float)width) * 1/4;
     }
+    
+    pRect->right += spread;
+    
+    lpts[3].x = pRect->left;                     lpts[3].y = pRect->bottom;
+	lpts[2].x = pRect->left + sixth;             lpts[2].y = pRect->bottom - eigth;
+	lpts[1].x = pRect->left + spread - quarter;  lpts[1].y = pRect->top + eigth;
+	lpts[0].x = pRect->left + spread;            lpts[0].y = pRect->top;
 
-    pts[0].x = pRect->left; 
-    pts[0].y = pRect->bottom;
-	pts[1].x = pRect->left + sixth; 
-    pts[1].y = pRect->bottom - eigth;
-	pts[2].x = pRect->left + spread - quarter; 
-    pts[2].y = pRect->top + eigth;
-	pts[3].x = pRect->left + spread; 
-    pts[3].y = pRect->top;
-    PolyBezier(hdc, pts, sizeof(pts)/sizeof(POINT));
-    MoveToEx(hdc, pts[3].x, pts[3].y, NULL);
+    rpts[3].x = pRect->right - spread;           rpts[3].y = pRect->top;
+	rpts[2].x = pRect->right - spread + quarter; rpts[2].y = pRect->top + eigth;
+	rpts[1].x = pRect->right - sixth;            rpts[1].y = pRect->bottom - eigth;
+	rpts[0].x = pRect->right;                    rpts[0].y = pRect->bottom;
+    MoveToEx(hdc, lpts[3].x, lpts[3].y, NULL);
+    BeginPath(hdc);
+    
+    PolyBezier(hdc, lpts, sizeof(lpts)/sizeof(POINT));
+    
+    //MoveToEx(hdc, lpts[0].x, lpts[0].y, NULL);
+	LineTo(hdc, rpts[3].x, rpts[3].y);
+    
+    PolyBezier(hdc, rpts, sizeof(rpts)/sizeof(POINT));
+    
+    //MoveToEx(hdc, rpts[0].x, rpts[0].y, NULL);
+    LineTo(hdc, lpts[3].x, lpts[3].y);
 
-    pts[0].x = pRect->right - spread;               pts[0].y = pRect->top;
-	pts[1].x = pRect->right - spread + quarter;     pts[1].y = pRect->top + eigth;
-	pts[2].x = pRect->right - sixth;                pts[2].y = pRect->bottom - eigth;
-	pts[3].x = pRect->right;                        pts[3].y = pRect->bottom;
-	LineTo(hdc, pts[0].x, pts[0].y);
-    PolyBezier(hdc, pts, sizeof(pts)/sizeof(POINT));
+    CloseFigure(hdc);
+    EndPath(hdc);
+    //StrokePath (hdc);
+    FlattenPath(hdc);
+    hRgn = PathToRegion(hdc);
+    FillRgn(hdc, hRgn, hBackBrush);
+    FrameRgn(hdc, hRgn, hBorderBrush, 1, 1);
+
+    DeleteObject(hBorderBrush);    
+    DeleteObject(hBackBrush);
+
+    pRect->left += spread;
+    pRect->right -= spread;
 }
 
 void DrawHalfRoundFrame(HDC hdc, RECT const *pRect, SIDE side, int radius, COLORREF clrBorder, COLORREF clrBack)
@@ -102,7 +129,7 @@ void DrawFrame(HDC hdc, POINT const *pPoints, int iCount, COLORREF clrBorder, CO
     HBRUSH hBrush = NULL;
     HBRUSH hOldBrush;
 
-    hPen = CreatePen(PS_SOLID, 1, clrBack);
+    hPen = CreatePen(PS_SOLID, 1, clrBorder);
     hOldPen = SelectObject(hdc, hPen); 
 
     hBrush = CreateSolidBrush (clrBack);

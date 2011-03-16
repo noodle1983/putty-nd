@@ -5,7 +5,7 @@ typedef enum{
     SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM
 }SIDE;
 
-void DrawChromeFrame(HDC hdc, RECT const *pRect, COLORREF clrBorder, COLORREF clrBack);
+HRGN DrawChromeFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack);
 void DrawHalfRoundFrame(HDC hdc, RECT const *pRect, SIDE side, 
     int radius, COLORREF clrBorder, COLORREF clrBack);
 void DrawFrame(HDC hdc, POINT const *pPoints, int iCount, 
