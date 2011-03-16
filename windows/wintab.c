@@ -48,6 +48,9 @@ int wintab_init(wintab *wintab, HWND hwndParent)
         ErrorExit("CreateWindow(WC_TABCONTROL...)"); 
     }
 
+    win_bind_data(wintab->hwndTab, wintab);
+    wintab->defWndProc = (WNDPROC)SetWindowLongPtr(wintab->hwndTab, GWL_WNDPROC, WintabWndProc);
+    
     wintab->hwndParent = hwndParent;
     wintab->end = 0;
     wintab->cur = 0;
@@ -228,6 +231,28 @@ int wintab_drawitem(wintab *wintab)
 }
 
 //-----------------------------------------------------------------------
+
+LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{ 
+    wintab* tab = win_get_data(hwnd);
+    if (tab == NULL) return 0;
+    debug(("[WintabWndProc]%s:%s\n", hwnd == tab->hwndTab? "TabMsg"
+                            : "UnknowMsg", TranslateWMessage(message))); 
+
+    HDC hdc;
+    PAINTSTRUCT p;
+    switch (message) {
+        case WM_PAINT:
+            hdc = BeginPaint(hwnd, &p);
+            wintab_drawitem(tab);
+            EndPaint(hwnd, &p);
+            return 0;
+    }
+    return( CallWindowProc( tab->defWndProc, hwnd, message, wParam, lParam));
+}
+
+//-----------------------------------------------------------------------
 //tabbar item related
 //-----------------------------------------------------------------------
 
@@ -260,7 +285,7 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->parentTab = wintab;
     wintabpage_init(&tabitem->page, cfg, wintab->hwndParent);
     tabitem->page.hwndTab = wintab->hwndTab;
-    wintabpage_bind_item(tabitem->page.hwndCtrl, tabitem); 
+    win_bind_data(tabitem->page.hwndCtrl, tabitem); 
     
     adjust_host(cfg);
     tabitem->cfg = *cfg;
@@ -1091,16 +1116,16 @@ int wintabpage_unregister()
 
 //-----------------------------------------------------------------------
 
-void wintabpage_bind_item(HWND hwndPage, wintabitem *tabitem)
+void win_bind_data(HWND hwnd, void *data)
 {
-    SetWindowLongPtr(hwndPage, GWLP_USERDATA, (LONG_PTR)tabitem);
+    SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)data);
 }
 
 //-----------------------------------------------------------------------
 
-wintabitem * wintabpage_get_item(HWND hwndPage)
+void* win_get_data(HWND hwnd)
 {
-    return (wintabitem *)GetWindowLongPtr(hwndPage, GWLP_USERDATA);
+    return (void *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 }
 
 //-----------------------------------------------------------------------
@@ -1123,7 +1148,7 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
     extern wintab tab;
     debug(("[WintabpageWndProc]%s:%s\n", hwnd == tab.items[tab.cur].page.hwndCtrl ? "PageMsg"
                             : "UnknowMsg", TranslateWMessage(message)));
-    wintabitem* tabitem = wintabpage_get_item(hwnd);
+    wintabitem* tabitem = win_get_data(hwnd);
     if (tabitem == NULL){
         return DefWindowProc(hwnd, message, wParam, lParam);
     }

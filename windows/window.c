@@ -2950,12 +2950,6 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
     wintabitem *tabitem = wintab_get_active_item(&tab);
 
     switch (message) {
-        case WM_DRAWITEM:
-            if( ( ( DRAWITEMSTRUCT* ) lParam )->hwndItem == tab.hwndTab){
-                wintab_drawitem(&tab); 
-                return TRUE;
-            }
-            break;
         case WM_TIMER:
             on_timer(hwnd, message, wParam, lParam);
 	        return 0;

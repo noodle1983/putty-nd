@@ -110,8 +110,15 @@ typedef struct {
     int end, cur, old;
 
     int extra_width, extra_height; //gaps from win to tab
+
+    LRESULT CALLBACK (*defWndProc)(HWND,UINT,WPARAM,LPARAM);
 }wintab;
 
+//-----------------------------------------------------------------------
+// common
+//-----------------------------------------------------------------------
+void win_bind_data(HWND hwnd, void *data);
+void* win_get_data(HWND hwnd);
 //-----------------------------------------------------------------------
 // tabbar related
 //-----------------------------------------------------------------------
@@ -131,6 +138,8 @@ void wintab_require_resize(wintab *wintab, int tab_width, int tab_height);
 void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height);
 
 int wintab_drawitem(wintab *wintab);
+LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
 
 //-----------------------------------------------------------------------
 // tabbar item related
@@ -164,7 +173,6 @@ int wintabpage_init(wintabpage *page, const Config *cfg, HWND hwndParent);
 void wintabpage_init_scrollbar(wintabpage *page, Terminal *term);
 int wintabpage_fini(wintabpage *page);
 int wintabpage_resize(wintabpage *page, const RECT *rc, const int cfg_winborder);
-void wintabpage_bind_item(HWND hwndPage, wintabitem *tabitem);
 wintabitem * wintabpage_get_item(HWND hwndPage);
 void wintabpage_get_term_size(wintabpage *page, int *term_width, int *term_height);
 
