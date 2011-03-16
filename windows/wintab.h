@@ -141,8 +141,12 @@ void wintab_get_page_rect(wintab *wintab, RECT *rc);
 void wintab_require_resize(wintab *wintab, int tab_width, int tab_height);
 void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height);
 
-int wintab_drawitem(wintab *wintab);
+int wintab_drawitems(wintab *wintab);
+int wintab_drawitem(wintab *wintab, HDC hdc, const int index);
 int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
+int wintab_hit_tab(wintab *wintab, const int x, const int y);
+int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);

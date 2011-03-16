@@ -79,6 +79,7 @@ HRGN DrawChromeFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack)
 
     pRect->left += spread;
     pRect->right -= spread;
+    return hRgn;
 }
 
 void DrawHalfRoundFrame(HDC hdc, RECT const *pRect, SIDE side, int radius, COLORREF clrBorder, COLORREF clrBack)

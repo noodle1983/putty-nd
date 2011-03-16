@@ -216,32 +216,46 @@ void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height)
 
 //-----------------------------------------------------------------------
 
-int wintab_drawitem(wintab *wintab)
+int wintab_drawitems(wintab *wintab)
 {
     int index = 0;
-    RECT rc;
-    COLORREF col, old_col;
-    HDC hdc = GetDC(wintab->hwndTab);
-    for (; index < wintab->end; index++){
-        TabCtrl_GetItemRect(wintab->hwndTab, index, &rc);
-        const char* name = wintab->items[index].cfg.host;
-        int name_len = strlen(name);
 
-        col = (index == wintab->cur)? wintab->sel_col: wintab->nosel_col;
-        
-        //DrawHalfRoundFrame(hdc, &rc, SIDE_TOP ,2, GetSysColor(COLOR_BTNSHADOW), GetSysColor(COLOR_WINDOW));
-        HRGN hRgn = DrawChromeFrame(hdc, &rc,  GetSysColor(COLOR_BTNSHADOW), col);
-        wintabitem_set_rgn(&wintab->items[index], hRgn);
-        old_col = SetBkColor(hdc, col);
-        TextOut(hdc, rc.left, rc.top + 2, name, name_len);
-        //DrawText(hdc, name, name_len, &rc, DT_SINGLELINE | DT_CENTER | DT_END_ELLIPSIS);
-        SetBkColor(hdc, old_col);
+    if (wintab->end <=0) 
+        return -1;
+    
+    HDC hdc = GetDC(wintab->hwndTab);
+    for (index = wintab->end - 1; index >= 0; index--){
+        if (index == wintab->cur) continue;
+        wintab_drawitem(wintab, hdc, index);
     }
+    wintab_drawitem(wintab, hdc, wintab->cur);
     ReleaseDC(wintab->hwndTab, hdc);
     return 0;
 }
 
 //-----------------------------------------------------------------------
+
+int wintab_drawitem(wintab *wintab, HDC hdc, const int index)
+{
+    RECT rc;
+    COLORREF col, old_col;
+    
+    TabCtrl_GetItemRect(wintab->hwndTab, index, &rc);
+    const char* name = wintab->items[index].cfg.host;
+    int name_len = strlen(name);
+
+    col = (index == wintab->cur)? wintab->sel_col: wintab->nosel_col;
+    
+    HRGN hRgn = DrawChromeFrame(hdc, &rc,  GetSysColor(COLOR_BTNSHADOW), col);
+    wintabitem_set_rgn(&wintab->items[index], hRgn);
+    old_col = SetBkColor(hdc, col);
+    TextOut(hdc, rc.left, rc.top + 2, name, name_len);
+    SetBkColor(hdc, old_col);
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+
 int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
@@ -258,11 +272,46 @@ int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
     SelectObject(hdc, hOldBrush); 
     DeleteObject(hBrush);
     
-    wintab_drawitem(wintab);
+    wintab_drawitems(wintab);
     EndPaint(hwnd, &p);
 
     return 0;
 }
+
+//-----------------------------------------------------------------------
+
+int wintab_hit_tab(wintab *wintab, const int x, const int y)
+{
+    int index = 0;
+
+    if (PtInRegion(wintab->items[wintab->cur].hRgn, x, y)){
+            return wintab->cur;
+    }
+    for (; index < wintab->end; index++){
+        if (index == wintab->cur) continue;
+        if (PtInRegion(wintab->items[index].hRgn, x, y)){
+            return index;
+        }
+    }
+    return -1;
+
+}
+
+int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    int index = wintab_hit_tab(wintab, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+    if (index < 0 || index >= wintab->end)
+        return -1;
+
+    if (wintab->cur == index) 
+        return 0;
+    
+    TabCtrl_SetCurFocus(wintab->hwndTab, index);
+    wintab_swith_tab(wintab);
+    return 0;
+}
+
 //-----------------------------------------------------------------------
 
 LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
@@ -277,6 +326,10 @@ LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
     switch (message) {
         case WM_PAINT:
             wintab_on_paint(tab, hwnd, message, wParam, lParam);
+            return 0;
+
+        case WM_LBUTTONDOWN:
+            wintab_on_lclick(tab, hwnd, message, wParam, lParam);
             return 0;
     }
     return( CallWindowProc( tab->defWndProc, hwnd, message, wParam, lParam));
