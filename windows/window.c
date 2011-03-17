@@ -1826,7 +1826,7 @@ static Mouse_Button translate_button(wintabitem* tabitem, Mouse_Button button)
     return 0;			       /* shouldn't happen */
 }
 
-static void show_mouseptr(wintabitem *tabitem, int show)
+void show_mouseptr(wintabitem *tabitem, int show)
 {
     /* NB that the counter in ShowCursor() is also frobbed by
      * update_mouse_pointer() */
@@ -1867,7 +1867,7 @@ void notify_remote_exit(void *frontend)
 	 * appropriate action. */
 	if (tabitem->cfg.close_on_exit == FORCE_ON ||
 	    (tabitem->cfg.close_on_exit == AUTO && exitcode != INT_MAX)) {
-	    wintabitem_delete(tabitem);
+	    wintabitem_fini(tabitem);
 	    //PostQuitMessage(0);
 	} else {
 	    tabitem->must_close_session = TRUE;
@@ -1875,9 +1875,10 @@ void notify_remote_exit(void *frontend)
 	    /* exitcode == INT_MAX indicates that the connection was closed
 	     * by a fatal error, so an error box will be coming our way and
 	     * we should not generate this informational one. */
-	    if (exitcode != INT_MAX)
+	    if (exitcode != INT_MAX){
 		MessageBox(hwnd, "Connection closed by remote host",
 			   appname, MB_OK | MB_ICONINFORMATION);
+	    }
 	}
     }
 }
@@ -1915,7 +1916,7 @@ int on_close(HWND hwnd, UINT message,
     str = dupprintf("%s Exit Confirmation", appname);
     if ( wintab_can_close(&tab)||
             MessageBox(hwnd,
-            	   "Are you sure you want to close this session?",
+            	   "Are you sure you want to close all the sessions?",
             	   str, MB_ICONWARNING | MB_OKCANCEL | MB_DEFBUTTON1)
             == IDOK){
         DestroyWindow(hwnd);

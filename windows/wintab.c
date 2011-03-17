@@ -95,6 +95,44 @@ int wintab_create_tab(wintab *wintab, Config *cfg)
     return 0;
 }
 
+
+//-----------------------------------------------------------------------
+
+int wintab_del_tab(wintab *wintab, const int index)
+{ 
+    int i;
+    int next_cur;
+    if (wintab->end  == 1){
+        PostMessage(wintab->hwndParent, WM_CLOSE, 0, 0L);
+        return 0;
+    }
+    
+    char *str;
+    show_mouseptr(&wintab->items[index], 1);
+    str = dupprintf("%s Exit Confirmation", wintab->items[index].cfg.host);
+    if (!( wintabitem_can_close(&wintab->items[index])||
+            MessageBox(wintab->hwndTab,
+            	   "Are you sure you want to close this session?",
+            	   str, MB_ICONWARNING | MB_OKCANCEL | MB_DEFBUTTON1)
+            == IDOK)){
+        return 0;
+    }
+    
+    if (index == wintab->cur){
+        next_cur = (index == (wintab->end -1)) ? (index -1) : (index + 1);
+        TabCtrl_SetCurFocus(wintab->hwndTab, next_cur);
+        wintab_swith_tab(wintab);
+    }
+    wintabitem_fini(&wintab->items[index]);
+    TabCtrl_DeleteItem(wintab->hwndTab, index);
+    for (i = index; i < (wintab->end - 1); i++){
+        //wintab->items[i] = wintab->items[i+1];
+    }
+    if (wintab->cur > index) wintab->cur -= 1;
+    wintab->end -= 1;
+    return 0;
+}
+
 //-----------------------------------------------------------------------
 
 int wintab_swith_tab(wintab *wintab)
@@ -161,7 +199,7 @@ int  wintab_can_close(wintab *wintab)
 {
     int index = 0;
     for (; index < wintab->end; index++){
-        if (wintab->items[index].cfg.warn_on_close && !wintab->items[index].session_closed)
+        if (!wintabitem_can_close(&wintab->items[index]))
             return FALSE;
     }
     return TRUE;
@@ -343,10 +381,17 @@ int wintab_hit_tab(wintab *wintab, const int x, const int y)
 int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    int index = wintab_hit_tab(wintab, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+    int x = GET_X_LPARAM(lParam);
+    int y = GET_Y_LPARAM(lParam);
+    int index = wintab_hit_tab(wintab, x, y);
     if (index < 0 || index >= wintab->end)
         return -1;
 
+    if (PtInRegion(wintab->items[index].hCloserRgn, x, y)){
+        wintab_del_tab(wintab, index);
+        return 0;
+    }
+    
     if (wintab->cur == index) 
         return 0;
     
@@ -456,7 +501,23 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
 
 void wintabitem_fini(wintabitem *tabitem)
 {
+    if (tabitem->ldisc) {
+    	ldisc_free(tabitem->ldisc);
+    	tabitem->ldisc = NULL;
+    }
+    if (tabitem->back) {
+    	tabitem->back->free(tabitem->backhandle);
+    	tabitem->backhandle = NULL;
+    	tabitem->back = NULL;
+        term_provide_resize_fn(tabitem->term, NULL, NULL);
+	
+    }
+    tabitem->session_closed = TRUE;
+    
     wintabpage_fini(&tabitem->page);
+    term_free(tabitem->term);
+    log_free(tabitem->logctx);
+    
     wintabitem_deinit_fonts(tabitem);
     sfree(tabitem->logpal);
     if (tabitem->pal)
@@ -504,8 +565,7 @@ int wintabitem_creat(wintab *wintab, Config *cfg)
 
 void wintabitem_delete(wintabitem *tabitem)
 {
-// free term
-// free log
+    wintabitem_fini(tabitem);
 }
 
 //-----------------------------------------------------------------------
@@ -935,22 +995,12 @@ void wintabitem_close_session(wintabitem *tabitem)
     //char morestuff[100];
     //int i;
 
-    tabitem->session_closed = TRUE;
+
     //sprintf(morestuff, "%.70s (inactive)", appname);
     //set_icon(NULL, morestuff);
     //set_title(NULL, morestuff);
 
-    if (tabitem->ldisc) {
-    	ldisc_free(tabitem->ldisc);
-    	tabitem->ldisc = NULL;
-    }
-    if (tabitem->back) {
-    	tabitem->back->free(tabitem->backhandle);
-    	tabitem->backhandle = NULL;
-    	tabitem->back = NULL;
-        term_provide_resize_fn(tabitem->term, NULL, NULL);
-	//update_specials_menu(NULL);
-    }
+    //update_specials_menu(NULL);
 
     /*
      * Show the Restart Session menu item. Do a precautionary
@@ -988,6 +1038,15 @@ void wintabitem_get_extra_size(wintabitem *tabitem, int *extra_width, int *extra
     wintab_get_extra_size(tabitem->parentTab, extra_width, extra_height);
     *extra_width += tabitem->page.extra_page_width + tabitem->page.extra_width;
     *extra_height += tabitem->page.extra_page_height + tabitem->page.extra_height;
+}
+
+//-----------------------------------------------------------------------
+
+int wintabitem_can_close(wintabitem *tabitem)
+{
+    if (tabitem->cfg.warn_on_close && !tabitem->session_closed)
+        return FALSE;
+    return TRUE;
 }
 
 //-----------------------------------------------------------------------
@@ -1157,7 +1216,7 @@ int wintabpage_init(wintabpage *page, const Config *cfg, HWND hwndParent)
                     WINTAB_PAGE_CLASS, 
                     WINTAB_PAGE_CLASS,
 			        winmode, 
-			        0, 0, 100, 100,
+			        0, 0, 0, 0,
 			        hwndParent, 
 			        NULL,   /* hMenu */
 			        hinst, 
@@ -1191,6 +1250,7 @@ void wintabpage_init_scrollbar(wintabpage *page, Terminal *term)
 
 int wintabpage_fini(wintabpage *page)
 {
+    DestroyWindow(page->hwndCtrl);
     return 0;
 }
 
