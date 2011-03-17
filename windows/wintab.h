@@ -102,7 +102,7 @@ typedef struct {
 
     int ignore_clip;
   
-    HRGN hRgn;
+    HRGN hRgn, hCloserRgn;
 }wintabitem;
 
 typedef struct {
@@ -113,7 +113,8 @@ typedef struct {
 
     int extra_width, extra_height; //gaps from win to tab
 
-    COLORREF bg_col, sel_col, nosel_col, on_col; 
+    COLORREF bg_col, sel_col, nosel_col, on_col, hl_col, bd_col; 
+    HRGN hSysRgn[3];
 
     LRESULT CALLBACK (*defWndProc)(HWND,UINT,WPARAM,LPARAM);
 }wintab;
@@ -142,6 +143,7 @@ void wintab_require_resize(wintab *wintab, int tab_width, int tab_height);
 void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height);
 
 int wintab_drawitems(wintab *wintab);
+int wintab_del_rgn(wintab *wintab);
 int wintab_drawitem(wintab *wintab, HDC hdc, const int index);
 int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
@@ -172,6 +174,7 @@ void wintabitem_close_session(wintabitem *tabitem);
 void wintabitem_require_resize(wintabitem *tabitem, int page_width, int page_height);
 void wintabitem_get_extra_size(wintabitem *tabitem, int *extra_width, int *extra_height);
 void wintabitem_set_rgn(wintabitem *tabitem, HRGN hRgn);
+void wintabitem_set_closer_rgn(wintabitem *tabitem, HRGN hRgn);
 
 int wintabitem_on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);

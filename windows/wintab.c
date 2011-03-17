@@ -32,6 +32,7 @@ int wintabpage_registed = 0;
 int wintab_init(wintab *wintab, HWND hwndParent)
 {
     RECT rc; 
+    int i;
 
     /* create tabar */
     INITCOMMONCONTROLSEX icce;
@@ -54,10 +55,14 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     wintab->hwndParent = hwndParent;
     wintab->end = 0;
     wintab->cur = 0;
-    wintab->bg_col = RGB(167, 193, 230);
-    wintab->sel_col = RGB(255, 255, 255);
+    wintab->bg_col = RGB(67, 115, 203);
+    wintab->sel_col = RGB(250, 250, 250);
     wintab->nosel_col = RGB(161, 199, 244);
     wintab->on_col = RGB(204, 224, 248);
+    wintab->hl_col = RGB(193, 53, 53);
+    wintab->bd_col = RGB(54, 83, 129);
+    for (i = 0; i < sizeof(wintab->hSysRgn)/sizeof (HRGN); i++)
+        wintab->hSysRgn[i] = NULL;
  
     wintabitem_creat(wintab, &cfg);
     
@@ -194,6 +199,19 @@ wintabitem* wintab_get_active_item(wintab *wintab)
 
 //-----------------------------------------------------------------------
 
+int wintab_del_rgn(wintab *wintab)
+{
+    int i;
+    for (i = 0; i < sizeof(wintab->hSysRgn)/sizeof (HRGN); i++){
+        if (wintab->hSysRgn[i])
+            DeleteObject(wintab->hSysRgn[i]);
+        wintab->hSysRgn[i] = NULL;
+    }
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+
 void wintab_require_resize(wintab *wintab, int tab_width, int tab_height)
 {
     int parent_width = tab_width + wintab->extra_width;
@@ -246,11 +264,33 @@ int wintab_drawitem(wintab *wintab, HDC hdc, const int index)
 
     col = (index == wintab->cur)? wintab->sel_col: wintab->nosel_col;
     
-    HRGN hRgn = DrawChromeFrame(hdc, &rc,  GetSysColor(COLOR_BTNSHADOW), col);
+    HRGN hRgn = DrawChromeFrame(hdc, &rc,  wintab->bd_col, col);
     wintabitem_set_rgn(&wintab->items[index], hRgn);
     old_col = SetBkColor(hdc, col);
     TextOut(hdc, rc.left, rc.top + 2, name, name_len);
     SetBkColor(hdc, old_col);
+
+    hRgn = DrawCloseButton(hdc, rc.right-4, (rc.top + rc.bottom)/2, 
+            wintab->bd_col, col);
+    wintabitem_set_closer_rgn(&wintab->items[index], hRgn);
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+
+int wintab_draw_sysbtn(wintab *wintab)
+{
+    RECT rc;
+    HDC hdc = GetDC(wintab->hwndTab);
+
+    GetClientRect(wintab->hwndTab, &rc);
+    rc.right -= 3;
+    rc.left = (rc.right - 100) > rc.left ? (rc.right - 100): rc.left ;
+    rc.bottom = rc.top + 15;
+    wintab_del_rgn(wintab);
+    DrawSysButtonFrame(hdc, &rc, wintab->bd_col, wintab->bg_col, wintab->hSysRgn); 
+    DrawSysButton(hdc, &rc, wintab->on_col); 
+    ReleaseDC(wintab->hwndTab, hdc);
     return 0;
 }
 
@@ -273,6 +313,7 @@ int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
     DeleteObject(hBrush);
     
     wintab_drawitems(wintab);
+    wintab_draw_sysbtn(wintab);
     EndPaint(hwnd, &p);
 
     return 0;
@@ -296,6 +337,8 @@ int wintab_hit_tab(wintab *wintab, const int x, const int y)
     return -1;
 
 }
+
+//-----------------------------------------------------------------------
 
 int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
@@ -324,6 +367,13 @@ LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
 
 
     switch (message) {
+        case WM_NCHITTEST:
+            //#define TID_POLLMOUSE 100
+            //#define MOUSE_POLL_DELAY 500
+            //SetTimer(hwnd,TID_POLLMOUSE,MOUSE_POLL_DELAY,NULL);
+            //PostMessage(hwnd,WM_MOUSELEAVE,0,0L);
+            //KillTimer(hwnd,TID_POLLMOUSE);
+            break;
         case WM_PAINT:
             wintab_on_paint(tab, hwnd, message, wParam, lParam);
             return 0;
@@ -365,6 +415,7 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->offset_height = cfg->window_border;
     tabitem->ignore_clip = FALSE;
     tabitem->hRgn = NULL;
+    tabitem->hCloserRgn = NULL;
     
     tabitem->parentTab = wintab;
     wintabpage_init(&tabitem->page, cfg, wintab->hwndParent);
@@ -940,11 +991,21 @@ void wintabitem_get_extra_size(wintabitem *tabitem, int *extra_width, int *extra
 }
 
 //-----------------------------------------------------------------------
+
 void wintabitem_set_rgn(wintabitem *tabitem, HRGN hRgn)
 {
     if (tabitem->hRgn)
         DeleteObject(tabitem->hRgn);
     tabitem->hRgn = hRgn;
+}
+
+//-----------------------------------------------------------------------
+
+void wintabitem_set_closer_rgn(wintabitem *tabitem, HRGN hRgn)
+{
+    if (tabitem->hCloserRgn)
+        DeleteObject(tabitem->hCloserRgn);
+    tabitem->hCloserRgn = hRgn;
 }
 //-----------------------------------------------------------------------
 

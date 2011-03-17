@@ -6,6 +6,10 @@ typedef enum{
 }SIDE;
 
 HRGN DrawChromeFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack);
+int DrawSysButtonFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, HRGN* hRgns);
+int DrawSysButton(HDC hdc, RECT *pRect, COLORREF clrBorder);
+HRGN DrawCloseButton(HDC hdc, const int x, const int y, 
+    COLORREF clrBorder, COLORREF clrBack );
 void DrawHalfRoundFrame(HDC hdc, RECT const *pRect, SIDE side, 
     int radius, COLORREF clrBorder, COLORREF clrBack);
 void DrawFrame(HDC hdc, POINT const *pPoints, int iCount, 

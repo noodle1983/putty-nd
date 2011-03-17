@@ -82,6 +82,135 @@ HRGN DrawChromeFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack)
     return hRgn;
 }
 
+int DrawSysButtonFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, HRGN* hRgns)
+{
+    HBRUSH hBackBrush;
+    HBRUSH hBorderBrush;
+    HRGN hRgn;
+    int width = pRect->right - pRect->left;
+    POINT prt[2][4] = {
+{{pRect->left, pRect->top},    {pRect->left + width*0.31, pRect->top},    {pRect->left + width*0.62, pRect->top},    {pRect->right, pRect->top}},
+{{pRect->left, pRect->bottom}, {pRect->left + width*0.31, pRect->bottom}, {pRect->left + width*0.62, pRect->bottom}, {pRect->right, pRect->bottom}}
+        };
+    int radius = 3;
+
+    hBorderBrush = CreateSolidBrush(clrBorder);
+    //hBorderBrush = GetSysColorBrush(COLOR_3DSHADOW);
+    hBackBrush = CreateSolidBrush (clrBack);
+
+    MoveToEx(hdc, prt[0][0].x, prt[0][0].y, NULL);
+    BeginPath(hdc);
+    LineTo(hdc, prt[1][0].x, prt[1][0].y - radius);
+    AngleArc(hdc, prt[1][0].x + radius, prt[1][0].y - radius,
+            radius,180, 90);
+    LineTo(hdc, prt[1][1].x, prt[1][1].y);
+    LineTo(hdc, prt[0][1].x, prt[0][1].y);
+    CloseFigure(hdc);
+    EndPath(hdc);
+    hRgn = PathToRegion(hdc);
+    FillRgn(hdc, hRgn, hBackBrush);
+    FrameRgn(hdc, hRgn, hBorderBrush, 1, 1);
+    hRgns[0] = hRgn;
+
+    MoveToEx(hdc, prt[0][1].x, prt[0][1].y, NULL);
+    BeginPath(hdc);
+    LineTo(hdc, prt[1][1].x, prt[1][1].y);
+    LineTo(hdc, prt[1][2].x, prt[1][2].y);
+    LineTo(hdc, prt[0][2].x, prt[0][2].y);
+    CloseFigure(hdc);
+    EndPath(hdc);
+    hRgn = PathToRegion(hdc);
+    FillRgn(hdc, hRgn, hBackBrush);
+    FrameRgn(hdc, hRgn, hBorderBrush, 1, 1);
+    hRgns[1] = hRgn;
+
+    MoveToEx(hdc, prt[0][2].x, prt[0][2].y, NULL);
+    BeginPath(hdc);
+    LineTo(hdc, prt[1][2].x, prt[1][2].y);
+    LineTo(hdc, prt[1][3].x - radius, prt[1][3].y);
+    AngleArc(hdc, prt[1][3].x - radius, prt[1][3].y - radius,
+            radius,270, 90);
+    LineTo(hdc, prt[0][3].x, prt[0][3].y);
+    CloseFigure(hdc);
+    EndPath(hdc);
+    hRgn = PathToRegion(hdc);
+    FillRgn(hdc, hRgn, hBackBrush);
+    FrameRgn(hdc, hRgn, hBorderBrush, 1, 1);
+    hRgns[2] = hRgn;
+    
+    //DeleteObject(hBorderBrush);    
+    DeleteObject(hBackBrush);
+    return 0;
+}
+
+int DrawSysButton(HDC hdc, RECT *pRect, COLORREF clrBorder)
+{
+    HGDIOBJ hPen = NULL;
+    HGDIOBJ hOldPen; 
+    int i;
+    POINT prt[3];
+    
+    int width = pRect->right - pRect->left;
+    RECT rc[3] = {
+        {pRect->left, pRect->top, pRect->left + width*0.31, pRect->bottom},
+        {pRect->left + width*0.31, pRect->top, pRect->left + width*0.62, pRect->bottom},
+        {pRect->left + width*0.62, pRect->top, pRect->right, pRect->bottom}
+    };
+    for (i = 0; i < 3; i++){
+        prt[i].x = (rc[i].left + rc[i].right)/2;
+        prt[i].y = (rc[i].top + rc[i].bottom)/2;
+    }
+
+    hPen = CreatePen(PS_SOLID, 2, clrBorder);
+    hOldPen = SelectObject(hdc, hPen);
+
+    DrawLine(hdc, prt[0].x - 4, prt[0].y, 
+                  prt[0].x + 4, prt[0].y);
+
+    DrawRect4(hdc, prt[1].x - 5, prt[1].y - 3, 
+                   prt[1].x + 5, prt[1].y + 3);
+
+    DrawLine(hdc, prt[2].x - 4, prt[2].y - 4, 
+                  prt[2].x + 4, prt[2].y + 4);
+    DrawLine(hdc, prt[2].x - 4, prt[2].y + 4,
+                  prt[2].x + 4, prt[2].y - 4);
+
+    SelectObject(hdc, hOldPen);
+    DeleteObject(hPen);
+    return 0;
+}
+
+HRGN DrawCloseButton(HDC hdc, const int x, const int y, 
+    COLORREF clrBorder, COLORREF clrBack )
+{
+    HGDIOBJ hPen = NULL;
+    HGDIOBJ hOldPen; 
+    HBRUSH hBrush = NULL;
+    HBRUSH hOldBrush;
+
+    hPen = CreatePen(PS_SOLID, 2, clrBorder);
+    hOldPen = SelectObject(hdc, hPen); 
+
+    hBrush = CreateSolidBrush (clrBack);
+    hOldBrush = SelectObject(hdc, hBrush);
+
+    BeginPath(hdc);
+    AngleArc(hdc, x , y, 6, 0, 360);
+    EndPath(hdc);
+    HRGN hRgn = PathToRegion(hdc);
+    FillRgn(hdc, hRgn, hBrush);
+    
+    DrawLine(hdc, x - 4, y - 4, 
+                  x + 4, y + 4);
+    DrawLine(hdc, x - 4, y + 4,
+                  x + 4, y - 4);
+    
+    SelectObject(hdc, hOldPen);
+    DeleteObject(hPen);
+    DeleteObject(hBrush);
+    return hRgn;
+}
+
 void DrawHalfRoundFrame(HDC hdc, RECT const *pRect, SIDE side, int radius, COLORREF clrBorder, COLORREF clrBack)
 {	
     POINT pts[6];
