@@ -749,7 +749,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     	    sfree(handles);
 
     	while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-    	    if (msg.message == WM_QUIT)
+    	    if (msg.message == WM_QUIT && msg.hwnd == hwnd)
     		goto finished;	       /* two-level break */
 
     	    if (!(IsWindow(logbox) && IsDialogMessage(logbox, &msg))){ 

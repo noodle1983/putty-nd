@@ -126,7 +126,7 @@ int wintab_del_tab(wintab *wintab, const int index)
     wintabitem_fini(&wintab->items[index]);
     TabCtrl_DeleteItem(wintab->hwndTab, index);
     for (i = index; i < (wintab->end - 1); i++){
-        //wintab->items[i] = wintab->items[i+1];
+        wintab->items[i] = wintab->items[i+1];
     }
     if (wintab->cur > index) wintab->cur -= 1;
     wintab->end -= 1;
@@ -559,13 +559,6 @@ int wintabitem_creat(wintab *wintab, Config *cfg)
     wintab->end++;
     //UpdateWindow(wintab->hwndTab);
     return 0;
-}
-
-//-----------------------------------------------------------------------
-
-void wintabitem_delete(wintabitem *tabitem)
-{
-    wintabitem_fini(tabitem);
 }
 
 //-----------------------------------------------------------------------
