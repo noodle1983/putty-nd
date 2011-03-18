@@ -141,7 +141,7 @@ int wintab_del_tab(wintab *wintab, const int index)
     int i;
     int next_cur;
     if (wintab->end  == 1){
-        PostMessage(wintab->hwndParent, WM_CLOSE, 0, 0L);
+        PostMessage(hwnd, WM_CLOSE, 0, 0L);
         return 0;
     }
     
@@ -479,6 +479,24 @@ int wintab_on_drawbtn(wintab* wintab, HWND hwnd, UINT message,
 
 //-----------------------------------------------------------------------
 
+int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    HWND hitBtn = (HWND)lParam;
+    if (hitBtn == NULL) return 0;
+    
+    if (hitBtn == wintab->hMinBtn){
+        ShowWindow(hwnd, SW_MINIMIZE);
+    }else if (hitBtn == wintab->hMaxBtn){
+        ShowWindow(hwnd, IsZoomed(hwnd)?SW_RESTORE:SW_MAXIMIZE);
+    }else if (hitBtn == wintab->hClsBtn){
+        PostMessage(hwnd, WM_CLOSE, 0, 0L);
+    }
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+
 LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 { 
@@ -504,6 +522,10 @@ LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
 
         case WM_LBUTTONDOWN:
             wintab_on_lclick(tab, hwnd, message, wParam, lParam);
+            return 0;
+
+        case WM_COMMAND:
+            wintab_handle_button(tab, hwnd, message, wParam, lParam);
             return 0;
     }
     return( CallWindowProc( tab->defWndProc, hwnd, message, wParam, lParam));
