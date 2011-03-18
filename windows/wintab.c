@@ -20,6 +20,19 @@
 extern HINSTANCE hinst;
 extern Config cfg;
 
+extern void show_mouseptr(wintabitem *tabitem, int show);
+extern int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
+extern int on_mouse_move(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
+extern int on_nc_mouse_move(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
+extern int process_clipdata(HGLOBAL clipdata, int unicode);
+extern int on_key(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
+extern int on_button(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
+
 const char* const WINTAB_PAGE_CLASS = "WintabPage";
 int wintabpage_registed = 0;
 
@@ -64,16 +77,18 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     for (i = 0; i < sizeof(wintab->hSysRgn)/sizeof (HRGN); i++)
         wintab->hSysRgn[i] = NULL;
  
-    wintabitem_creat(wintab, &cfg);
+    if (wintabitem_creat(wintab, &cfg) != 0){
+        ErrorExit("wintabitem_creat(...)"); 
+    }
     
     //init the extra size
     wintab_resize(wintab, &rc);
     
     //resize according to term
     int index = wintab->cur;
-    int term_width = wintab->items[index].font_width * wintab->items[index].term->cols;
-    int term_height = wintab->items[index].font_height * wintab->items[index].term->rows;
-    wintabitem_require_resize(&wintab->items[index], term_width, term_height);
+    int term_width = wintab->items[index]->font_width * wintab->items[index]->term->cols;
+    int term_height = wintab->items[index]->font_height * wintab->items[index]->term->rows;
+    wintabitem_require_resize(wintab->items[index], term_width, term_height);
     return 0; 
 }
 
@@ -83,7 +98,7 @@ int wintab_fini(wintab *wintab)
 {
     int index = 0;
     for (; index < wintab->end; index ++)
-        wintabitem_fini(&wintab->items[index]);
+        wintabitem_fini(wintab->items[index]);
     return 0;
 }
 
@@ -91,8 +106,7 @@ int wintab_fini(wintab *wintab)
 
 int wintab_create_tab(wintab *wintab, Config *cfg)
 { 
-    wintabitem_creat(wintab, cfg);  
-    return 0;
+    return wintabitem_creat(wintab, cfg); 
 }
 
 
@@ -108,9 +122,9 @@ int wintab_del_tab(wintab *wintab, const int index)
     }
     
     char *str;
-    show_mouseptr(&wintab->items[index], 1);
-    str = dupprintf("%s Exit Confirmation", wintab->items[index].cfg.host);
-    if (!( wintabitem_can_close(&wintab->items[index])||
+    show_mouseptr(wintab->items[index], 1);
+    str = dupprintf("%s Exit Confirmation", wintab->items[index]->cfg.host);
+    if (!( wintabitem_can_close(wintab->items[index])||
             MessageBox(wintab->hwndTab,
             	   "Are you sure you want to close this session?",
             	   str, MB_ICONWARNING | MB_OKCANCEL | MB_DEFBUTTON1)
@@ -123,13 +137,15 @@ int wintab_del_tab(wintab *wintab, const int index)
         TabCtrl_SetCurFocus(wintab->hwndTab, next_cur);
         wintab_swith_tab(wintab);
     }
-    wintabitem_fini(&wintab->items[index]);
+    wintabitem_fini(wintab->items[index]);
+    sfree(wintab->items[index]);
     TabCtrl_DeleteItem(wintab->hwndTab, index);
     for (i = index; i < (wintab->end - 1); i++){
         wintab->items[i] = wintab->items[i+1];
     }
     if (wintab->cur > index) wintab->cur -= 1;
     wintab->end -= 1;
+    wintab->items[wintab->end] = NULL;
     return 0;
 }
 
@@ -141,9 +157,9 @@ int wintab_swith_tab(wintab *wintab)
     if (index == -1)
         return -1;
 
-    ShowWindow(wintab->items[wintab->cur].page.hwndCtrl, SW_HIDE);
+    ShowWindow(wintab->items[wintab->cur]->page.hwndCtrl, SW_HIDE);
     wintab->cur = index;
-    ShowWindow(wintab->items[wintab->cur].page.hwndCtrl, SW_SHOW);
+    ShowWindow(wintab->items[wintab->cur]->page.hwndCtrl, SW_SHOW);
     
     //init the extra size
     RECT rc;
@@ -167,7 +183,7 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     wintab->extra_height = wr.bottom - wr.top - tab_height;
     
     wintab_get_page_rect(wintab, &rcPage);
-    wintabpage_resize(&wintab->items[index].page, &rcPage, wintab->items[index].cfg.window_border);
+    wintabpage_resize(&wintab->items[index]->page, &rcPage, wintab->items[index]->cfg.window_border);
     return 0;
 }
 
@@ -199,7 +215,7 @@ int  wintab_can_close(wintab *wintab)
 {
     int index = 0;
     for (; index < wintab->end; index++){
-        if (!wintabitem_can_close(&wintab->items[index]))
+        if (!wintabitem_can_close(wintab->items[index]))
             return FALSE;
     }
     return TRUE;
@@ -209,7 +225,7 @@ int  wintab_can_close(wintab *wintab)
 
 void wintab_check_closed_session(wintab *wintab)
 {
-    wintabitem_check_closed_session(&wintab->items[wintab->cur]);
+    wintabitem_check_closed_session(wintab->items[wintab->cur]);
 }
 
 //-----------------------------------------------------------------------
@@ -217,7 +233,7 @@ void wintab_check_closed_session(wintab *wintab)
 void wintab_term_paste(wintab *wintab)
 {
     //for
-    term_paste(wintab->items[wintab->cur].term);
+    term_paste(wintab->items[wintab->cur]->term);
 }
 
 //-----------------------------------------------------------------------
@@ -225,14 +241,14 @@ void wintab_term_paste(wintab *wintab)
 void wintab_term_set_focus(wintab *wintab, int has_focus)
 {
     //get select ...
-    term_set_focus(wintab->items[wintab->cur].term, has_focus);
+    term_set_focus(wintab->items[wintab->cur]->term, has_focus);
 }
 
 //-----------------------------------------------------------------------
 
 wintabitem* wintab_get_active_item(wintab *wintab)
 {
-    return &wintab->items[wintab->cur];
+    return wintab->items[wintab->cur];
 }
 
 //-----------------------------------------------------------------------
@@ -297,20 +313,20 @@ int wintab_drawitem(wintab *wintab, HDC hdc, const int index)
     COLORREF col, old_col;
     
     TabCtrl_GetItemRect(wintab->hwndTab, index, &rc);
-    const char* name = wintab->items[index].cfg.host;
+    const char* name = wintab->items[index]->cfg.host;
     int name_len = strlen(name);
 
     col = (index == wintab->cur)? wintab->sel_col: wintab->nosel_col;
     
     HRGN hRgn = DrawChromeFrame(hdc, &rc,  wintab->bd_col, col);
-    wintabitem_set_rgn(&wintab->items[index], hRgn);
+    wintabitem_set_rgn(wintab->items[index], hRgn);
     old_col = SetBkColor(hdc, col);
     TextOut(hdc, rc.left, rc.top + 2, name, name_len);
     SetBkColor(hdc, old_col);
 
     hRgn = DrawCloseButton(hdc, rc.right-4, (rc.top + rc.bottom)/2, 
             wintab->bd_col, col);
-    wintabitem_set_closer_rgn(&wintab->items[index], hRgn);
+    wintabitem_set_closer_rgn(wintab->items[index], hRgn);
     return 0;
 }
 
@@ -363,12 +379,12 @@ int wintab_hit_tab(wintab *wintab, const int x, const int y)
 {
     int index = 0;
 
-    if (PtInRegion(wintab->items[wintab->cur].hRgn, x, y)){
+    if (PtInRegion(wintab->items[wintab->cur]->hRgn, x, y)){
             return wintab->cur;
     }
     for (; index < wintab->end; index++){
         if (index == wintab->cur) continue;
-        if (PtInRegion(wintab->items[index].hRgn, x, y)){
+        if (PtInRegion(wintab->items[index]->hRgn, x, y)){
             return index;
         }
     }
@@ -387,7 +403,7 @@ int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
     if (index < 0 || index >= wintab->end)
         return -1;
 
-    if (PtInRegion(wintab->items[index].hCloserRgn, x, y)){
+    if (PtInRegion(wintab->items[index]->hCloserRgn, x, y)){
         wintab_del_tab(wintab, index);
         return 0;
     }
@@ -535,23 +551,26 @@ void wintabitem_fini(wintabitem *tabitem)
 int wintabitem_creat(wintab *wintab, Config *cfg)
 {
     int index = wintab->end;
-    if (index >= sizeof(wintab->items)/sizeof(wintabitem)){
+    if (index >= sizeof(wintab->items)/sizeof(wintabitem*)){
         MessageBox(NULL, "reach max tab size", TEXT("Error"), MB_OK); 
         return -1;
     }
 
-    if (wintabitem_init(wintab, &wintab->items[index], cfg) != 0){
-        wintabitem_fini(&wintab->items[index]);
+    wintab->items[index] = snew(wintabitem);
+    if (wintabitem_init(wintab, wintab->items[index], cfg) != 0){
+        wintabitem_fini(wintab->items[index]);
+        sfree(wintab->items[index]);
         return -1;
     }
-    UpdateWindow(wintab->items[index].page.hwndCtrl);
+    UpdateWindow(wintab->items[index]->page.hwndCtrl);
     
     TCITEM tie; 
     tie.mask = TCIF_TEXT | TCIF_IMAGE; 
     tie.iImage = -1; 
     tie.pszText = cfg->session_name; 
     if (TabCtrl_InsertItem(wintab->hwndTab, index, &tie) == -1) { 
-        wintabitem_fini(&wintab->items[index]);
+        wintabitem_fini(wintab->items[index]);
+        sfree(wintab->items[index]);
         return -1; 
     } 
     TabCtrl_SetCurFocus(wintab->hwndTab, index);
@@ -1352,7 +1371,7 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
     extern wintab tab;
-    debug(("[WintabpageWndProc]%s:%s\n", hwnd == tab.items[tab.cur].page.hwndCtrl ? "PageMsg"
+    debug(("[WintabpageWndProc]%s:%s\n", hwnd == tab.items[tab.cur]->page.hwndCtrl ? "PageMsg"
                             : "UnknowMsg", TranslateWMessage(message)));
     wintabitem* tabitem = win_get_data(hwnd);
     if (tabitem == NULL){

@@ -126,6 +126,7 @@ static HMENU savedsess_menu;
 
 Config cfg;			       /* exported to windlg.c */
 wintab tab;
+static int initialized = 0;
 
 static struct sesslist sesslist;       /* for saved-session menu */
 
@@ -596,6 +597,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     hinst = inst;
     hwnd = NULL;
     flags = FLAG_VERBOSE | FLAG_INTERACTIVE;
+    initialized = 0;
 
     sk_init();
 
@@ -666,7 +668,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     }
 #endif
     wintab_init(&tab, hwnd);
-    logctx = tab.items[0].logctx;
+    logctx = tab.items[0]->logctx;
 
     //resizeWindows();
 
@@ -731,6 +733,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 
             //term_set_focus(term, GetForegroundWindow() == hwnd);
     UpdateWindow(hwnd);
+    initialized = 1;
 
     while (1) {
     	HANDLE *handles;
@@ -749,7 +752,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     	    sfree(handles);
 
     	while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-    	    if (msg.message == WM_QUIT && msg.hwnd == hwnd)
+    	    if (msg.message == WM_QUIT)
     		goto finished;	       /* two-level break */
 
     	    if (!(IsWindow(logbox) && IsDialogMessage(logbox, &msg))){ 
@@ -2876,6 +2879,7 @@ int on_sys_color_change(wintabitem* tabitem, HWND hwnd, UINT message,
 int on_default(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
+    if (!initialized) return 0;
     if (message == tabitem->wm_mousewheel || message == WM_MOUSEWHEEL) {
 	    int shift_pressed=0, control_pressed=0;
 
@@ -2945,7 +2949,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 {
 debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
                             :hwnd == tab.hwndTab ? "TabBarMsg"
-                            :hwnd == tab.items[0].page.hwndCtrl ? "PageMsg"
+                            :hwnd == tab.items[0]->page.hwndCtrl ? "PageMsg"
                             : "UnknowMsg", TranslateWMessage(message)));
 
     wintabitem *tabitem = wintab_get_active_item(&tab);
