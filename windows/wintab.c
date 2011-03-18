@@ -35,6 +35,10 @@ extern int on_button(wintabitem* tabitem, HWND hwnd, UINT message,
 
 const char* const WINTAB_PAGE_CLASS = "WintabPage";
 int wintabpage_registed = 0;
+const int MIN_BTN_WIDTH = 32;
+const int MAX_BTN_WIDTH = 32;
+const int CLS_BTN_WIDTH = 36;
+const int SYS_BTN_HEIGHT = 15;
 
 //-----------------------------------------------------------------------
 // tabbar related
@@ -76,6 +80,26 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     wintab->bd_col = RGB(54, 83, 129);
     for (i = 0; i < sizeof(wintab->hSysRgn)/sizeof (HRGN); i++)
         wintab->hSysRgn[i] = NULL;
+
+    //create sys button 
+    wintab->hMinBtn = CreateWindowEx(
+        WS_EX_TOPMOST|WS_EX_STATICEDGE|WS_EX_TRANSPARENT, 
+        WC_BUTTON, "",
+        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 
+        0, 0, MIN_BTN_WIDTH, SYS_BTN_HEIGHT,
+        wintab->hwndTab, NULL, hinst, NULL); 
+    wintab->hMaxBtn = CreateWindowEx(
+        WS_EX_TOPMOST|WS_EX_STATICEDGE|WS_EX_TRANSPARENT, 
+        WC_BUTTON, "",
+        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 
+        0, 0, MAX_BTN_WIDTH, SYS_BTN_HEIGHT,
+        wintab->hwndTab, NULL, hinst, NULL); 
+    wintab->hClsBtn = CreateWindowEx(
+        WS_EX_TOPMOST|WS_EX_STATICEDGE|WS_EX_TRANSPARENT, 
+        WC_BUTTON, "",
+        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 
+        0, 0, CLS_BTN_WIDTH, SYS_BTN_HEIGHT,
+        wintab->hwndTab, NULL, hinst, NULL); 
  
     if (wintabitem_creat(wintab, &cfg) != 0){
         ErrorExit("wintabitem_creat(...)"); 
@@ -172,6 +196,7 @@ int wintab_swith_tab(wintab *wintab)
 int wintab_resize(wintab *wintab, const RECT *rc)
 {
     RECT rcPage, wr;
+    int xPos;
     int index = wintab->cur;
     int tab_width = rc->right - rc->left;
     int tab_height = rc->bottom - rc->top;
@@ -181,6 +206,16 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     GetWindowRect(wintab->hwndParent, &wr);
     wintab->extra_width = wr.right - wr.left - tab_width;
     wintab->extra_height = wr.bottom - wr.top - tab_height;
+
+    xPos = rc->right - 3 - CLS_BTN_WIDTH;
+    SetWindowPos(wintab->hClsBtn, 0, xPos, 0, 
+        0, 0, SWP_NOSIZE|SWP_NOZORDER);
+    xPos -= MAX_BTN_WIDTH;
+    SetWindowPos(wintab->hMaxBtn, 0, xPos, 0, 
+        0, 0, SWP_NOSIZE|SWP_NOZORDER);
+    xPos -= MIN_BTN_WIDTH;
+    SetWindowPos(wintab->hMinBtn, 0, xPos, 0, 
+        0, 0, SWP_NOSIZE|SWP_NOZORDER);
     
     wintab_get_page_rect(wintab, &rcPage);
     wintabpage_resize(&wintab->items[index]->page, &rcPage, wintab->items[index]->cfg.window_border);
@@ -342,7 +377,10 @@ int wintab_draw_sysbtn(wintab *wintab)
     rc.left = (rc.right - 100) > rc.left ? (rc.right - 100): rc.left ;
     rc.bottom = rc.top + 15;
     wintab_del_rgn(wintab);
-    DrawSysButtonFrame(hdc, &rc, wintab->bd_col, wintab->bg_col, wintab->hSysRgn); 
+    DrawSysButtonFrame(hdc, &rc, wintab->bd_col, wintab->bg_col, wintab->hSysRgn);
+    SetWindowRgn(wintab->hMinBtn, wintab->hSysRgn[0], FALSE);
+    SetWindowRgn(wintab->hMaxBtn, wintab->hSysRgn[1], FALSE);
+    SetWindowRgn(wintab->hClsBtn, wintab->hSysRgn[2], FALSE);
     DrawSysButton(hdc, &rc, wintab->on_col); 
     ReleaseDC(wintab->hwndTab, hdc);
     return 0;
@@ -367,7 +405,7 @@ int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
     DeleteObject(hBrush);
     
     wintab_drawitems(wintab);
-    wintab_draw_sysbtn(wintab);
+    //wintab_draw_sysbtn(wintab);
     EndPaint(hwnd, &p);
 
     return 0;
@@ -418,6 +456,29 @@ int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
 
 //-----------------------------------------------------------------------
 
+int wintab_on_drawbtn(wintab* wintab, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    DRAWITEMSTRUCT* dis = (DRAWITEMSTRUCT*)lParam ;
+    RECT rc = dis->rcItem;
+    HRGN hRgn;
+    HBRUSH hBackBrush = CreateSolidBrush (wintab->bg_col);
+    HDC hdc = GetDC(dis->hwndItem);//dis->hDC;
+
+    GetWindowRgn(dis->hwndItem, hRgn);
+    
+    FillRect(hdc, &rc, hBackBrush);
+    //if (dis->hwndItem == wintab->hMinBtn){
+    //    FillRgn(hdc, hRgn, hBackBrush);
+    //}
+    
+    DeleteObject(hBackBrush);
+    ReleaseDC(dis->hwndItem, hdc);
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+
 LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 { 
@@ -426,8 +487,10 @@ LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
     debug(("[WintabWndProc]%s:%s\n", hwnd == tab->hwndTab? "TabMsg"
                             : "UnknowMsg", TranslateWMessage(message))); 
 
-
     switch (message) {
+        case WM_DRAWITEM:
+            wintab_on_drawbtn(tab, hwnd, message, wParam, lParam);
+            return TRUE;
         case WM_NCHITTEST:
             //#define TID_POLLMOUSE 100
             //#define MOUSE_POLL_DELAY 500

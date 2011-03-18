@@ -82,6 +82,33 @@ HRGN DrawChromeFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack)
     return hRgn;
 }
 
+HRGN DrawRndBtnRgn(HDC hdc, RECT *pRect, 
+    const int isRndtl, const int trRadius,
+    const int blRadius, const int brRadisu)
+{
+    int radius;
+    HRGN hRgn;
+    
+    int width = pRect->right - pRect->left;
+    int height = pRect->bottom - pRect->top;
+    /*
+    MoveToEx(hdc, prt[0][0].x, prt[0][0].y, NULL);
+    BeginPath(hdc);
+    LineTo(hdc, prt[1][0].x, prt[1][0].y - radius);
+    AngleArc(hdc, prt[1][0].x + radius, prt[1][0].y - radius,
+            radius,180, 90);
+    LineTo(hdc, prt[1][1].x, prt[1][1].y);
+    LineTo(hdc, prt[0][1].x, prt[0][1].y);
+    CloseFigure(hdc);
+    EndPath(hdc);
+    //StrokePath (hdc);
+    FlattenPath(hdc);
+    hRgn = PathToRegion(hdc);
+    */
+    return hRgn;
+    
+}
+
 int DrawSysButtonFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, HRGN* hRgns)
 {
     HBRUSH hBackBrush;

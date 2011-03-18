@@ -115,6 +115,9 @@ typedef struct {
 
     COLORREF bg_col, sel_col, nosel_col, on_col, hl_col, bd_col; 
     HRGN hSysRgn[3];
+    HWND hMinBtn;
+    HWND hMaxBtn;
+    HWND hClsBtn;
 
     LRESULT CALLBACK (*defWndProc)(HWND,UINT,WPARAM,LPARAM);
 }wintab;
