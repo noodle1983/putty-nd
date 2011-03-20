@@ -80,26 +80,8 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     wintab->bd_col = RGB(54, 83, 129);
     for (i = 0; i < sizeof(wintab->hSysRgn)/sizeof (HRGN); i++)
         wintab->hSysRgn[i] = NULL;
-
-    //create sys button 
-    wintab->hMinBtn = CreateWindowEx(
-        WS_EX_TOPMOST|WS_EX_STATICEDGE|WS_EX_TRANSPARENT, 
-        WC_BUTTON, "",
-        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 
-        0, 0, MIN_BTN_WIDTH, SYS_BTN_HEIGHT,
-        wintab->hwndTab, NULL, hinst, NULL); 
-    wintab->hMaxBtn = CreateWindowEx(
-        WS_EX_TOPMOST|WS_EX_STATICEDGE|WS_EX_TRANSPARENT, 
-        WC_BUTTON, "",
-        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 
-        0, 0, MAX_BTN_WIDTH, SYS_BTN_HEIGHT,
-        wintab->hwndTab, NULL, hinst, NULL); 
-    wintab->hClsBtn = CreateWindowEx(
-        WS_EX_TOPMOST|WS_EX_STATICEDGE|WS_EX_TRANSPARENT, 
-        WC_BUTTON, "",
-        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 
-        0, 0, CLS_BTN_WIDTH, SYS_BTN_HEIGHT,
-        wintab->hwndTab, NULL, hinst, NULL); 
+    wintab_create_toolbar(wintab);
+    wintab_create_sysbtn(wintab);
  
     if (wintabitem_creat(wintab, &cfg) != 0){
         ErrorExit("wintabitem_creat(...)"); 
@@ -133,6 +115,85 @@ int wintab_create_tab(wintab *wintab, Config *cfg)
     return wintabitem_creat(wintab, cfg); 
 }
 
+//-----------------------------------------------------------------------
+
+int wintab_create_sysbtn(wintab *wintab)
+{
+    wintab->hMinBtn = CreateWindowEx(
+        WS_EX_TOPMOST|WS_EX_STATICEDGE|WS_EX_TRANSPARENT, 
+        WC_BUTTON, "",
+        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 
+        0, 0, MIN_BTN_WIDTH, SYS_BTN_HEIGHT,
+        wintab->hwndTab, NULL, hinst, NULL); 
+    wintab->hMaxBtn = CreateWindowEx(
+        WS_EX_TOPMOST|WS_EX_STATICEDGE|WS_EX_TRANSPARENT, 
+        WC_BUTTON, "",
+        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 
+        0, 0, MAX_BTN_WIDTH, SYS_BTN_HEIGHT,
+        wintab->hwndTab, NULL, hinst, NULL); 
+    wintab->hClsBtn = CreateWindowEx(
+        WS_EX_TOPMOST|WS_EX_STATICEDGE|WS_EX_TRANSPARENT, 
+        WC_BUTTON, "",
+        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 
+        0, 0, CLS_BTN_WIDTH, SYS_BTN_HEIGHT,
+        wintab->hwndTab, NULL, hinst, NULL); 
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+
+int wintab_create_toolbar(wintab *wintab)
+{
+    const int ImageListID = 0;
+    const int numButtons = 3;
+    const DWORD buttonStyles = BTNS_AUTOSIZE;
+    const int bitmapSize = 16;
+    
+    wintab->hToolBar = CreateWindowEx(
+        WS_EX_TOPMOST,
+        TOOLBARCLASSNAME, "",
+        WS_CHILD | TBSTYLE_TRANSPARENT, 
+        0, 0, 0, 0,
+        wintab->hwndTab, NULL, hinst, NULL); 
+
+    // Create the imagelist.
+    wintab->hImageList = (HWND)ImageList_Create(
+        bitmapSize, bitmapSize,   // Dimensions of individual bitmaps.
+        ILC_COLOR16 | ILC_MASK,   // Ensures transparent background.
+        numButtons, 0);
+
+    // Set the image list.
+    SendMessage(wintab->hToolBar, TB_SETIMAGELIST, (WPARAM)ImageListID, 
+        (LPARAM)wintab->hImageList);
+
+    // Load the button images.
+    SendMessage(wintab->hToolBar, TB_LOADIMAGES, (WPARAM)IDB_STD_SMALL_COLOR, 
+        (LPARAM)HINST_COMMCTRL);
+
+    // Initialize button info.
+    // IDM_NEW, IDM_OPEN, and IDM_SAVE are application-defined command constants.
+    TBBUTTON tbButtons[3] = 
+    {
+        { MAKELONG(STD_FILENEW, ImageListID), IDM_NEWSESS, TBSTATE_ENABLED, 
+          buttonStyles, {0}, 0, (INT_PTR)L"New" },
+        { MAKELONG(STD_FILEOPEN, ImageListID), IDM_DUPSESS, TBSTATE_ENABLED, 
+          buttonStyles, {0}, 0, (INT_PTR)L"Open"},
+        { MAKELONG(STD_FILESAVE, ImageListID), IDM_RECONF, 0, 
+          buttonStyles, {0}, 0, (INT_PTR)L"Save"}
+    };
+
+    // Add buttons.
+    SendMessage(wintab->hToolBar, TB_BUTTONSTRUCTSIZE, 
+        (WPARAM)sizeof(TBBUTTON), 0);
+    SendMessage(wintab->hToolBar, TB_ADDBUTTONS, (WPARAM)numButtons, 
+        (LPARAM)&tbButtons);
+
+    // Tell the toolbar to resize itself, and show it.
+    SendMessage(wintab->hToolBar, TB_AUTOSIZE, 0, 0); 
+    ShowWindow(wintab->hToolBar, TRUE);
+    
+    return 0;
+}
 
 //-----------------------------------------------------------------------
 
@@ -195,7 +256,7 @@ int wintab_swith_tab(wintab *wintab)
 
 int wintab_resize(wintab *wintab, const RECT *rc)
 {
-    RECT rcPage, wr;
+    RECT rcDis, wr;
     int xPos;
     int index = wintab->cur;
     int tab_width = rc->right - rc->left;
@@ -217,14 +278,19 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     SetWindowPos(wintab->hMinBtn, 0, xPos, 0, 
         0, 0, SWP_NOSIZE|SWP_NOZORDER);
     
-    wintab_get_page_rect(wintab, &rcPage);
-    wintabpage_resize(&wintab->items[index]->page, &rcPage, wintab->items[index]->cfg.window_border);
+    wintab_get_dis_rect(wintab, &rcDis);
+    //SendMessage(wintab->hToolBar, TB_AUTOSIZE, 0, 0); 
+    SetWindowPos(wintab->hToolBar, 0, rcDis.left, rcDis.top, 
+        0, 0, SWP_NOSIZE|SWP_NOZORDER);
+    //SendMessage(wintab->hToolBar, TB_SETBUTTONSIZE, 0, MAKELPARAM(23, 23));
+    rcDis.top += 23;
+    wintabpage_resize(&wintab->items[index]->page, &rcDis, wintab->items[index]->cfg.window_border);
     return 0;
 }
 
 //-----------------------------------------------------------------------
 
-void wintab_get_page_rect(wintab *wintab, RECT *rc)
+void wintab_get_dis_rect(wintab *wintab, RECT *rc)
 {
     GetClientRect(wintab->hwndTab, rc);  
     TabCtrl_AdjustRect(wintab->hwndTab, FALSE, rc);
@@ -491,9 +557,13 @@ int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
         ShowWindow(hwnd, IsZoomed(hwnd)?SW_RESTORE:SW_MAXIMIZE);
     }else if (hitBtn == wintab->hClsBtn){
         PostMessage(hwnd, WM_CLOSE, 0, 0L);
+    }else {
+        on_menu(wintab_get_active_item(wintab), hWnd, message, wParam, lParam);
     }
     return 0;
 }
+
+//-----------------------------------------------------------------------
 
 //-----------------------------------------------------------------------
 

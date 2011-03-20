@@ -5,6 +5,34 @@
 #ifndef WINTAB_H
 #define WINTAB_H
 
+/* From MSDN: In the WM_SYSCOMMAND message, the four low-order bits of
+ * wParam are used by Windows, and should be masked off, so we shouldn't
+ * attempt to store information in them. Hence all these identifiers have
+ * the low 4 bits clear. Also, identifiers should < 0xF000. */
+
+#define IDM_SHOWLOG   0x0010
+#define IDM_NEWSESS   0x0020
+#define IDM_DUPSESS   0x0030
+#define IDM_RESTART   0x0040
+#define IDM_RECONF    0x0050
+#define IDM_CLRSB     0x0060
+#define IDM_RESET     0x0070
+#define IDM_HELP      0x0140
+#define IDM_ABOUT     0x0150
+#define IDM_SAVEDSESS 0x0160
+#define IDM_COPYALL   0x0170
+#define IDM_FULLSCREEN	0x0180
+#define IDM_PASTE     0x0190
+#define IDM_SPECIALSEP 0x0200
+
+#define IDM_SPECIAL_MIN 0x0400
+#define IDM_SPECIAL_MAX 0x0800
+
+#define IDM_SAVED_MIN 0x1000
+#define IDM_SAVED_MAX 0x5000
+#define MENU_SAVED_STEP 16
+/* Maximum number of sessions on saved-session submenu */
+#define MENU_SAVED_MAX ((IDM_SAVED_MAX-IDM_SAVED_MIN) / MENU_SAVED_STEP)
 
 #define NCFGCOLOURS 22
 #define NEXTCOLOURS 240
@@ -119,6 +147,9 @@ typedef struct {
     HWND hMaxBtn;
     HWND hClsBtn;
 
+    HWND hToolBar;
+    HWND hImageList;
+
     LRESULT CALLBACK (*defWndProc)(HWND,UINT,WPARAM,LPARAM);
 }wintab;
 
@@ -133,6 +164,8 @@ void* win_get_data(HWND hwnd);
 int wintab_init(wintab *wintab, HWND hwndParent);
 int wintab_fini(wintab *wintab);
 int wintab_create_tab(wintab *wintab, Config *cfg);
+int wintab_create_sysbtn(wintab *wintab);
+int wintab_create_toolbar(wintab *wintab);
 int wintab_swith_tab(wintab *wintab);
 int wintab_resize(wintab *wintab, const RECT *rc);
 void wintab_onsize(wintab *wintab, HWND hwndParent, LPARAM lParam);
@@ -141,7 +174,7 @@ void wintab_check_closed_session(wintab *wintab);
 void wintab_term_paste(wintab *wintab);
 void wintab_term_set_focus(wintab *wintab, int has_focus);
 wintabitem* wintab_get_active_item(wintab *wintab);
-void wintab_get_page_rect(wintab *wintab, RECT *rc);
+void wintab_get_dis_rect(wintab *wintab, RECT *rc);
 void wintab_require_resize(wintab *wintab, int tab_width, int tab_height);
 void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height);
 

@@ -30,34 +30,7 @@
 #include <richedit.h>
 #include <mmsystem.h>
 
-/* From MSDN: In the WM_SYSCOMMAND message, the four low-order bits of
- * wParam are used by Windows, and should be masked off, so we shouldn't
- * attempt to store information in them. Hence all these identifiers have
- * the low 4 bits clear. Also, identifiers should < 0xF000. */
 
-#define IDM_SHOWLOG   0x0010
-#define IDM_NEWSESS   0x0020
-#define IDM_DUPSESS   0x0030
-#define IDM_RESTART   0x0040
-#define IDM_RECONF    0x0050
-#define IDM_CLRSB     0x0060
-#define IDM_RESET     0x0070
-#define IDM_HELP      0x0140
-#define IDM_ABOUT     0x0150
-#define IDM_SAVEDSESS 0x0160
-#define IDM_COPYALL   0x0170
-#define IDM_FULLSCREEN	0x0180
-#define IDM_PASTE     0x0190
-#define IDM_SPECIALSEP 0x0200
-
-#define IDM_SPECIAL_MIN 0x0400
-#define IDM_SPECIAL_MAX 0x0800
-
-#define IDM_SAVED_MIN 0x1000
-#define IDM_SAVED_MAX 0x5000
-#define MENU_SAVED_STEP 16
-/* Maximum number of sessions on saved-session submenu */
-#define MENU_SAVED_MAX ((IDM_SAVED_MAX-IDM_SAVED_MIN) / MENU_SAVED_STEP)
 
 
 /* Needed for Chinese support and apparently not always defined. */
