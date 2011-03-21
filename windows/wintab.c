@@ -152,8 +152,8 @@ int wintab_create_toolbar(wintab *wintab)
     wintab->hToolBar = CreateWindowEx(
         WS_EX_TOPMOST,
         TOOLBARCLASSNAME, "",
-        WS_CHILD | TBSTYLE_TRANSPARENT, 
-        0, 0, 0, 0,
+        WS_CHILD | TBSTYLE_TRANSPARENT | CCS_NORESIZE | CCS_NOPARENTALIGN, 
+        0, 0, 100, 23,
         wintab->hwndTab, NULL, hinst, NULL); 
 
     // Create the imagelist.
@@ -175,11 +175,11 @@ int wintab_create_toolbar(wintab *wintab)
     TBBUTTON tbButtons[3] = 
     {
         { MAKELONG(STD_FILENEW, ImageListID), IDM_NEWSESS, TBSTATE_ENABLED, 
-          buttonStyles, {0}, 0, (INT_PTR)L"New" },
+          buttonStyles, {0}, 0, (INT_PTR)NULL },
         { MAKELONG(STD_FILEOPEN, ImageListID), IDM_DUPSESS, TBSTATE_ENABLED, 
-          buttonStyles, {0}, 0, (INT_PTR)L"Open"},
+          buttonStyles, {0}, 0, (INT_PTR)NULL},
         { MAKELONG(STD_FILESAVE, ImageListID), IDM_RECONF, 0, 
-          buttonStyles, {0}, 0, (INT_PTR)L"Save"}
+          buttonStyles, {0}, 0, (INT_PTR)NULL}
     };
 
     // Add buttons.
@@ -189,7 +189,7 @@ int wintab_create_toolbar(wintab *wintab)
         (LPARAM)&tbButtons);
 
     // Tell the toolbar to resize itself, and show it.
-    SendMessage(wintab->hToolBar, TB_AUTOSIZE, 0, 0); 
+    //SendMessage(wintab->hToolBar, TB_AUTOSIZE, 0, 0); 
     ShowWindow(wintab->hToolBar, TRUE);
     
     return 0;
@@ -279,10 +279,8 @@ int wintab_resize(wintab *wintab, const RECT *rc)
         0, 0, SWP_NOSIZE|SWP_NOZORDER);
     
     wintab_get_dis_rect(wintab, &rcDis);
-    //SendMessage(wintab->hToolBar, TB_AUTOSIZE, 0, 0); 
     SetWindowPos(wintab->hToolBar, 0, rcDis.left, rcDis.top, 
-        0, 0, SWP_NOSIZE|SWP_NOZORDER);
-    //SendMessage(wintab->hToolBar, TB_SETBUTTONSIZE, 0, MAKELPARAM(23, 23));
+        rcDis.right - rcDis.left, 23, SWP_NOZORDER);
     rcDis.top += 23;
     wintabpage_resize(&wintab->items[index]->page, &rcDis, wintab->items[index]->cfg.window_border);
     return 0;
