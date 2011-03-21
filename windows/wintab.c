@@ -297,7 +297,7 @@ void wintab_split_client_rect(wintab *wintab)
     wintab->rcTabBar.top  = IsZoomed(hwnd) ? (rc.top) : (rc.top + 3);
     wintab->rcTabBar.right = rc.right - 3 - 100;
     wintab->rcTabBar.bottom = IsZoomed(hwnd) ? 
-        (wintab->rcTabBar.top + 30) : (wintab->rcTabBar.top + 40);
+        (wintab->rcTabBar.top + 25) : (wintab->rcTabBar.top + 35);
 
     wintab->rcSysBtn = wintab->rcTabBar;
     wintab->rcSysBtn.left = wintab->rcTabBar.right;
@@ -415,7 +415,7 @@ void wintab_calc_item_size(wintab *wintab, HDC hdc)
     
     int index = 0;   
     RECT rc = wintab->rcTabBar;
-    rc.top = rc.bottom - 30;
+    rc.top = rc.bottom - 25;
     int left = rc.left;
     int average_size = (wintab->rcTabBar.right - wintab->rcTabBar.left)/wintab->end;
     wintabitem* tabitem;
@@ -579,7 +579,21 @@ int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
 int wintab_on_drawbtn(wintab* wintab, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    wintab_drawitems(wintab);
+    DRAWITEMSTRUCT* dis = (DRAWITEMSTRUCT*)lParam ;
+    RECT rc = dis->rcItem;
+    HRGN hRgn;
+    HBRUSH hBackBrush = CreateSolidBrush (wintab->bg_col);
+    HDC hdc = GetDC(dis->hwndItem);//dis->hDC;
+
+    GetWindowRgn(dis->hwndItem, hRgn);
+    
+    FillRect(hdc, &rc, hBackBrush);
+    //if (dis->hwndItem == wintab->hMinBtn){
+    //    FillRgn(hdc, hRgn, hBackBrush);
+    //}
+    
+    DeleteObject(hBackBrush);
+    ReleaseDC(dis->hwndItem, hdc);
     return 0;
 }
 
