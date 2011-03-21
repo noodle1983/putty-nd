@@ -482,7 +482,7 @@ int registerClass(HINSTANCE inst)
 	wndclass.cbWndExtra = 0;
 	wndclass.hInstance = inst;
 	wndclass.hIcon = LoadIcon(inst, MAKEINTRESOURCE(IDI_MAINICON));
-	wndclass.hCursor = LoadCursor(NULL, IDC_IBEAM);
+	wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wndclass.hbrBackground = NULL;
 	wndclass.lpszMenuName = NULL;
 	wndclass.lpszClassName = appname;
@@ -2939,7 +2939,8 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
         case WM_LBUTTONUP:
         case WM_MBUTTONUP:
         case WM_RBUTTONUP:
-            break;
+            PostMessage(tab.hwndTab, message, wParam, lParam);
+            return 0;
 	        //on_button(tabitem, hwnd, message, wParam, lParam);
     		//return 0;
         case WM_MOUSEMOVE:

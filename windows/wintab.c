@@ -522,6 +522,12 @@ int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
     //wintab_draw_sysbtn(wintab);
     EndPaint(hwnd, &p);
 
+    InvalidateRect(wintab->hToolBar, NULL, TRUE);
+    InvalidateRect(wintab->hMaxBtn, NULL, TRUE);
+    InvalidateRect(wintab->hMinBtn, NULL, TRUE);
+    InvalidateRect(wintab->hClsBtn, NULL, TRUE);
+    
+
     return 0;
 }
 
@@ -573,21 +579,7 @@ int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
 int wintab_on_drawbtn(wintab* wintab, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    DRAWITEMSTRUCT* dis = (DRAWITEMSTRUCT*)lParam ;
-    RECT rc = dis->rcItem;
-    HRGN hRgn;
-    HBRUSH hBackBrush = CreateSolidBrush (wintab->bg_col);
-    HDC hdc = GetDC(dis->hwndItem);//dis->hDC;
-
-    GetWindowRgn(dis->hwndItem, hRgn);
-    
-    FillRect(hdc, &rc, hBackBrush);
-    //if (dis->hwndItem == wintab->hMinBtn){
-    //    FillRgn(hdc, hRgn, hBackBrush);
-    //}
-    
-    DeleteObject(hBackBrush);
-    ReleaseDC(dis->hwndItem, hdc);
+    wintab_drawitems(wintab);
     return 0;
 }
 
@@ -627,13 +619,13 @@ LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
         case WM_DRAWITEM:
             wintab_on_drawbtn(tab, hwnd, message, wParam, lParam);
             return TRUE;
-        case WM_NCHITTEST:
+        //case WM_NCHITTEST:
             //#define TID_POLLMOUSE 100
             //#define MOUSE_POLL_DELAY 500
             //SetTimer(hwnd,TID_POLLMOUSE,MOUSE_POLL_DELAY,NULL);
             //PostMessage(hwnd,WM_MOUSELEAVE,0,0L);
             //KillTimer(hwnd,TID_POLLMOUSE);
-            break;
+            //break;
         case WM_PAINT:
             wintab_on_paint(tab, hwnd, message, wParam, lParam);
             return 0;
