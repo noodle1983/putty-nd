@@ -256,7 +256,7 @@ int wintab_swith_tab(wintab *wintab)
 
 int wintab_resize(wintab *wintab, const RECT *rc)
 {
-    RECT rcDis, wr;
+    RECT wr;
     int xPos;
     int index = wintab->cur;
     int tab_width = rc->right - rc->left;
@@ -278,20 +278,42 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     SetWindowPos(wintab->hMinBtn, 0, xPos, 0, 
         0, 0, SWP_NOSIZE|SWP_NOZORDER);
     
-    wintab_get_dis_rect(wintab, &rcDis);
-    SetWindowPos(wintab->hToolBar, 0, rcDis.left, rcDis.top, 
-        rcDis.right - rcDis.left, 23, SWP_NOZORDER);
-    rcDis.top += 23;
-    wintabpage_resize(&wintab->items[index]->page, &rcDis, wintab->items[index]->cfg.window_border);
+    wintab_split_client_rect(wintab);
+    SetWindowPos(wintab->hToolBar, 0, 
+        wintab->rcToolBar.left, wintab->rcToolBar.top, 
+        wintab->rcToolBar.right - wintab->rcToolBar.left,
+        wintab->rcToolBar.bottom - wintab->rcToolBar.top, SWP_NOZORDER);
+    wintabpage_resize(&wintab->items[index]->page, &wintab->rcPage, wintab->items[index]->cfg.window_border);
     return 0;
 }
 
 //-----------------------------------------------------------------------
 
-void wintab_get_dis_rect(wintab *wintab, RECT *rc)
+void wintab_split_client_rect(wintab *wintab)
 {
-    GetClientRect(wintab->hwndTab, rc);  
-    TabCtrl_AdjustRect(wintab->hwndTab, FALSE, rc);
+    RECT rc;
+    GetClientRect(wintab->hwndTab, &rc);  
+    wintab->rcTabBar.left = rc.left + 3;
+    wintab->rcTabBar.top  = IsZoomed(hwnd) ? (rc.top) : (rc.top + 3);
+    wintab->rcTabBar.right = rc.right - 3 - 100;
+    wintab->rcTabBar.bottom = IsZoomed(hwnd) ? 
+        (wintab->rcTabBar.top + 30) : (wintab->rcTabBar.top + 40);
+
+    wintab->rcSysBtn = wintab->rcTabBar;
+    wintab->rcSysBtn.left = wintab->rcTabBar.right;
+    wintab->rcSysBtn.right = rc.right - 3;
+
+    wintab->rcToolBar = wintab->rcTabBar;
+    wintab->rcToolBar.right = wintab->rcSysBtn.right;
+    wintab->rcToolBar.top = wintab->rcTabBar.bottom;
+    wintab->rcToolBar.bottom = wintab->rcToolBar.top + 25;
+
+    wintab->rcPage = wintab->rcToolBar;
+    wintab->rcPage.top = wintab->rcToolBar.bottom;
+    wintab->rcPage.bottom = rc.bottom - 3;
+    
+    
+    //TabCtrl_AdjustRect(wintab->hwndTab, FALSE, rc);
     //rc->left += 3;
     //rc->top  += 23;
     //rc->right -= 3;
@@ -387,6 +409,29 @@ void wintab_get_extra_size(wintab *wintab, int *extra_width, int *extra_height)
 
 //-----------------------------------------------------------------------
 
+void wintab_calc_item_size(wintab *wintab, HDC hdc)
+{
+    if (wintab->end == 0) return ;
+    
+    int index = 0;   
+    RECT rc = wintab->rcTabBar;
+    rc.top = rc.bottom - 30;
+    int left = rc.left;
+    int average_size = (wintab->rcTabBar.right - wintab->rcTabBar.left)/wintab->end;
+    wintabitem* tabitem;
+    for (index = 0; index < wintab->end; index++){
+        tabitem = wintab->items[index];
+        rc.left = left;
+        rc.right = average_size * (index + 1);
+
+        snprintf(tabitem->disName, 256,  "%d. %s", index+1, tabitem->cfg.host);
+        wintabitem_adjust_text_rect(tabitem, hdc, &rc);
+        left = tabitem->rcDis.right;
+    }
+}
+
+//-----------------------------------------------------------------------
+
 int wintab_drawitems(wintab *wintab)
 {
     int index = 0;
@@ -395,6 +440,9 @@ int wintab_drawitems(wintab *wintab)
         return -1;
     
     HDC hdc = GetDC(wintab->hwndTab);
+
+    wintab_calc_item_size(wintab, hdc);
+    
     for (index = wintab->end - 1; index >= 0; index--){
         if (index == wintab->cur) continue;
         wintab_drawitem(wintab, hdc, index);
@@ -411,21 +459,23 @@ int wintab_drawitem(wintab *wintab, HDC hdc, const int index)
     RECT rc;
     COLORREF col, old_col;
     
-    TabCtrl_GetItemRect(wintab->hwndTab, index, &rc);
-    const char* name = wintab->items[index]->cfg.host;
+    //TabCtrl_GetItemRect(wintab->hwndTab, index, &rc);
+    wintabitem* tabitem = wintab->items[index];
+    rc = tabitem->rcDis;
+    const char* name = tabitem->disName;
     int name_len = strlen(name);
 
     col = (index == wintab->cur)? wintab->sel_col: wintab->nosel_col;
     
     HRGN hRgn = DrawChromeFrame(hdc, &rc,  wintab->bd_col, col);
-    wintabitem_set_rgn(wintab->items[index], hRgn);
+    wintabitem_set_rgn(tabitem, hRgn);
     old_col = SetBkColor(hdc, col);
-    TextOut(hdc, rc.left, rc.top + 2, name, name_len);
+    TextOut(hdc, rc.left, rc.top + 4, name, name_len);
     SetBkColor(hdc, old_col);
 
     hRgn = DrawCloseButton(hdc, rc.right-4, (rc.top + rc.bottom)/2, 
             wintab->bd_col, col);
-    wintabitem_set_closer_rgn(wintab->items[index], hRgn);
+    wintabitem_set_closer_rgn(tabitem, hRgn);
     return 0;
 }
 
@@ -1231,6 +1281,58 @@ void wintabitem_set_closer_rgn(wintabitem *tabitem, HRGN hRgn)
         DeleteObject(tabitem->hCloserRgn);
     tabitem->hCloserRgn = hRgn;
 }
+
+//-----------------------------------------------------------------------
+
+void wintabitem_adjust_text_rect(wintabitem *tabitem, HDC hdc, const RECT* rc)
+{
+    const int padding = 35;
+    
+    int len = strlen(tabitem->disName);
+    int fitNum;
+    SIZE sz;
+    SIZE dot3sz;
+    
+    tabitem->rcDis = *rc;
+    int nMaxExtent = rc->right - rc->left - padding;
+    if(GetTextExtentExPoint(hdc, tabitem->disName, len,
+            nMaxExtent, &fitNum, NULL, &sz)!=0){
+        
+		if(fitNum < len){	
+            if(fitNum > 0){
+                GetTextExtentPoint(hdc, "...", strlen("..."), &dot3sz);
+                nMaxExtent -= dot3sz.cx;
+                
+                //too narrow to have a char
+                if (nMaxExtent <= 0){
+                    strcpy(tabitem->disName, ".");
+                    return;
+                }
+                
+				if(GetTextExtentExPoint(hdc, tabitem->disName, len,
+                    nMaxExtent, &fitNum, NULL, &sz)==0) {
+                    //at lest it can show the dots.
+                    strcpy(tabitem->disName, "...");	 
+                	return ;
+				}
+                //append the dots.
+                tabitem->disName[fitNum] = '\0';
+                strcpy(tabitem->disName, "...");
+                return;
+			}	else{
+				strcpy(tabitem->disName, ".");
+                return;
+			}
+		} else{
+		    //too wide
+		    tabitem->rcDis.right = tabitem->rcDis.left + sz.cx + padding;
+		    return ;
+        }
+        
+	}
+
+}
+
 //-----------------------------------------------------------------------
 
 int wintabitem_on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
