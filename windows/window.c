@@ -2080,21 +2080,6 @@ int on_reconfig(wintabitem* tabitem, UINT message,
     				 SWP_NOMOVE | SWP_NOSIZE);
     		}
 	    }
-	    if (tabitem->cfg.sunken_edge)
-    		nexflag |= WS_EX_CLIENTEDGE;
-	    else
-    		nexflag &= ~(WS_EX_CLIENTEDGE);
-
-	    if (tabitem->cfg.resize_action == RESIZE_DISABLED ||
-                    is_full_screen())
-    		nflg &= ~WS_THICKFRAME;
-	    else
-    		nflg |= WS_THICKFRAME;
-
-	    if (tabitem->cfg.resize_action == RESIZE_DISABLED)
-    		nflg &= ~WS_MAXIMIZEBOX;
-	    else
-    		nflg |= WS_MAXIMIZEBOX;
 
 	    if (nflg != flag || nexflag != exflag) {
     		if (nflg != flag)
@@ -5467,11 +5452,7 @@ static void clear_full_screen(wintabitem* tabitem)
 
     /* Reinstate the window furniture. */
     style = oldstyle = GetWindowLongPtr(hwnd, GWL_STYLE);
-    style |= WS_CAPTION | WS_BORDER;
-    if (tabitem->cfg.resize_action == RESIZE_DISABLED)
-        style &= ~WS_THICKFRAME;
-    else
-        style |= WS_THICKFRAME;   
+    style &= ~(WS_CAPTION | WS_BORDER | WS_THICKFRAME);
     if (style != oldstyle) {
     	SetWindowLongPtr(hwnd, GWL_STYLE, style);
     	SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
