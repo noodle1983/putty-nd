@@ -72,7 +72,7 @@ HRGN DrawChromeFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack)
     FlattenPath(hdc);
     hRgn = PathToRegion(hdc);
     FillRgn(hdc, hRgn, hBackBrush);
-    FrameRgn(hdc, hRgn, hBorderBrush, 1, 1);
+    //FrameRgn(hdc, hRgn, hBorderBrush, 1, 1);
 
     DeleteObject(hBorderBrush);    
     DeleteObject(hBackBrush);

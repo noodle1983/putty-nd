@@ -73,7 +73,7 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     wintab->end = 0;
     wintab->cur = 0;
     wintab->bg_col = RGB(67, 115, 203);
-    wintab->sel_col = RGB(250, 250, 250);
+    wintab->sel_col = RGB(240, 240, 240);
     wintab->nosel_col = RGB(161, 199, 244);
     wintab->on_col = RGB(204, 224, 248);
     wintab->hl_col = RGB(193, 53, 53);
@@ -152,7 +152,7 @@ int wintab_create_toolbar(wintab *wintab)
     wintab->hToolBar = CreateWindowEx(
         WS_EX_TOPMOST,
         TOOLBARCLASSNAME, "",
-        WS_CHILD | TBSTYLE_TRANSPARENT | CCS_NORESIZE | CCS_NOPARENTALIGN, 
+        WS_CHILD | TBSTYLE_TRANSPARENT | CCS_NORESIZE | CCS_NOPARENTALIGN | CCS_NODIVIDER, 
         0, 0, 100, 23,
         wintab->hwndTab, NULL, hinst, NULL); 
 
@@ -521,15 +521,30 @@ int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
     HDC hdc;
     PAINTSTRUCT p;
     HBRUSH hBrush = NULL;
+    HBRUSH hSelBrush = NULL;
     HBRUSH hOldBrush;
+    HGDIOBJ hPen = NULL;
+    HGDIOBJ hOldPen; 
 
     hdc = BeginPaint(hwnd, &p);
     
     hBrush = CreateSolidBrush (wintab->bg_col);
     hOldBrush = SelectObject(hdc, hBrush);
     FillRect(hdc, &p.rcPaint, hBrush); 
+
+    hSelBrush = CreateSolidBrush (wintab->sel_col);
+    hOldBrush = SelectObject(hdc, hSelBrush);
+    
+    hPen = CreatePen(PS_SOLID, 1, wintab->sel_col);
+    hOldPen = SelectObject(hdc, hPen); 
+    RoundRect(hdc, wintab->rcToolBar.left+1, wintab->rcToolBar.top,
+        wintab->rcToolBar.right+1, wintab->rcPage.bottom, 5, 5);
+    
     SelectObject(hdc, hOldBrush); 
     DeleteObject(hBrush);
+    DeleteObject(hSelBrush);
+    SelectObject(hdc, hOldPen);
+    DeleteObject(hPen);
     
     wintab_drawitems(wintab);
     //wintab_draw_sysbtn(wintab);
