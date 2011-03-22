@@ -397,6 +397,19 @@ void wintab_require_resize(wintab *wintab, int tab_width, int tab_height)
 
     SetWindowPos(wintab->hwndTab, NULL, 0, 0, 
         tab_width, tab_height, SWP_NOMOVE | SWP_NOZORDER); 
+
+    SetWindowPos(wintab->hToolBar, NULL, 0, 0, 
+        tab_width - 6, 25, SWP_NOMOVE | SWP_NOZORDER);
+
+    int xPos = tab_width - 3 - CLS_BTN_WIDTH;
+    SetWindowPos(wintab->hClsBtn, 0, xPos, 0, 
+        0, 0, SWP_NOSIZE|SWP_NOZORDER);
+    xPos -= MAX_BTN_WIDTH;
+    SetWindowPos(wintab->hMaxBtn, 0, xPos, 0, 
+        0, 0, SWP_NOSIZE|SWP_NOZORDER);
+    xPos -= MIN_BTN_WIDTH;
+    SetWindowPos(wintab->hMinBtn, 0, xPos, 0, 
+        0, 0, SWP_NOSIZE|SWP_NOZORDER);
 }
 
 //-----------------------------------------------------------------------
@@ -648,6 +661,52 @@ int wintab_move_window(wintab* wintab, HWND hWnd, UINT message,
     }
     return -1;
 }
+
+//-----------------------------------------------------------------------
+
+int wintab_resize_window(wintab* wintab, HWND hWnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    static int sizing = FALSE;
+    static RECT wc;
+    static POINT ptStart;
+
+    if (IsZoomed(hwnd)) return -1;
+    
+    if (message == WM_LBUTTONDOWN){
+        GetWindowRect(wintab->hwndTab, &wc);
+        GetCursorPos(&ptStart);
+        ScreenToClient(wintab->hwndTab, &ptStart);
+        if (ptStart.x > (wc.left + 3)
+            && ptStart.x < (wc.right - 3)
+            && ptStart.y < (wc.top + 3)
+            && ptStart.y < (wc.bottom - 3))
+            return -1;
+        sizing = TRUE;
+        SendMessage(hwnd, WM_ENTERSIZEMOVE, wParam, lParam);
+        SetCapture(wintab->hwndTab); 
+        return 0;
+    }
+    if (message == WM_MOUSEMOVE){
+        if (!sizing) return -1;
+        POINT ptCur;
+        GetCursorPos(&ptCur);
+        ScreenToClient(wintab->hwndTab, &ptCur);
+        wintab_require_resize(wintab, 
+            wc.right - wc.left + ptCur.x - ptStart.x, 
+            wc.bottom - wc.top + ptCur.y - ptStart.y);
+        return 0;
+    }
+    if (message == WM_LBUTTONUP){
+        if (!sizing) return -1;
+        ReleaseCapture();
+        sizing = FALSE;
+        SendMessage(hwnd, WM_EXITSIZEMOVE, wParam, lParam);
+        return 0;
+    }
+    return -1;
+}
+
 //-----------------------------------------------------------------------
 
 LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
@@ -676,14 +735,19 @@ LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
 
         case WM_LBUTTONDOWN:
             if (wintab_on_lclick(tab, hWnd, message, wParam, lParam) == -1){
-                //down on the caption
-                wintab_move_window(tab, hWnd, message, wParam, lParam);
+                //if on the edge
+                if (wintab_resize_window(tab, hWnd, message, wParam, lParam) == -1){
+                    //down on the caption
+                    wintab_move_window(tab, hWnd, message, wParam, lParam);
+                }
             }
             return 0;
         case WM_MOUSEMOVE:
+            wintab_resize_window(tab, hWnd, message, wParam, lParam);
             wintab_move_window(tab, hWnd, message, wParam, lParam);
             return 0;
         case WM_LBUTTONUP:
+            wintab_resize_window(tab, hWnd, message, wParam, lParam);
             wintab_move_window(tab, hWnd, message, wParam, lParam);
             return 0;
             
