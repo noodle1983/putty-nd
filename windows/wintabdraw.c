@@ -72,10 +72,22 @@ HRGN DrawChromeFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack)
     FlattenPath(hdc);
     hRgn = PathToRegion(hdc);
     FillRgn(hdc, hRgn, hBackBrush);
-    //FrameRgn(hdc, hRgn, hBorderBrush, 1, 1);
+    FrameRgn(hdc, hRgn, hBorderBrush, 1, 1);
 
     DeleteObject(hBorderBrush);    
     DeleteObject(hBackBrush);
+
+    HGDIOBJ hPen = NULL;
+    HGDIOBJ hOldPen; 
+
+    hPen = CreatePen(PS_SOLID, 2, clrBack);
+    hOldPen = SelectObject(hdc, hPen);
+
+    DrawLine(hdc, rpts[0].x, rpts[0].y, 
+                  lpts[3].x, lpts[3].y);
+
+    SelectObject(hdc, hOldPen);
+    DeleteObject(hPen);
 
     pRect->left += spread;
     pRect->right -= spread;

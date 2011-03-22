@@ -140,7 +140,7 @@ typedef struct {
     HWND hwndTab;
     HWND hwndParent;
     wintabitem* items[64];
-    int end, cur;
+    int end, cur, next;
 
     int extra_width, extra_height; //gaps from win to tab
 

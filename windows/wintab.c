@@ -200,7 +200,6 @@ int wintab_create_toolbar(wintab *wintab)
 int wintab_del_tab(wintab *wintab, const int index)
 { 
     int i;
-    int next_cur;
     if (wintab->end  == 1){
         PostMessage(hwnd, WM_CLOSE, 0, 0L);
         return 0;
@@ -218,19 +217,18 @@ int wintab_del_tab(wintab *wintab, const int index)
     }
     
     if (index == wintab->cur){
-        next_cur = (index == (wintab->end -1)) ? (index -1) : (index + 1);
-        TabCtrl_SetCurFocus(wintab->hwndTab, next_cur);
+        wintab->next = (index == (wintab->end -1)) ? (index -1) : (index + 1);
         wintab_swith_tab(wintab);
     }
     wintabitem_fini(wintab->items[index]);
     sfree(wintab->items[index]);
-    TabCtrl_DeleteItem(wintab->hwndTab, index);
     for (i = index; i < (wintab->end - 1); i++){
         wintab->items[i] = wintab->items[i+1];
     }
     if (wintab->cur > index) wintab->cur -= 1;
     wintab->end -= 1;
     wintab->items[wintab->end] = NULL;
+    InvalidateRect(wintab->hwndTab, NULL, TRUE);
     return 0;
 }
 
@@ -238,7 +236,7 @@ int wintab_del_tab(wintab *wintab, const int index)
 
 int wintab_swith_tab(wintab *wintab)
 {
-    int index = TabCtrl_GetCurSel(wintab->hwndTab);
+    int index = wintab->next;
     if (index == -1)
         return -1;
 
@@ -461,6 +459,13 @@ int wintab_drawitems(wintab *wintab)
         wintab_drawitem(wintab, hdc, index);
     }
     wintab_drawitem(wintab, hdc, wintab->cur);
+    
+    RECT curRc = wintab->items[wintab->cur]->rcDis;
+    DrawLinec(hdc, wintab->rcTabBar.left, wintab->rcTabBar.bottom-1, 
+        curRc.left+3, curRc.bottom-1, wintab->bd_col);
+    int spread = ((float)(curRc.right - curRc.left)) * 2/3;
+    DrawLinec(hdc, curRc.right + spread+3, curRc.bottom-1,
+        wintab->rcTabBar.right, wintab->rcTabBar.bottom-1, wintab->bd_col);
     ReleaseDC(wintab->hwndTab, hdc);
     return 0;
 }
@@ -597,7 +602,7 @@ int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
     if (wintab->cur == index) 
         return 0;
     
-    TabCtrl_SetCurFocus(wintab->hwndTab, index);
+    wintab->next = index;
     wintab_swith_tab(wintab);
     return 0;
 }
@@ -891,19 +896,10 @@ int wintabitem_creat(wintab *wintab, Config *cfg)
     }
     UpdateWindow(wintab->items[index]->page.hwndCtrl);
     
-    TCITEM tie; 
-    tie.mask = TCIF_TEXT | TCIF_IMAGE; 
-    tie.iImage = -1; 
-    tie.pszText = cfg->session_name; 
-    if (TabCtrl_InsertItem(wintab->hwndTab, index, &tie) == -1) { 
-        wintabitem_fini(wintab->items[index]);
-        sfree(wintab->items[index]);
-        return -1; 
-    } 
-    TabCtrl_SetCurFocus(wintab->hwndTab, index);
+    wintab->next = index;
     wintab_swith_tab(wintab);
     wintab->end++;
-    //UpdateWindow(wintab->hwndTab);
+    InvalidateRect(wintab->hwndTab, NULL, TRUE);
     return 0;
 }
 
