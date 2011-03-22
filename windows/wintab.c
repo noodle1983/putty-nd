@@ -618,20 +618,49 @@ int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
 }
 
 //-----------------------------------------------------------------------
+int wintab_move_window(wintab* wintab, HWND hWnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    static int moving = FALSE;
+    static RECT rc;
+    static POINT ptStart;
 
+    if (message == WM_LBUTTONDOWN){
+        moving = TRUE;
+        GetWindowRect(hwnd, &rc);
+        GetCursorPos(&ptStart);
+        SetCapture(wintab->hwndTab); 
+        return 0;
+    }
+    if (message == WM_MOUSEMOVE){
+        if (!moving) return -1;
+        POINT ptCur;
+        GetCursorPos(&ptCur);
+        SetWindowPos(hwnd, 0, rc.left + ptCur.x - ptStart.x, 
+                rc.top + ptCur.y - ptStart.y, 0 , 0, SWP_NOSIZE|SWP_NOZORDER);
+        return 0;
+    }
+    if (message == WM_LBUTTONUP){
+        if (!moving) return -1;
+        ReleaseCapture();
+        moving = FALSE;
+        return 0;
+    }
+    return -1;
+}
 //-----------------------------------------------------------------------
 
-LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
+LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 { 
-    wintab* tab = win_get_data(hwnd);
+    wintab* tab = win_get_data(hWnd);
     if (tab == NULL) return 0;
-    debug(("[WintabWndProc]%s:%s\n", hwnd == tab->hwndTab? "TabMsg"
+    debug(("[WintabWndProc]%s:%s\n", hWnd == tab->hwndTab? "TabMsg"
                             : "UnknowMsg", TranslateWMessage(message))); 
-
+    
     switch (message) {
         case WM_DRAWITEM:
-            wintab_on_drawbtn(tab, hwnd, message, wParam, lParam);
+            wintab_on_drawbtn(tab, hWnd, message, wParam, lParam);
             return TRUE;
         //case WM_NCHITTEST:
             //#define TID_POLLMOUSE 100
@@ -640,19 +669,29 @@ LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
             //PostMessage(hwnd,WM_MOUSELEAVE,0,0L);
             //KillTimer(hwnd,TID_POLLMOUSE);
             //break;
+            //return HTCAPTION;
         case WM_PAINT:
-            wintab_on_paint(tab, hwnd, message, wParam, lParam);
+            wintab_on_paint(tab, hWnd, message, wParam, lParam);
             return 0;
 
         case WM_LBUTTONDOWN:
-            wintab_on_lclick(tab, hwnd, message, wParam, lParam);
+            if (wintab_on_lclick(tab, hWnd, message, wParam, lParam) == -1){
+                //down on the caption
+                wintab_move_window(tab, hWnd, message, wParam, lParam);
+            }
             return 0;
-
+        case WM_MOUSEMOVE:
+            wintab_move_window(tab, hWnd, message, wParam, lParam);
+            return 0;
+        case WM_LBUTTONUP:
+            wintab_move_window(tab, hWnd, message, wParam, lParam);
+            return 0;
+            
         case WM_COMMAND:
-            wintab_handle_button(tab, hwnd, message, wParam, lParam);
+            wintab_handle_button(tab, hWnd, message, wParam, lParam);
             return 0;
     }
-    return( CallWindowProc( tab->defWndProc, hwnd, message, wParam, lParam));
+    return( CallWindowProc( tab->defWndProc, hWnd, message, wParam, lParam));
 }
 
 //-----------------------------------------------------------------------
