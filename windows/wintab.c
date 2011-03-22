@@ -73,7 +73,7 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     wintab->end = 0;
     wintab->cur = 0;
     wintab->bg_col = RGB(67, 115, 203);
-    wintab->sel_col = RGB(240, 240, 240);
+    wintab->sel_col = GetSysColor(COLOR_BTNFACE);//RGB(240, 240, 240);
     wintab->nosel_col = RGB(161, 199, 244);
     wintab->on_col = RGB(204, 224, 248);
     wintab->hl_col = RGB(193, 53, 53);
@@ -1441,7 +1441,7 @@ void wintabitem_adjust_text_rect(wintabitem *tabitem, HDC hdc, const RECT* rc)
 				}
                 //append the dots.
                 tabitem->disName[fitNum] = '\0';
-                strcpy(tabitem->disName, "...");
+                strcat(tabitem->disName, "...");
                 return;
 			}	else{
 				strcpy(tabitem->disName, ".");
