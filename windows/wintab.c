@@ -59,7 +59,7 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     
     GetClientRect(hwndParent, &rc);    
     wintab->hwndTab = CreateWindow(WC_TABCONTROL, "", 
-        WS_CHILD | WS_VISIBLE | TCS_FOCUSNEVER | TCS_OWNERDRAWFIXED, 
+        WS_CHILD | WS_VISIBLE | TCS_FOCUSNEVER | TCS_OWNERDRAWFIXED | CS_DBLCLKS , 
         0, 0, rc.right, rc.bottom, 
         hwndParent, NULL, hinst, NULL); 
     if (wintab->hwndTab == NULL){
@@ -585,16 +585,36 @@ int wintab_hit_tab(wintab *wintab, const int x, const int y)
 
 //-----------------------------------------------------------------------
 
-int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
+int wintab_is_dbclick()
+{
+    static long lasttime = 0;
+    long thistime = GetMessageTime();
+    if (thistime - lasttime < 200){
+        lasttime = thistime;
+        return TRUE;
+    }
+    lasttime = thistime;
+    return FALSE;
+}
+
+//-----------------------------------------------------------------------
+
+int wintab_on_lclick(wintab* wintab, HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
     int x = GET_X_LPARAM(lParam);
-    int y = GET_Y_LPARAM(lParam);
+    int y = GET_Y_LPARAM(lParam);   
+    int is_dbclick = wintab_is_dbclick();
     int index = wintab_hit_tab(wintab, x, y);
-    if (index < 0 || index >= wintab->end)
+    if (index < 0 || index >= wintab->end){
+        if (is_dbclick){
+            ShowWindow(hwnd, IsZoomed(hwnd)?SW_RESTORE:SW_MAXIMIZE);
+            return 0;
+        }
         return -1;
-
-    if (PtInRegion(wintab->items[index]->hCloserRgn, x, y)){
+    }
+    
+    if (is_dbclick || PtInRegion(wintab->items[index]->hCloserRgn, x, y)){
         wintab_del_tab(wintab, index);
         return 0;
     }
@@ -762,6 +782,7 @@ LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
                     //down on the caption
                     wintab_move_window(tab, hWnd, message, wParam, lParam);
                 }
+                break;
             }
             return 0;
         case WM_MOUSEMOVE:
