@@ -9298,6 +9298,7 @@ static const char *ssh_init(void *frontend_handle, void **backend_handle,
 	ssh->deferred_data_size = 0L;
     ssh->max_data_size = parse_blocksize(ssh->cfg.ssh_rekey_data);
     ssh->kex_in_progress = FALSE;
+    autocmd_init(&ssh->cfg);
 
 #ifndef NO_GSSAPI
     ssh->gsslibs = NULL;
