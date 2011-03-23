@@ -721,13 +721,19 @@ int wintab_move_window(wintab* wintab, HWND hWnd, UINT message,
 }
 
 //-----------------------------------------------------------------------
+typedef enum{
+    RESIZE_NONE = 0, 
+    RESIZE_X = 1, 
+    RESIZE_Y = 2, 
+    RESIZE_XY = 3
+} ResizeType;
 
 int wintab_resize_window(wintab* wintab, HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    static int sizing = FALSE;
     static RECT wc;
     static POINT ptStart;
+    static ResizeType resize_type = RESIZE_NONE;
 
     if (IsZoomed(hwnd)) return -1;
     
@@ -735,30 +741,37 @@ int wintab_resize_window(wintab* wintab, HWND hWnd, UINT message,
         GetWindowRect(wintab->hwndTab, &wc);
         GetCursorPos(&ptStart);
         ScreenToClient(wintab->hwndTab, &ptStart);
-        if (ptStart.x > 3
-            && ptStart.x < (wc.right -wc.left - 3)
-            && ptStart.y > 3
-            && ptStart.y < (wc.bottom - wc.top - 3))
+        int width = wc.right - wc.left;
+        int height = wc.bottom - wc.top;
+        resize_type = ((ptStart.x >= width -3 && ptStart.x <= width && ptStart.y >= 0 && ptStart.y <= 3)
+                 ||(ptStart.x >= 0 && ptStart.x <= 3 && ptStart.y >= height -3 && ptStart.y <= height)
+                 ||(ptStart.x >= 0 && ptStart.x <= 3 && ptStart.y >= 0 && ptStart.y <= 3)
+                 ||(ptStart.x >= width -3 && ptStart.x <= width&& ptStart.y >= height -3 && ptStart.y <= height)) ? RESIZE_XY
+             :((ptStart.x >= 0 && ptStart.x <= 3) ||(ptStart.x >= width -3 && ptStart.x <= width))? RESIZE_X
+             :((ptStart.y >= 0 && ptStart.y <= 3) ||(ptStart.y >= height -3 && ptStart.y <= height))?RESIZE_Y
+             : RESIZE_NONE;
+        if (resize_type == RESIZE_NONE) 
             return -1;
-        sizing = TRUE;
         SendMessage(hwnd, WM_ENTERSIZEMOVE, wParam, lParam);
         SetCapture(wintab->hwndTab); 
         return 0;
     }
     if (message == WM_MOUSEMOVE){
-        if (!sizing) return -1;
+        if (!resize_type) return -1;
         POINT ptCur;
         GetCursorPos(&ptCur);
         ScreenToClient(wintab->hwndTab, &ptCur);
+        int x_offset = (resize_type == RESIZE_Y) ? 0 : (ptCur.x - ptStart.x);
+        int y_offset = (resize_type == RESIZE_X) ? 0 : (ptCur.y - ptStart.y);
         wintab_require_resize(wintab, 
-            wc.right - wc.left + ptCur.x - ptStart.x, 
-            wc.bottom - wc.top + ptCur.y - ptStart.y);
+            wc.right - wc.left + x_offset, 
+            wc.bottom - wc.top + y_offset);
         return 0;
     }
     if (message == WM_LBUTTONUP){
-        if (!sizing) return -1;
+        if (!resize_type) return -1;
         ReleaseCapture();
-        sizing = FALSE;
+        resize_type = RESIZE_NONE;
         SendMessage(hwnd, WM_EXITSIZEMOVE, wParam, lParam);
         return 0;
     }
