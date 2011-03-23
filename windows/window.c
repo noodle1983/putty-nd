@@ -1843,7 +1843,7 @@ void notify_remote_exit(void *frontend)
 	 * appropriate action. */
 	if (tabitem->cfg.close_on_exit == FORCE_ON ||
 	    (tabitem->cfg.close_on_exit == AUTO && exitcode != INT_MAX)) {
-	    wintabitem_fini(tabitem);
+	    wintabitem_close_session(tabitem);
 	    //PostQuitMessage(0);
 	} else {
 	    tabitem->must_close_session = TRUE;

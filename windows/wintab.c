@@ -354,16 +354,28 @@ void wintab_check_closed_session(wintab *wintab)
 
 void wintab_term_paste(wintab *wintab)
 {
-    //for
-    term_paste(wintab->items[wintab->cur]->term);
+    if (wintab->cur < 0 || wintab->cur > wintab->end)
+        return;
+    wintabitem* tabitem = wintab->items[wintab->cur];
+    if (tabitem->back 
+        && tabitem->session_closed == FALSE
+        && tabitem->term) {
+        term_paste(tabitem->term);
+    }
 }
 
 //-----------------------------------------------------------------------
 
 void wintab_term_set_focus(wintab *wintab, int has_focus)
 {
-    //get select ...
-    term_set_focus(wintab->items[wintab->cur]->term, has_focus);
+    if (wintab->cur < 0 || wintab->cur > wintab->end)
+        return;
+    wintabitem* tabitem = wintab->items[wintab->cur];
+    if (tabitem->back 
+        && tabitem->session_closed == FALSE
+        && tabitem->term) {
+        term_set_focus(tabitem->term, has_focus);
+    }
 }
 
 //-----------------------------------------------------------------------
@@ -923,10 +935,13 @@ void wintabitem_fini(wintabitem *tabitem)
     
     wintabpage_fini(&tabitem->page);
     term_free(tabitem->term);
+    tabitem->term = NULL;
     log_free(tabitem->logctx);
+    tabitem->logctx = NULL;
     
     wintabitem_deinit_fonts(tabitem);
     sfree(tabitem->logpal);
+    tabitem->logpal = NULL;
     if (tabitem->pal)
     	DeleteObject(tabitem->pal);
     if (tabitem->cfg.protocol == PROT_SSH) {
@@ -1394,7 +1409,20 @@ void wintabitem_close_session(wintabitem *tabitem)
     //set_icon(NULL, morestuff);
     //set_title(NULL, morestuff);
 
-    //update_specials_menu(NULL);
+    
+    tabitem->session_closed = TRUE;
+    if (tabitem->ldisc) {
+    	ldisc_free(tabitem->ldisc);
+    	tabitem->ldisc = NULL;
+    }
+    if (tabitem->back) {
+    	tabitem->back->free(tabitem->backhandle);
+    	tabitem->backhandle = NULL;
+    	tabitem->back = NULL;
+        term_provide_resize_fn(tabitem->term, NULL, NULL);
+        update_specials_menu(tabitem);
+	
+    }
 
     /*
      * Show the Restart Session menu item. Do a precautionary
