@@ -705,6 +705,7 @@ static const char *telnet_init(void *frontend_handle, void **backend_handle,
     telnet->ldisc = NULL;
     telnet->pinger = NULL;
     *backend_handle = telnet;
+    autocmd_init(&telnet->cfg);
 
     /*
      * Try to find host.
