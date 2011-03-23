@@ -98,12 +98,12 @@ HRGN DrawRndBtnRgn(HDC hdc, RECT *pRect,
     const int isRndtl, const int trRadius,
     const int blRadius, const int brRadisu)
 {
-    int radius;
+    /*int radius;
     HRGN hRgn;
     
     int width = pRect->right - pRect->left;
     int height = pRect->bottom - pRect->top;
-    /*
+    
     MoveToEx(hdc, prt[0][0].x, prt[0][0].y, NULL);
     BeginPath(hdc);
     LineTo(hdc, prt[1][0].x, prt[1][0].y - radius);
@@ -116,9 +116,109 @@ HRGN DrawRndBtnRgn(HDC hdc, RECT *pRect,
     //StrokePath (hdc);
     FlattenPath(hdc);
     hRgn = PathToRegion(hdc);
-    */
-    return hRgn;
     
+    return hRgn*/;
+    return NULL;
+    
+}
+int DrawMinButton(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, COLORREF clrBtn)
+{
+    HBRUSH hBackBrush = CreateSolidBrush (clrBack);
+    HBRUSH hBorderBrush = CreateSolidBrush (clrBorder);
+    HBRUSH hBtBrush = CreateSolidBrush (clrBtn); 
+    int width = pRect->right - pRect->left;
+    int height = pRect->bottom - pRect->top;
+    RECT rc;
+    rc.top = pRect->top + height * 1 /3 + height/5;
+    rc.bottom = pRect->top + height * 2 /3 + height/4;
+    rc.left = pRect->left + width*2/7 + 1;
+    rc.right = pRect->right - width*2/7 - 1;
+
+    FillRect(hdc, pRect, hBackBrush);
+    FrameRect(hdc, pRect, hBorderBrush);
+    FillRect(hdc, &rc, hBtBrush);
+    FrameRect(hdc, &rc, hBorderBrush);
+    
+    DeleteObject(hBackBrush);
+    DeleteObject(hBorderBrush);
+    DeleteObject(hBtBrush);
+    return 0;
+}
+
+
+int DrawMaxButton(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, COLORREF clrBtn, int isZoomed)
+{
+    HBRUSH hBackBrush = CreateSolidBrush (clrBack);
+    HBRUSH hBorderBrush = CreateSolidBrush (clrBorder);
+    HBRUSH hBtBrush = CreateSolidBrush (clrBtn); 
+    int width = pRect->right - pRect->left;
+    int height = pRect->bottom - pRect->top;
+    RECT rc1, rc2;
+    rc1.top = pRect->top + height/5;
+    rc1.bottom = pRect->top + height * 2 /3 + height/4;
+    rc1.left = pRect->left + width*2/7;
+    rc1.right = pRect->right - width*2/7;
+
+    rc2 = rc1;
+    rc2.top += 3;
+    rc2.bottom -= 3;
+    rc2.left += 3;
+    rc2.right -= 3;
+
+    FillRect(hdc, pRect, hBackBrush);
+    FrameRect(hdc, pRect, hBorderBrush);
+    if (isZoomed){     
+        OffsetRect(&rc1, 3, -3);
+        OffsetRect(&rc2, 3, -3);
+        FillRect(hdc, &rc1, hBtBrush);
+        FrameRect(hdc, &rc1, hBorderBrush);
+        FillRect(hdc, &rc2, hBackBrush);
+        FrameRect(hdc, &rc2, hBorderBrush);
+
+        OffsetRect(&rc1, -4, 4);
+        OffsetRect(&rc2, -4, 4);
+        FillRect(hdc, &rc1, hBtBrush);
+        FrameRect(hdc, &rc1, hBorderBrush);
+        FillRect(hdc, &rc2, hBackBrush);
+        FrameRect(hdc, &rc2, hBorderBrush);
+    }else{
+        FillRect(hdc, &rc1, hBtBrush);
+        FrameRect(hdc, &rc1, hBorderBrush);
+        FillRect(hdc, &rc2, hBackBrush);
+        FrameRect(hdc, &rc2, hBorderBrush);
+    }
+    
+    DeleteObject(hBackBrush);
+    DeleteObject(hBorderBrush);
+    DeleteObject(hBtBrush);
+    return 0;
+}
+
+int DrawClsButton(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, COLORREF clrBtn)
+{
+    HBRUSH hBackBrush = CreateSolidBrush (clrBack);
+    POINT pt = {(pRect->right + pRect->left)/2, (pRect->bottom + pRect->top)/2};
+
+    FillRect(hdc, pRect, hBackBrush);
+
+    HGDIOBJ hBdPen = CreatePen(PS_SOLID, 5, clrBorder);
+    HGDIOBJ hBtnPen = CreatePen(PS_SOLID, 3, clrBtn);
+    HGDIOBJ hOldPen = SelectObject(hdc, hBdPen);
+    DrawLine(hdc, pt.x - 3, pt.y - 3, 
+                  pt.x + 3, pt.y + 3);
+    DrawLine(hdc, pt.x - 3, pt.y + 3,
+                  pt.x + 3, pt.y - 3);
+    SelectObject(hdc, hBtnPen);
+    DrawLine(hdc, pt.x - 3, pt.y - 3, 
+                  pt.x + 3, pt.y + 3);
+    DrawLine(hdc, pt.x - 3, pt.y + 3,
+                  pt.x + 3, pt.y - 3);
+    SelectObject(hdc, hOldPen);
+
+    DeleteObject(hBdPen);
+    DeleteObject(hBtnPen);
+    DeleteObject(hBackBrush);
+    return 0;
 }
 
 int DrawSysButtonFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, HRGN* hRgns)

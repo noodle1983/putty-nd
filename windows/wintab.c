@@ -629,23 +629,22 @@ int wintab_on_lclick(wintab* wintab, HWND hWnd, UINT message,
 
 //-----------------------------------------------------------------------
 
-int wintab_on_drawbtn(wintab* wintab, HWND hwnd, UINT message,
+int wintab_on_drawbtn(wintab* wintab, HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
     DRAWITEMSTRUCT* dis = (DRAWITEMSTRUCT*)lParam ;
     RECT rc = dis->rcItem;
-    HRGN hRgn;
-    HBRUSH hBackBrush = CreateSolidBrush (wintab->bg_col);
     HDC hdc = GetDC(dis->hwndItem);//dis->hDC;
 
-    GetWindowRgn(dis->hwndItem, hRgn);
-    
-    FillRect(hdc, &rc, hBackBrush);
-    //if (dis->hwndItem == wintab->hMinBtn){
-    //    FillRgn(hdc, hRgn, hBackBrush);
-    //}
-    
-    DeleteObject(hBackBrush);
+    COLORREF bg_col = (dis->itemAction != ODA_FOCUS)? wintab->bg_col : wintab->nosel_col;
+    COLORREF btn_col = (dis->itemAction != ODA_FOCUS)? wintab->nosel_col : wintab->sel_col;
+    if (dis->hwndItem == wintab->hMinBtn){
+        DrawMinButton(hdc, &rc, wintab->bd_col, bg_col, btn_col);
+    }else if (dis->hwndItem == wintab->hMaxBtn){
+        DrawMaxButton(hdc, &rc, wintab->bd_col, bg_col, btn_col, IsZoomed(hwnd));
+    }else if (dis->hwndItem == wintab->hClsBtn){
+        DrawClsButton(hdc, &rc, wintab->bd_col, bg_col, btn_col);
+    }
     ReleaseDC(dis->hwndItem, hdc);
     return 0;
 }

@@ -5,6 +5,9 @@ typedef enum{
     SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM
 }SIDE;
 
+int DrawMinButton(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, COLORREF clrBtn);
+int DrawMaxButton(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, COLORREF clrBtn, int isZoomed);
+int DrawClsButton(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, COLORREF clrBtn);
 HRGN DrawChromeFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack);
 int DrawSysButtonFrame(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, HRGN* hRgns);
 int DrawSysButton(HDC hdc, RECT *pRect, COLORREF clrBorder);
