@@ -719,10 +719,10 @@ int wintab_resize_window(wintab* wintab, HWND hWnd, UINT message,
         GetWindowRect(wintab->hwndTab, &wc);
         GetCursorPos(&ptStart);
         ScreenToClient(wintab->hwndTab, &ptStart);
-        if (ptStart.x > (wc.left + 3)
-            && ptStart.x < (wc.right - 3)
-            && ptStart.y < (wc.top + 3)
-            && ptStart.y < (wc.bottom - 3))
+        if (ptStart.x > 3
+            && ptStart.x < (wc.right -wc.left - 3)
+            && ptStart.y > 3
+            && ptStart.y < (wc.bottom - wc.top - 3))
             return -1;
         sizing = TRUE;
         SendMessage(hwnd, WM_ENTERSIZEMOVE, wParam, lParam);
