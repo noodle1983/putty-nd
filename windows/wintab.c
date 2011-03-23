@@ -20,6 +20,9 @@
 extern HINSTANCE hinst;
 extern Config cfg;
 
+#define TID_POLLMOUSE 100
+#define MOUSE_POLL_DELAY 100
+
 extern void show_mouseptr(wintabitem *tabitem, int show);
 extern int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
@@ -752,6 +755,42 @@ int wintab_resize_window(wintab* wintab, HWND hWnd, UINT message,
 
 //-----------------------------------------------------------------------
 
+VOID CALLBACK wintab_timerProc(HWND hWnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
+{
+    RECT wc;
+    POINT pt;
+    wintab* wintab = win_get_data(hWnd);
+    
+    GetWindowRect(wintab->hwndTab, &wc);
+    GetCursorPos(&pt);
+    ScreenToClient(wintab->hwndTab, &pt);
+    debug(("GetCursor x:%d, y:%d\n", pt.x, pt.y));
+    int width = wc.right - wc.left;
+    int height = wc.bottom - wc.top;
+    
+    if ((pt.x >= width -3 && pt.x <= width && pt.y >= 0 && pt.y <= 3)
+         ||(pt.x >= 0 && pt.x <= 3 && pt.y >= height -3 && pt.y <= height)){
+        SetCursor(LoadCursor(NULL, IDC_SIZENESW));
+        return;
+    }else if ((pt.x >= 0 && pt.x <= 3 && pt.y >= 0 && pt.y <= 3)
+         ||(pt.x >= width -3 && pt.x <= width&& pt.y >= height -3 && pt.y <= height)){
+        SetCursor(LoadCursor(NULL, IDC_SIZENWSE));
+        return;
+    }else if ((pt.x >= 0 && pt.x <= 3)
+         ||(pt.x >= width -3 && pt.x <= width)){
+        SetCursor(LoadCursor(NULL, IDC_SIZEWE));
+        return;
+    }else if ((pt.y >= 0 && pt.y <= 3)
+         ||(pt.y >= height -3 && pt.y <= height)){
+        SetCursor(LoadCursor(NULL, IDC_SIZENS));
+        return;
+    }
+
+    KillTimer(hWnd,TID_POLLMOUSE);
+
+}
+//-----------------------------------------------------------------------
+
 LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 { 
@@ -764,14 +803,10 @@ LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
         case WM_DRAWITEM:
             wintab_on_drawbtn(tab, hWnd, message, wParam, lParam);
             return TRUE;
-        //case WM_NCHITTEST:
-            //#define TID_POLLMOUSE 100
-            //#define MOUSE_POLL_DELAY 500
-            //SetTimer(hwnd,TID_POLLMOUSE,MOUSE_POLL_DELAY,NULL);
-            //PostMessage(hwnd,WM_MOUSELEAVE,0,0L);
-            //KillTimer(hwnd,TID_POLLMOUSE);
-            //break;
-            //return HTCAPTION;
+        case WM_NCHITTEST:
+            wintab_timerProc(hWnd, WM_TIMER, TID_POLLMOUSE, 0);
+            SetTimer(hWnd,TID_POLLMOUSE,MOUSE_POLL_DELAY,wintab_timerProc);
+            break;
         case WM_PAINT:
             wintab_on_paint(tab, hWnd, message, wParam, lParam);
             return 0;
