@@ -647,6 +647,8 @@ int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
     }else {
         on_menu(wintab_get_active_item(wintab), hWnd, message, wParam, lParam);
     }
+    //button would hold the focus
+    SetFocus(hwnd);
     return 0;
 }
 
