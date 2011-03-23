@@ -679,6 +679,8 @@ int wintab_move_window(wintab* wintab, HWND hWnd, UINT message,
     static RECT rc;
     static POINT ptStart;
 
+    if (IsZoomed(hwnd)) return -1;
+
     if (message == WM_LBUTTONDOWN){
         moving = TRUE;
         GetWindowRect(hwnd, &rc);
