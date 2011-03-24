@@ -2912,7 +2912,18 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
 
     wintabitem *tabitem = wintab_get_active_item(&tab);
 
+  
     switch (message) {
+        case WM_GETMINMAXINFO:  
+        {   
+            RECT WorkArea; 
+            SystemParametersInfo( SPI_GETWORKAREA, 0, &WorkArea, 0 );  
+            ( ( MINMAXINFO * )lParam )->ptMaxSize.x = ( WorkArea.right - WorkArea.left );  
+            ( ( MINMAXINFO * )lParam )->ptMaxSize.y = ( WorkArea.bottom - WorkArea.top );  
+            ( ( MINMAXINFO * )lParam )->ptMaxPosition.x = WorkArea.left;  
+            ( ( MINMAXINFO * )lParam )->ptMaxPosition.y = WorkArea.top;  
+            return 0;  
+        }
         case WM_TIMER:
             on_timer(hwnd, message, wParam, lParam);
 	        return 0;
