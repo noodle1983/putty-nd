@@ -782,6 +782,11 @@ int wintab_resize_window(wintab* wintab, HWND hWnd, UINT message,
 
 VOID CALLBACK wintab_timerProc(HWND hWnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
 {
+    if (IsZoomed(hwnd)) {
+        KillTimer(hWnd,TID_POLLMOUSE);
+        return ;
+    }
+    
     RECT wc;
     POINT pt;
     wintab* wintab = win_get_data(hWnd);
@@ -789,7 +794,6 @@ VOID CALLBACK wintab_timerProc(HWND hWnd, UINT uMsg, UINT_PTR idEvent, DWORD dwT
     GetWindowRect(wintab->hwndTab, &wc);
     GetCursorPos(&pt);
     ScreenToClient(wintab->hwndTab, &pt);
-    debug(("GetCursor x:%d, y:%d\n", pt.x, pt.y));
     int width = wc.right - wc.left;
     int height = wc.bottom - wc.top;
     
