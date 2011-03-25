@@ -18,10 +18,12 @@
 #include "wintabdraw.h"
 
 extern HINSTANCE hinst;
+extern int fullscr_on_max;
 extern Config cfg;
 
 #define TID_POLLMOUSE 100
 #define MOUSE_POLL_DELAY 100
+#define BORDER_SIZE 3
 
 extern void show_mouseptr(wintabitem *tabitem, int show);
 extern int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
@@ -291,6 +293,7 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     int index = wintab->cur;
     int tab_width = rc->right - rc->left;
     int tab_height = rc->bottom - rc->top;
+    int border =  (IsZoomed(hwnd)) ? 0 : BORDER_SIZE;
     SetWindowPos(wintab->hwndTab, HWND_BOTTOM, 0, 0, 
         tab_width, tab_height, SWP_NOMOVE);
     
@@ -298,7 +301,7 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     wintab->extra_width = wr.right - wr.left - tab_width;
     wintab->extra_height = wr.bottom - wr.top - tab_height;
 
-    xPos = rc->right - 3 - CLS_BTN_WIDTH;
+    xPos = rc->right - border - CLS_BTN_WIDTH;
     SetWindowPos(wintab->hClsBtn, 0, xPos, 0, 
         0, 0, SWP_NOSIZE|SWP_NOZORDER);
     xPos -= MAX_BTN_WIDTH;
@@ -323,15 +326,27 @@ void wintab_split_client_rect(wintab *wintab)
 {
     RECT rc;
     GetClientRect(wintab->hwndTab, &rc);  
-    wintab->rcTabBar.left = rc.left + 3;
-    wintab->rcTabBar.top  = IsZoomed(hwnd) ? (rc.top) : (rc.top + 3);
-    wintab->rcTabBar.right = rc.right - 3 - 100;
+
+    if (win_fullscr_on_max()&& IsZoomed(hwnd)){
+        wintab->rcTabBar.left = 0;
+        wintab->rcTabBar.top  = 0;
+        wintab->rcTabBar.right = 0;
+        wintab->rcTabBar.bottom = 0;
+        wintab->rcSysBtn = wintab->rcTabBar;
+        wintab->rcToolBar = wintab->rcTabBar;
+        wintab->rcPage = rc;
+        return;
+    }
+    int border =  (IsZoomed(hwnd)) ? 0 : BORDER_SIZE;
+    wintab->rcTabBar.left = rc.left + border;
+    wintab->rcTabBar.top  = rc.top + border;
+    wintab->rcTabBar.right = rc.right - border - 100;
     wintab->rcTabBar.bottom = IsZoomed(hwnd) ? 
         (wintab->rcTabBar.top + 25) : (wintab->rcTabBar.top + 35);
 
     wintab->rcSysBtn = wintab->rcTabBar;
     wintab->rcSysBtn.left = wintab->rcTabBar.right;
-    wintab->rcSysBtn.right = rc.right - 3;
+    wintab->rcSysBtn.right = rc.right - border;
 
     wintab->rcToolBar = wintab->rcTabBar;
     wintab->rcToolBar.right = wintab->rcSysBtn.right;
@@ -340,14 +355,8 @@ void wintab_split_client_rect(wintab *wintab)
 
     wintab->rcPage = wintab->rcToolBar;
     wintab->rcPage.top = wintab->rcToolBar.bottom;
-    wintab->rcPage.bottom = rc.bottom - 3;
-    
-    
-    //TabCtrl_AdjustRect(wintab->hwndTab, FALSE, rc);
-    //rc->left += 3;
-    //rc->top  += 23;
-    //rc->right -= 3;
-    //rc->bottom -= 3;
+    wintab->rcPage.bottom = rc.bottom - border;
+     
 }
 
 //-----------------------------------------------------------------------
@@ -433,6 +442,7 @@ void wintab_require_resize(wintab *wintab, int tab_width, int tab_height)
 {
     int parent_width = tab_width + wintab->extra_width;
     int parent_height = tab_height + wintab->extra_height;
+    int border =  (IsZoomed(hwnd)) ? 0 : BORDER_SIZE;
     
     SetWindowPos(wintab->hwndParent, NULL, 0, 0, 
         parent_width, parent_height, SWP_NOMOVE | SWP_NOZORDER); 
@@ -443,7 +453,7 @@ void wintab_require_resize(wintab *wintab, int tab_width, int tab_height)
     SetWindowPos(wintab->hToolBar, NULL, 0, 0, 
         tab_width - 6, 25, SWP_NOMOVE | SWP_NOZORDER);
 
-    int xPos = tab_width - 3 - CLS_BTN_WIDTH;
+    int xPos = tab_width - border - CLS_BTN_WIDTH;
     SetWindowPos(wintab->hClsBtn, 0, xPos, 0, 
         0, 0, SWP_NOSIZE|SWP_NOZORDER);
     xPos -= MAX_BTN_WIDTH;
@@ -547,9 +557,10 @@ int wintab_draw_sysbtn(wintab *wintab)
 {
     RECT rc;
     HDC hdc = GetDC(wintab->hwndTab);
+    int border =  (IsZoomed(hwnd)) ? 0 : BORDER_SIZE;
 
     GetClientRect(wintab->hwndTab, &rc);
-    rc.right -= 3;
+    rc.right -= border;
     rc.left = (rc.right - 100) > rc.left ? (rc.right - 100): rc.left ;
     rc.bottom = rc.top + 15;
     wintab_del_rgn(wintab);
@@ -772,12 +783,12 @@ int wintab_resize_window(wintab* wintab, HWND hWnd, UINT message,
         ScreenToClient(wintab->hwndTab, &ptStart);
         int width = wc.right - wc.left;
         int height = wc.bottom - wc.top;
-        resize_type = ((ptStart.x >= width -3 && ptStart.x <= width && ptStart.y >= 0 && ptStart.y <= 3)
-                 ||(ptStart.x >= 0 && ptStart.x <= 3 && ptStart.y >= height -3 && ptStart.y <= height)
-                 ||(ptStart.x >= 0 && ptStart.x <= 3 && ptStart.y >= 0 && ptStart.y <= 3)
-                 ||(ptStart.x >= width -3 && ptStart.x <= width&& ptStart.y >= height -3 && ptStart.y <= height)) ? RESIZE_XY
-             :((ptStart.x >= 0 && ptStart.x <= 3) ||(ptStart.x >= width -3 && ptStart.x <= width))? RESIZE_X
-             :((ptStart.y >= 0 && ptStart.y <= 3) ||(ptStart.y >= height -3 && ptStart.y <= height))?RESIZE_Y
+        resize_type = ((ptStart.x >= width -BORDER_SIZE && ptStart.x <= width && ptStart.y >= 0 && ptStart.y <= BORDER_SIZE)
+                 ||(ptStart.x >= 0 && ptStart.x <= BORDER_SIZE && ptStart.y >= height -BORDER_SIZE && ptStart.y <= height)
+                 ||(ptStart.x >= 0 && ptStart.x <= BORDER_SIZE && ptStart.y >= 0 && ptStart.y <= BORDER_SIZE)
+                 ||(ptStart.x >= width -BORDER_SIZE && ptStart.x <= width&& ptStart.y >= height -BORDER_SIZE && ptStart.y <= height)) ? RESIZE_XY
+             :((ptStart.x >= 0 && ptStart.x <= BORDER_SIZE) ||(ptStart.x >= width -BORDER_SIZE && ptStart.x <= width))? RESIZE_X
+             :((ptStart.y >= 0 && ptStart.y <= BORDER_SIZE) ||(ptStart.y >= height -BORDER_SIZE && ptStart.y <= height))?RESIZE_Y
              : RESIZE_NONE;
         if (resize_type == RESIZE_NONE) 
             return -1;
@@ -826,20 +837,20 @@ VOID CALLBACK wintab_timerProc(HWND hWnd, UINT uMsg, UINT_PTR idEvent, DWORD dwT
     int width = wc.right - wc.left;
     int height = wc.bottom - wc.top;
     
-    if ((pt.x >= width -3 && pt.x <= width && pt.y >= 0 && pt.y <= 3)
-         ||(pt.x >= 0 && pt.x <= 3 && pt.y >= height -3 && pt.y <= height)){
+    if ((pt.x >= width -BORDER_SIZE && pt.x <= width && pt.y >= 0 && pt.y <= BORDER_SIZE)
+         ||(pt.x >= 0 && pt.x <= BORDER_SIZE && pt.y >= height -BORDER_SIZE && pt.y <= height)){
         SetCursor(LoadCursor(NULL, IDC_SIZENESW));
         return;
-    }else if ((pt.x >= 0 && pt.x <= 3 && pt.y >= 0 && pt.y <= 3)
-         ||(pt.x >= width -3 && pt.x <= width&& pt.y >= height -3 && pt.y <= height)){
+    }else if ((pt.x >= 0 && pt.x <= BORDER_SIZE && pt.y >= 0 && pt.y <= BORDER_SIZE)
+         ||(pt.x >= width -BORDER_SIZE && pt.x <= width&& pt.y >= height -BORDER_SIZE && pt.y <= height)){
         SetCursor(LoadCursor(NULL, IDC_SIZENWSE));
         return;
-    }else if ((pt.x >= 0 && pt.x <= 3)
-         ||(pt.x >= width -3 && pt.x <= width)){
+    }else if ((pt.x >= 0 && pt.x <= BORDER_SIZE)
+         ||(pt.x >= width -BORDER_SIZE && pt.x <= width)){
         SetCursor(LoadCursor(NULL, IDC_SIZEWE));
         return;
-    }else if ((pt.y >= 0 && pt.y <= 3)
-         ||(pt.y >= height -3 && pt.y <= height)){
+    }else if ((pt.y >= 0 && pt.y <= BORDER_SIZE)
+         ||(pt.y >= height -BORDER_SIZE && pt.y <= height)){
         SetCursor(LoadCursor(NULL, IDC_SIZENS));
         return;
     }

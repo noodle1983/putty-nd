@@ -136,6 +136,10 @@ static int compose_state = 0;
 
 static UINT wm_mousewheel = WM_MOUSEWHEEL;
 
+int win_fullscr_on_max()
+{
+    return fullscr_on_max;
+}
 /* Dummy routine, only required in plink. */
 void ldisc_update(void *frontend, int echo, int edit)
 {
@@ -2772,8 +2776,11 @@ debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
     switch (message) {
         case WM_GETMINMAXINFO:  
         {   
-            RECT WorkArea; 
-            SystemParametersInfo( SPI_GETWORKAREA, 0, &WorkArea, 0 );  
+            RECT WorkArea;
+            if (fullscr_on_max)
+                GetWindowRect(GetDesktopWindow(), &WorkArea);
+            else
+                SystemParametersInfo( SPI_GETWORKAREA, 0, &WorkArea, 0 );  
             ( ( MINMAXINFO * )lParam )->ptMaxSize.x = ( WorkArea.right - WorkArea.left );  
             ( ( MINMAXINFO * )lParam )->ptMaxSize.y = ( WorkArea.bottom - WorkArea.top );  
             ( ( MINMAXINFO * )lParam )->ptMaxPosition.x = WorkArea.left;  
