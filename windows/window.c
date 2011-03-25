@@ -5236,7 +5236,7 @@ static int is_full_screen()
 {
     if (!IsZoomed(hwnd))
 	return FALSE;
-    if (GetWindowLongPtr(hwnd, GWL_STYLE) & WS_CAPTION)
+    if (!(GetMenuState(popup_menus[0].menu, IDM_FULLSCREEN,MF_BYCOMMAND) & MF_CHECKED))
 	return FALSE;
     return TRUE;
 }
