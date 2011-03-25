@@ -147,109 +147,7 @@ char *get_ttymode(void *frontend, const char *mode)
     wintabitem *tabitem = (wintabitem *)frontend;
     return term_get_ttymode(tabitem->term, mode);
 }
-#if 0
-static void start_backend(void)
-{
-    const char *error;
-    char msg[1024], *title;
-    char *realhost;
-    int i;
 
-    /*
-     * Select protocol. This is farmed out into a table in a
-     * separate file to enable an ssh-free variant.
-     */
-    back = backend_from_proto(cfg.protocol);
-    if (back == NULL) {
-	char *str = dupprintf("%s Internal Error", appname);
-	MessageBox(NULL, "Unsupported protocol number found",
-		   str, MB_OK | MB_ICONEXCLAMATION);
-	sfree(str);
-	cleanup_exit(1);
-    }
-
-    error = back->init(NULL, &backhandle, &cfg,
-		       cfg.host, cfg.port, &realhost, cfg.tcp_nodelay,
-		       cfg.tcp_keepalives);
-    back->provide_logctx(backhandle, logctx);
-    if (error) {
-	char *str = dupprintf("%s Error", appname);
-	sprintf(msg, "Unable to open connection to\n"
-		"%.800s\n" "%s", cfg_dest(&cfg), error);
-	MessageBox(NULL, msg, str, MB_ICONERROR | MB_OK);
-	sfree(str);
-	exit(0);
-    }
-    window_name = icon_name = NULL;
-    if (*cfg.wintitle) {
-	title = cfg.wintitle;
-    } else {
-	sprintf(msg, "%s - %s", realhost, appname);
-	title = msg;
-    }
-    sfree(realhost);
-    set_title(NULL, title);
-    set_icon(NULL, title);
-
-    /*
-     * Connect the terminal to the backend for resize purposes.
-     */
-    term_provide_resize_fn(term, back->size, backhandle);
-
-    /*
-     * Set up a line discipline.
-     */
-    ldisc = ldisc_create(&cfg, term, back, backhandle, NULL);
-
-    /*
-     * Destroy the Restart Session menu item. (This will return
-     * failure if it's already absent, as it will be the very first
-     * time we call this function. We ignore that, because as long
-     * as the menu item ends up not being there, we don't care
-     * whether it was us who removed it or not!)
-     */
-    for (i = 0; i < lenof(popup_menus); i++) {
-	DeleteMenu(popup_menus[i].menu, IDM_RESTART, MF_BYCOMMAND);
-    }
-
-    must_close_session = FALSE;
-    session_closed = FALSE;
-}
-#endif
-#if 0
-static void close_session(void)
-{
-    char morestuff[100];
-    int i;
-
-    session_closed = TRUE;
-    sprintf(morestuff, "%.70s (inactive)", appname);
-    set_icon(NULL, morestuff);
-    set_title(NULL, morestuff);
-
-    if (ldisc) {
-	ldisc_free(ldisc);
-	ldisc = NULL;
-    }
-    if (back) {
-	back->free(backhandle);
-	backhandle = NULL;
-	back = NULL;
-        term_provide_resize_fn(term, NULL, NULL);
-	update_specials_menu(NULL);
-    }
-
-    /*
-     * Show the Restart Session menu item. Do a precautionary
-     * delete first to ensure we never end up with more than one.
-     */
-    for (i = 0; i < lenof(popup_menus); i++) {
-	DeleteMenu(popup_menus[i].menu, IDM_RESTART, MF_BYCOMMAND);
-	InsertMenu(popup_menus[i].menu, IDM_DUPSESS, MF_BYCOMMAND | MF_ENABLED,
-		   IDM_RESTART, "&Restart Session");
-    }
-}
-#endif
 /*
  * Initialize COM.
  */
@@ -2098,13 +1996,25 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
         case IDM_SAVEDSESS:
             on_session_menu(hwnd, message, wParam, lParam);
             break;
-        case IDM_RESTART:
+        case IDM_RESTART:{
+            char *str;
+            show_mouseptr(tabitem, 1);
+            str = dupprintf("%s Exit Confirmation", tabitem->cfg.host);
+            if (!( wintabitem_can_close(tabitem)||
+                    MessageBox(hwnd,
+                    	   "Are you sure you want to close this session?",
+                    	   str, MB_ICONWARNING | MB_OKCANCEL | MB_DEFBUTTON1)
+                    == IDOK)){
+                break;
+            }
+            wintabitem_close_session(tabitem);
             if (!tabitem->back) {
             logevent(NULL, "----- Session restarted -----");
             term_pwron(tabitem->term, FALSE);
             wintabitem_start_backend(tabitem);
             }
             break;
+        }
         case IDM_RECONF:
             on_reconfig(tabitem, message, wParam, lParam);
             break;

@@ -135,6 +135,8 @@ typedef struct {
 
     RECT rcDis;
     char disName[256];
+
+    HANDLE close_mutex;
 }wintabitem;
 
 typedef struct {

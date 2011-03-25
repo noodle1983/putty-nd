@@ -201,7 +201,7 @@ int wintab_create_toolbar(wintab *wintab)
         { 1, IDM_DUPSESS, TBSTATE_ENABLED,  buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 5, 0, TBSTATE_ENABLED, TBSTYLE_SEP, {0}, 0, (INT_PTR)NULL},
         { 2, IDM_RECONF, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
-        { 3, IDM_RESET, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 3, IDM_RESTART, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 4, IDM_SFTP, 0,  buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 5, IDM_SHOWLOG, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 5, 0, TBSTATE_ENABLED, TBSTYLE_SEP, {0}, 0, (INT_PTR)NULL},
@@ -926,6 +926,7 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->ignore_clip = FALSE;
     tabitem->hRgn = NULL;
     tabitem->hCloserRgn = NULL;
+    tabitem->close_mutex= CreateMutex(NULL, FALSE, NULL);
     
     tabitem->parentTab = wintab;
     wintabpage_init(&tabitem->page, cfg, wintab->hwndParent);
@@ -966,18 +967,9 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
 
 void wintabitem_fini(wintabitem *tabitem)
 {
-    if (tabitem->ldisc) {
-    	ldisc_free(tabitem->ldisc);
-    	tabitem->ldisc = NULL;
-    }
-    if (tabitem->back) {
-    	tabitem->back->free(tabitem->backhandle);
-    	tabitem->backhandle = NULL;
-    	tabitem->back = NULL;
-        term_provide_resize_fn(tabitem->term, NULL, NULL);
-	
-    }
-    tabitem->session_closed = TRUE;
+    wintabitem_close_session(tabitem);
+
+    CloseHandle(tabitem->close_mutex);
     
     wintabpage_fini(&tabitem->page);
     term_free(tabitem->term);
@@ -1447,6 +1439,13 @@ void wintabitem_check_closed_session(wintabitem *tabitem)
 
 void wintabitem_close_session(wintabitem *tabitem)
 {
+    if (!tabitem->back)  return;
+    WaitForSingleObject(tabitem->close_mutex, INFINITE);
+
+    if (!tabitem->back)  {
+        ReleaseMutex(tabitem->close_mutex);
+        return;
+    }
     //char morestuff[100];
     //int i;
 
@@ -1454,7 +1453,7 @@ void wintabitem_close_session(wintabitem *tabitem)
     //sprintf(morestuff, "%.70s (inactive)", appname);
     //set_icon(NULL, morestuff);
     //set_title(NULL, morestuff);
-
+    
     
     tabitem->session_closed = TRUE;
     if (tabitem->ldisc) {
@@ -1479,6 +1478,7 @@ void wintabitem_close_session(wintabitem *tabitem)
 	//InsertMenu(popup_menus[i].menu, IDM_DUPSESS, MF_BYCOMMAND | MF_ENABLED,
 	//	   IDM_RESTART, "&Restart Session");
     //}
+    ReleaseMutex(tabitem->close_mutex);
 }
 
 //-----------------------------------------------------------------------
