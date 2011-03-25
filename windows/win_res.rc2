@@ -12,6 +12,16 @@
 #include "win_res.h"
 
 IDB_TREE                BITMAP  DISCARDABLE     "LIST.BMP"
+IDI_DUP_SESS     ICON "dupsession.ico"
+IDI_SESS_CFG     ICON "setting.ico"
+IDI_RESET_SESS   ICON "resetconnection.ico"
+IDI_SFTP         ICON "pscp.ico"
+IDI_SHOW_LOG     ICON "log.ico"
+IDI_COYP_ALL     ICON "copyall.ico"
+IDI_PASTE        ICON "paste.ico"
+IDI_CLEAR_SB     ICON "clear.ico"
+IDI_FULL_SCREEN  ICON "fullscreen.ico"
+IDI_ABOUT        ICON "about.ico"
 
 IDI_MAINICON ICON "putty.ico"
 

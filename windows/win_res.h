@@ -7,6 +7,16 @@
 
 #define IDI_MAINICON     200
 #define IDI_CFGICON      201
+#define IDI_DUP_SESS     202
+#define IDI_SESS_CFG     203
+#define IDI_RESET_SESS   204
+#define IDI_SFTP         205
+#define IDI_SHOW_LOG     206
+#define IDI_COYP_ALL     207
+#define IDI_PASTE        208
+#define IDI_CLEAR_SB     209
+#define IDI_FULL_SCREEN  210
+#define IDI_ABOUT        211
 
 #define IDD_MAINBOX      102
 #define IDD_LOGBOX       110

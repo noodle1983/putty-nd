@@ -148,9 +148,9 @@ int wintab_create_sysbtn(wintab *wintab)
 int wintab_create_toolbar(wintab *wintab)
 {
     const int ImageListID = 0;
-    const int numButtons = 3;
     const DWORD buttonStyles = BTNS_AUTOSIZE;
     const int bitmapSize = 16;
+    HICON hicon; 
     
     wintab->hToolBar = CreateWindowEx(
         WS_EX_TOPMOST,
@@ -160,11 +160,32 @@ int wintab_create_toolbar(wintab *wintab)
         wintab->hwndTab, NULL, hinst, NULL); 
 
     // Create the imagelist.
-    wintab->hImageList = (HWND)ImageList_Create(
-        bitmapSize, bitmapSize,   // Dimensions of individual bitmaps.
-        ILC_COLOR16 | ILC_MASK,   // Ensures transparent background.
-        numButtons, 0);
+    wintab->hImageList = 
+        (HWND)ImageList_Create(bitmapSize, bitmapSize, ILC_MASK, 7, 0);
 
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_MAINICON)); 
+    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);  
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_DUP_SESS)); 
+    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SESS_CFG    )); 
+    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_RESET_SESS  )); 
+    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SFTP        )); 
+    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SHOW_LOG    )); 
+    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_COYP_ALL    )); 
+    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_PASTE       )); 
+    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_CLEAR_SB    )); 
+    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_FULL_SCREEN )); 
+    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_ABOUT       )); 
+    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    
     // Set the image list.
     SendMessage(wintab->hToolBar, TB_SETIMAGELIST, (WPARAM)ImageListID, 
         (LPARAM)wintab->hImageList);
@@ -174,17 +195,25 @@ int wintab_create_toolbar(wintab *wintab)
         (LPARAM)HINST_COMMCTRL);
 
     // Initialize button info.
-    // IDM_NEW, IDM_OPEN, and IDM_SAVE are application-defined command constants.
-    TBBUTTON tbButtons[3] = 
+    TBBUTTON tbButtons[] = 
     {
-        { MAKELONG(STD_FILENEW, ImageListID), IDM_NEWSESS, TBSTATE_ENABLED, 
-          buttonStyles, {0}, 0, (INT_PTR)NULL },
-        { MAKELONG(STD_FILEOPEN, ImageListID), IDM_DUPSESS, TBSTATE_ENABLED, 
-          buttonStyles, {0}, 0, (INT_PTR)NULL},
-        { MAKELONG(STD_FILESAVE, ImageListID), IDM_RECONF, 0, 
-          buttonStyles, {0}, 0, (INT_PTR)NULL}
+        { 0, IDM_NEWSESS, TBSTATE_ENABLED,buttonStyles, {0}, 0, (INT_PTR)NULL },
+        { 1, IDM_DUPSESS, TBSTATE_ENABLED,  buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 5, 0, TBSTATE_ENABLED, TBSTYLE_SEP, {0}, 0, (INT_PTR)NULL},
+        { 2, IDM_RECONF, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 3, IDM_RESET, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 4, IDM_SFTP, 0,  buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 5, IDM_SHOWLOG, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 5, 0, TBSTATE_ENABLED, TBSTYLE_SEP, {0}, 0, (INT_PTR)NULL},
+        { 6, IDM_COPYALL, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 7, IDM_PASTE, TBSTATE_ENABLED,  buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 8, IDM_CLRSB, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 9, IDM_FULLSCREEN, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 5, 0, TBSTATE_ENABLED, TBSTYLE_SEP, {0}, 0, (INT_PTR)NULL},
+        { 10, IDM_ABOUT, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL}
     };
 
+    const int numButtons = sizeof(tbButtons)/sizeof(TBBUTTON);
     // Add buttons.
     SendMessage(wintab->hToolBar, TB_BUTTONSTRUCTSIZE, 
         (WPARAM)sizeof(TBBUTTON), 0);
