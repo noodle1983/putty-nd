@@ -1918,75 +1918,21 @@ int on_init_menu_popup(HWND hwnd, UINT message,
 int on_session_menu(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    char b[2048];
-    char c[30], *cl;
-    int freecl = FALSE;
-    BOOL inherit_handles;
-    STARTUPINFO si;
-    PROCESS_INFORMATION pi;
-    HANDLE filemap = NULL;
-
     if (wParam == IDM_DUPSESS) {
-        /*
-         * Allocate a file-mapping memory chunk for the
-         * config structure.
-         */
-        SECURITY_ATTRIBUTES sa;
-        Config *p;
-
-        sa.nLength = sizeof(sa);
-        sa.lpSecurityDescriptor = NULL;
-        sa.bInheritHandle = TRUE;
-        filemap = CreateFileMapping(INVALID_HANDLE_VALUE,
-    				&sa,
-    				PAGE_READWRITE,
-    				0, sizeof(Config), NULL);
-        if (filemap && filemap != INVALID_HANDLE_VALUE) {
-    	p = (Config *) MapViewOfFile(filemap,
-    				     FILE_MAP_WRITE,
-    				     0, 0, sizeof(Config));
-    	if (p) {
-    	    *p = cfg;  /* structure copy */
-    	    UnmapViewOfFile(p);
-    	}
-        }
-        inherit_handles = TRUE;
-        sprintf(c, "putty &%p", filemap);
-        cl = c;
+        wintabitem* tabitem = wintab_get_active_item(&tab);
+        assert (tabitem != NULL);
+        cfg = tabitem->cfg;
+        wintab_create_tab(&tab, &cfg);
+        return 0;
     } else if (wParam == IDM_SAVEDSESS) {
-        unsigned int sessno = ((lParam - IDM_SAVED_MIN)
-    			   / MENU_SAVED_STEP) + 1;
-        if (sessno < (unsigned)sesslist.nsessions) {
-    	char *session = sesslist.sessions[sessno];
-    	cl = dupprintf("putty @%s", session);
-    	inherit_handles = FALSE;
-    	freecl = TRUE;
-        } else
+        //noodle: please try reconfigure
     	return 0;
     } else /* IDM_NEWSESS */ {
-        //cl = NULL;
-        //inherit_handles = FALSE;
         if (!do_config())
             return -1;
         wintab_create_tab(&tab, &cfg);
         return 0;
     }
-
-    GetModuleFileName(NULL, b, sizeof(b) - 1);
-    si.cb = sizeof(si);
-    si.lpReserved = NULL;
-    si.lpDesktop = NULL;
-    si.lpTitle = NULL;
-    si.dwFlags = 0;
-    si.cbReserved2 = 0;
-    si.lpReserved2 = NULL;
-    CreateProcess(b, cl, NULL, NULL, inherit_handles,
-    	      NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
-
-    if (filemap)
-        CloseHandle(filemap);
-    if (freecl)
-        sfree(cl);
     return 0;
 }
 
