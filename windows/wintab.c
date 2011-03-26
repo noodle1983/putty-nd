@@ -210,7 +210,7 @@ int wintab_create_toolbar(wintab *wintab)
         { 6, IDM_COPYALL, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 7, IDM_PASTE, TBSTATE_ENABLED,  buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 8, IDM_CLRSB, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
-        { 9, IDM_FULLSCREEN, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 9, IDM_FULLSCREEN, 0, buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 5, 0, TBSTATE_ENABLED, TBSTYLE_SEP, {0}, 0, (INT_PTR)NULL},
         { 10, IDM_ABOUT, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL}
     };
