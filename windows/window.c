@@ -2765,10 +2765,10 @@ int on_default(wintabitem* tabitem, HWND hwnd, UINT message,
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
-                            :hwnd == tab.hwndTab ? "TabBarMsg"
-                            :hwnd == tab.items[0]->page.hwndCtrl ? "PageMsg"
-                            : "UnknowMsg", TranslateWMessage(message)));
+    //debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
+    //                        :hwnd == tab.hwndTab ? "TabBarMsg"
+    //                        :hwnd == tab.items[0]->page.hwndCtrl ? "PageMsg"
+    //                        : "UnknowMsg", TranslateWMessage(message)));
 
     wintabitem *tabitem = wintab_get_active_item(&tab);
 

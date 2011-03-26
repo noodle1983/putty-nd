@@ -865,8 +865,8 @@ LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
 { 
     wintab* tab = win_get_data(hWnd);
     if (tab == NULL) return 0;
-    debug(("[WintabWndProc]%s:%s\n", hWnd == tab->hwndTab? "TabMsg"
-                            : "UnknowMsg", TranslateWMessage(message))); 
+    //debug(("[WintabWndProc]%s:%s\n", hWnd == tab->hwndTab? "TabMsg"
+    //                        : "UnknowMsg", TranslateWMessage(message))); 
     
     switch (message) {
         case WM_DRAWITEM:
@@ -1889,9 +1889,9 @@ void wintabpage_get_term_size(wintabpage *page, int *term_width, int *term_heigh
 LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    extern wintab tab;
-    debug(("[WintabpageWndProc]%s:%s\n", hwnd == tab.items[tab.cur]->page.hwndCtrl ? "PageMsg"
-                            : "UnknowMsg", TranslateWMessage(message)));
+    //extern wintab tab;
+    //debug(("[WintabpageWndProc]%s:%s\n", hwnd == tab.items[tab.cur]->page.hwndCtrl ? "PageMsg"
+    //                        : "UnknowMsg", TranslateWMessage(message)));
     wintabitem* tabitem = win_get_data(hwnd);
     if (tabitem == NULL){
         return DefWindowProc(hwnd, message, wParam, lParam);
