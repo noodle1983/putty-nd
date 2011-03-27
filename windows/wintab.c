@@ -277,6 +277,7 @@ int wintab_swith_tab(wintab *wintab)
     ShowWindow(wintab->items[wintab->cur]->page.hwndCtrl, SW_HIDE);
     wintab->cur = index;
     ShowWindow(wintab->items[wintab->cur]->page.hwndCtrl, SW_SHOW);
+    SetWindowText(hwnd, wintab->items[wintab->cur]->window_name);
     
     //init the extra size
     RECT rc;
@@ -937,6 +938,9 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->ignore_clip = FALSE;
     tabitem->hRgn = NULL;
     tabitem->hCloserRgn = NULL;
+    tabitem->window_name = tabitem->icon_name = NULL;
+    set_title(tabitem, cfg->session_name);
+    set_icon(tabitem, cfg->session_name);
     tabitem->close_mutex= CreateMutex(NULL, FALSE, NULL);
     
     tabitem->parentTab = wintab;
@@ -991,6 +995,8 @@ void wintabitem_fini(wintabitem *tabitem)
     wintabitem_deinit_fonts(tabitem);
     sfree(tabitem->logpal);
     tabitem->logpal = NULL;
+    sfree(tabitem->window_name);tabitem->window_name = NULL;
+    sfree(tabitem->icon_name);tabitem->icon_name = NULL;
     if (tabitem->pal)
     	DeleteObject(tabitem->pal);
     if (tabitem->cfg.protocol == PROT_SSH) {

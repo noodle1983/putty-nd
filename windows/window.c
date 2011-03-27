@@ -130,8 +130,6 @@ struct agent_callback {
 #define NEXTCOLOURS 240
 #define NALLCOLOURS (NCFGCOLOURS + NEXTCOLOURS)
 
-static char *window_name, *icon_name;
-
 static int compose_state = 0;
 
 static UINT wm_mousewheel = WM_MOUSEWHEEL;
@@ -1962,8 +1960,8 @@ int on_reconfig(wintabitem* tabitem, UINT message,
 	set_title(NULL, tabitem->cfg.wintitle);
 	if (IsIconic(hwnd)) {
 	    SetWindowText(hwnd,
-			  tabitem->cfg.win_name_always ? window_name :
-			  icon_name);
+			  tabitem->cfg.win_name_always ? tabitem->window_name :
+			  tabitem->icon_name);
 	}
 
 	if (strcmp(tabitem->cfg.font.name, prev_cfg.font.name) != 0 ||
@@ -2413,9 +2411,9 @@ int on_size(wintabitem* tabitem, HWND hwnd, UINT message,
     wintab_onsize(&tab, hwnd, lParam);
 	if (wParam == SIZE_MINIMIZED)
 	    SetWindowText(hwnd,
-			  tabitem->cfg.win_name_always ? window_name : icon_name);
+			  tabitem->cfg.win_name_always ? tabitem->window_name : tabitem->icon_name);
 	if (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)
-	    SetWindowText(hwnd, window_name);
+	    SetWindowText(hwnd, tabitem->window_name);
         if (wParam == SIZE_RESTORED) {
             processed_resize = FALSE;
             clear_full_screen(tabitem);
@@ -4328,19 +4326,23 @@ static int TranslateKey(wintabitem* tabitem, UINT message, WPARAM wParam, LPARAM
 
 void set_title(void *frontend, char *title)
 {
-    sfree(window_name);
-    window_name = snewn(1 + strlen(title), char);
-    strcpy(window_name, title);
-    if (cfg.win_name_always || !IsIconic(hwnd))
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
+    sfree(tabitem->window_name);
+    tabitem->window_name = snewn(1 + strlen(title), char);
+    strcpy(tabitem->window_name, title);
+    if (tabitem->cfg.win_name_always || !IsIconic(hwnd))
 	SetWindowText(hwnd, title);
 }
 
 void set_icon(void *frontend, char *title)
 {
-    sfree(icon_name);
-    icon_name = snewn(1 + strlen(title), char);
-    strcpy(icon_name, title);
-    if (!cfg.win_name_always && IsIconic(hwnd))
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
+    sfree(tabitem->icon_name);
+    tabitem->icon_name = snewn(1 + strlen(title), char);
+    strcpy(tabitem->icon_name, title);
+    if (!tabitem->cfg.win_name_always && IsIconic(hwnd))
 	SetWindowText(hwnd, title);
 }
 
@@ -5226,7 +5228,9 @@ void get_window_pixels(void *frontend, int *x, int *y)
  */
 char *get_window_title(void *frontend, int icon)
 {
-    return icon ? icon_name : window_name;
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
+    return icon ? tabitem->icon_name : tabitem->window_name;
 }
 
 /*

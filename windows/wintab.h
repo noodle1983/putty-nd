@@ -135,6 +135,7 @@ typedef struct {
 
     RECT rcDis;
     char disName[256];
+    char *window_name, *icon_name;
 
     HANDLE close_mutex;
 }wintabitem;
