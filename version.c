@@ -30,7 +30,7 @@ char sshver[] = "PuTTY-Custom-r" STR(SVN_REV);
 
 #else
 
-char ver[] = "Noodle build 0.2, " __DATE__ " " __TIME__;
+char ver[] = "Noodle build 0.3, " __DATE__ " " __TIME__;
 char sshver[] = "PuTTY-Local: " __DATE__ " " __TIME__;
 
 #endif
