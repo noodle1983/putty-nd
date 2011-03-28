@@ -490,7 +490,9 @@ void wintab_calc_item_size(wintab *wintab, HDC hdc)
         rc.left = left;
         rc.right = average_size * (index + 1);
 
-        snprintf(tabitem->disName, 256,  "%d. %s", index+1, tabitem->cfg.host);
+        char *disname = strrchr(tabitem->cfg.session_name, '#');
+        disname = (disname == NULL)? tabitem->cfg.session_name : (disname + 1);
+        snprintf(tabitem->disName, 256,  "%d. %s", index+1, disname);
         wintabitem_adjust_text_rect(tabitem, hdc, &rc);
         left = tabitem->rcDis.right;
     }
