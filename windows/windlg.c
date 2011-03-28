@@ -895,6 +895,7 @@ static void refresh_session_treeview(
 	}
     TreeView_SelectItem(sessionview, hfirst);
 	get_sesslist(&sesslist, FALSE);
+    load_settings(select_session?select_session:DEFAULT_SESSION_NAME, &cfg);
 }
 
 /*
