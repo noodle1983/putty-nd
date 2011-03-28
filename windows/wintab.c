@@ -687,6 +687,51 @@ int wintab_on_lclick(wintab* wintab, HWND hWnd, UINT message,
 
 //-----------------------------------------------------------------------
 
+int wintab_on_rclick(wintab* wintab, HWND hWnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    int x = GET_X_LPARAM(lParam);
+    int y = GET_Y_LPARAM(lParam);   
+    int index = wintab_hit_tab(wintab, x, y);
+    if (index < 0 || index >= wintab->end){
+        return -1;
+    }
+    
+    if (PtInRegion(wintab->items[index]->hCloserRgn, x, y)){
+        wintab_del_tab(wintab, index);
+        return 0;
+    }
+    
+    if (wintab->cur != index) {
+        wintab->next = index;
+        wintab_swith_tab(wintab);
+    }
+
+    wintabitem *tabitem = wintab->items[index];
+    if (!tabitem->specials_menu) 
+        return 0;
+    POINT screen_pos;
+    GetCursorPos(&screen_pos);
+    int menuid = TrackPopupMenu(tabitem->specials_menu,
+			   TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD,
+			   screen_pos.x, screen_pos.y,
+			   0, wintab->hwndTab, NULL);	
+    int i = (menuid - IDM_SPECIAL_MIN) / 0x10;
+    /*
+     * Ensure we haven't been sent a bogus SYSCOMMAND
+     * which would cause us to reference invalid memory
+     * and crash. Perhaps I'm just too paranoid here.
+     */
+    if (i >= tabitem->n_specials)
+        return 0;
+    if (tabitem->back)
+        tabitem->back->special(tabitem->backhandle, tabitem->specials[i].code);
+    net_pending_errors();
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+
 int wintab_on_drawbtn(wintab* wintab, HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
@@ -920,6 +965,9 @@ LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
                 }
                 break;
             }
+            return 0;
+        case WM_RBUTTONDOWN:
+            wintab_on_rclick(tab, hWnd, message, wParam, lParam);
             return 0;
         case WM_MOUSEMOVE:
             wintab_resize_window(tab, hWnd, message, wParam, lParam);
