@@ -14,6 +14,7 @@
 #include "win_res.h"
 #include "storage.h"
 #include "dialog.h"
+#include "wintab.h"
 
 #include <commctrl.h>
 #include <commdlg.h>
@@ -1616,10 +1617,12 @@ int do_reconfig(HWND hwnd, int protcfginfo)
 
 void logevent(void *frontend, const char *string)
 {
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
     char timebuf[40];
     struct tm tm;
 
-    log_eventlog(logctx, string);
+    log_eventlog(tabitem->logctx, string);
 
     if (nevents >= negsize) {
 	negsize += 64;

@@ -517,31 +517,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     guessSize(&guess_width, &guess_height);
     creatMainWindow(inst, guess_width, guess_height);
 
-#if 0
-    //todo remove after tab is done
-    if (0){
-        memset(&ucsdata, 0, sizeof(ucsdata));
-        //cfgtopalette();
-        /*
-         * Initialise the terminal. (We have to do this _after_
-         * creating the window, since the terminal is the first thing
-         * which will call schedule_timer(), which will in turn call
-         * timer_change_notify() which will expect hwnd to exist.)
-         */
-        term = term_init(&cfg, &ucsdata, &tab.items[0]);
-        logctx = log_init(NULL, &cfg);
-        term_provide_logctx(term, logctx);
-        term_size(term, cfg.height, cfg.width, cfg.savelines);
-
-        /*
-         * Initialise the fonts, simultaneously correcting the guesses
-         * for font_{width,height}.
-         */
-        init_fonts(0,0);
-    }
-#endif
     wintab_init(&tab, hwnd);
-    logctx = tab.items[0]->logctx;
 
     //resizeWindows();
 
