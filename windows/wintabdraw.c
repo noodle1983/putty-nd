@@ -168,15 +168,15 @@ int DrawMaxButton(HDC hdc, RECT *pRect, COLORREF clrBorder, COLORREF clrBack, CO
     FillRect(hdc, pRect, hBackBrush);
     FrameRect(hdc, pRect, hBorderBrush);
     if (isZoomed){     
-        OffsetRect(&rc1, 3, -3);
-        OffsetRect(&rc2, 3, -3);
+        OffsetRect(&rc1, 3, -1);
+        OffsetRect(&rc2, 3, -1);
         FillRect(hdc, &rc1, hBtBrush);
         FrameRect(hdc, &rc1, hBorderBrush);
         FillRect(hdc, &rc2, hBackBrush);
         FrameRect(hdc, &rc2, hBorderBrush);
 
-        OffsetRect(&rc1, -4, 4);
-        OffsetRect(&rc2, -4, 4);
+        OffsetRect(&rc1, -4, 3);
+        OffsetRect(&rc2, -4, 3);
         FillRect(hdc, &rc1, hBtBrush);
         FrameRect(hdc, &rc1, hBorderBrush);
         FillRect(hdc, &rc2, hBackBrush);
