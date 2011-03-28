@@ -617,7 +617,7 @@ int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
     InvalidateRect(wintab->hMaxBtn, NULL, TRUE);
     InvalidateRect(wintab->hMinBtn, NULL, TRUE);
     InvalidateRect(wintab->hClsBtn, NULL, TRUE);
-    
+    InvalidateRect(wintab_get_active_item(wintab)->page.hwndCtrl, NULL, TRUE);
 
     return 0;
 }
@@ -766,33 +766,47 @@ int wintab_move_window(wintab* wintab, HWND hWnd, UINT message,
 //-----------------------------------------------------------------------
 typedef enum{
     RESIZE_NONE = 0, 
-    RESIZE_X = 1, 
-    RESIZE_Y = 2, 
-    RESIZE_XY = 3
+    RESIZE_EDGE_MASK = 0xFF,
+    RESIZE_X_MASK = 0x100,
+    RESIZE_X_RIGHT = RESIZE_X_MASK | WMSZ_RIGHT,
+    RESIZE_X_LEFT = RESIZE_X_MASK | WMSZ_LEFT,
+    RESIZE_Y_MASK = 0x200, 
+    RESIZE_Y_BOTTOM = RESIZE_Y_MASK | WMSZ_BOTTOM, 
+    RESIZE_Y_TOP = RESIZE_Y_MASK | WMSZ_TOP, 
+    RESIZE_XY_MASK = RESIZE_X_MASK | RESIZE_Y_MASK,
+    RESIZE_XY_BOTTOMRIGHT = RESIZE_XY_MASK | WMSZ_BOTTOMRIGHT,
+    RESIZE_XY_BOTTOMLEFT = RESIZE_XY_MASK | WMSZ_BOTTOMLEFT,
+    RESIZE_XY_TOPRIGHT = RESIZE_XY_MASK | WMSZ_TOPRIGHT,
+    RESIZE_XY_TOPLEFT = RESIZE_XY_MASK | WMSZ_TOPLEFT
 } ResizeType;
 
 int wintab_resize_window(wintab* wintab, HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
     static RECT wc;
+    static RECT tc;
     static POINT ptStart;
     static ResizeType resize_type = RESIZE_NONE;
 
     if (IsZoomed(hwnd)) return -1;
     
     if (message == WM_LBUTTONDOWN){
-        GetWindowRect(wintab->hwndTab, &wc);
+        GetWindowRect(hwnd, &wc);
+        GetWindowRect(wintab->hwndTab, &tc);
         GetCursorPos(&ptStart);
-        ScreenToClient(wintab->hwndTab, &ptStart);
-        int width = wc.right - wc.left;
-        int height = wc.bottom - wc.top;
-        resize_type = ((ptStart.x >= width -BORDER_SIZE && ptStart.x <= width && ptStart.y >= 0 && ptStart.y <= BORDER_SIZE)
-                 ||(ptStart.x >= 0 && ptStart.x <= BORDER_SIZE && ptStart.y >= height -BORDER_SIZE && ptStart.y <= height)
-                 ||(ptStart.x >= 0 && ptStart.x <= BORDER_SIZE && ptStart.y >= 0 && ptStart.y <= BORDER_SIZE)
-                 ||(ptStart.x >= width -BORDER_SIZE && ptStart.x <= width&& ptStart.y >= height -BORDER_SIZE && ptStart.y <= height)) ? RESIZE_XY
-             :((ptStart.x >= 0 && ptStart.x <= BORDER_SIZE) ||(ptStart.x >= width -BORDER_SIZE && ptStart.x <= width))? RESIZE_X
-             :((ptStart.y >= 0 && ptStart.y <= BORDER_SIZE) ||(ptStart.y >= height -BORDER_SIZE && ptStart.y <= height))?RESIZE_Y
-             : RESIZE_NONE;
+        POINT ptOnTab = ptStart;
+        ScreenToClient(wintab->hwndTab, &ptOnTab);
+        int width = tc.right - tc.left;
+        int height = tc.bottom - tc.top;
+        resize_type = (ptOnTab.x >= width -BORDER_SIZE && ptOnTab.x <= width && ptOnTab.y >= 0 && ptOnTab.y <= BORDER_SIZE)? RESIZE_XY_TOPRIGHT
+                 :(ptOnTab.x >= 0 && ptOnTab.x <= BORDER_SIZE && ptOnTab.y >= height -BORDER_SIZE && ptOnTab.y <= height)?RESIZE_XY_BOTTOMLEFT
+                 :(ptOnTab.x >= 0 && ptOnTab.x <= BORDER_SIZE && ptOnTab.y >= 0 && ptOnTab.y <= BORDER_SIZE)?RESIZE_XY_TOPLEFT
+                 :(ptOnTab.x >= width -BORDER_SIZE && ptOnTab.x <= width&& ptOnTab.y >= height -BORDER_SIZE && ptOnTab.y <= height) ? RESIZE_XY_BOTTOMRIGHT
+                 :(ptOnTab.x >= 0 && ptOnTab.x <= BORDER_SIZE) ? RESIZE_X_LEFT
+                 :(ptOnTab.x >= width -BORDER_SIZE && ptOnTab.x <= width)? RESIZE_X_RIGHT
+                 :(ptOnTab.y >= 0 && ptOnTab.y <= BORDER_SIZE) ? RESIZE_Y_TOP
+                 :(ptOnTab.y >= height -BORDER_SIZE && ptOnTab.y <= height)?RESIZE_Y_BOTTOM
+                 : RESIZE_NONE;
         if (resize_type == RESIZE_NONE) 
             return -1;
         SendMessage(hwnd, WM_ENTERSIZEMOVE, wParam, lParam);
@@ -803,12 +817,26 @@ int wintab_resize_window(wintab* wintab, HWND hWnd, UINT message,
         if (!resize_type) return -1;
         POINT ptCur;
         GetCursorPos(&ptCur);
-        ScreenToClient(wintab->hwndTab, &ptCur);
-        int x_offset = (resize_type == RESIZE_Y) ? 0 : (ptCur.x - ptStart.x);
-        int y_offset = (resize_type == RESIZE_X) ? 0 : (ptCur.y - ptStart.y);
-        wintab_require_resize(wintab, 
-            wc.right - wc.left + x_offset, 
-            wc.bottom - wc.top + y_offset);
+        int width_offset = (resize_type & RESIZE_X_MASK) ? (ptCur.x - ptStart.x) : 0;
+        int height_offset = (resize_type & RESIZE_Y_MASK) ? (ptCur.y - ptStart.y) : 0;
+        int x = (resize_type == RESIZE_X_RIGHT 
+                        || resize_type == RESIZE_XY_TOPRIGHT
+                        || resize_type == RESIZE_XY_BOTTOMRIGHT)? wc.left : wc.left + width_offset;
+        int y = (resize_type == RESIZE_Y_BOTTOM 
+                        || resize_type == RESIZE_XY_BOTTOMRIGHT
+                        || resize_type == RESIZE_XY_BOTTOMLEFT)? wc.top : wc.top + height_offset;
+        width_offset = (resize_type == RESIZE_X_RIGHT 
+                        || resize_type == RESIZE_XY_TOPRIGHT
+                        || resize_type == RESIZE_XY_BOTTOMRIGHT)?width_offset:(-width_offset);
+        height_offset = (resize_type == RESIZE_Y_BOTTOM 
+                        || resize_type == RESIZE_XY_BOTTOMRIGHT
+                        || resize_type == RESIZE_XY_BOTTOMLEFT)?height_offset:(-height_offset);
+        RECT rc = {x, y, wc.right - wc.left + width_offset, wc.bottom - wc.top + height_offset};
+        
+        SetWindowPos(hwnd, NULL,  x, y, 
+            wc.right - wc.left + width_offset, 
+            wc.bottom - wc.top + height_offset, SWP_NOZORDER);
+        SendMessage(hwnd, WM_SIZING, RESIZE_EDGE_MASK & resize_type, (LPARAM)&rc);
         return 0;
     }
     if (message == WM_LBUTTONUP){
