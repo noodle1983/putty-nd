@@ -2751,21 +2751,26 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
         case WM_GETMINMAXINFO:  
         {   
             RECT WorkArea;
-            if (fullscr_on_max)
-                GetWindowRect(GetDesktopWindow(), &WorkArea);
-            else{
-                SystemParametersInfo( SPI_GETWORKAREA, 0, &WorkArea, 0 ); 
-                RECT rc;
-                GetWindowRect(hwnd, &rc);
-                POINT pt = {(rc.left + rc.right)/2, (rc.top + rc.bottom)/2};
-                if (!PtInRect(&WorkArea, pt))
-                    GetWindowRect(GetDesktopWindow(), &WorkArea);
-                
-            }
+            HMONITOR mon;
+        	MONITORINFO mi;
+        	mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        	mi.cbSize = sizeof(mi);
+        	GetMonitorInfo(mon, &mi);
+
+        	/* structure copy */
+        	WorkArea = fullscr_on_max ? mi.rcMonitor: mi.rcWork;
+            
+            /*
+            RECT cli_rc, pri_rc;
+            SystemParametersInfo( SPI_GETWORKAREA, 0, &pri_rc, 0 ); 
+            GetWindowRect(GetDesktopWindow(), &cli_rc);
+            POINT pt = {(pri_rc.left + pri_rc.right)/2, (pri_rc.top + pri_rc.bottom)/2};
+            WorkArea = (PtInRect(&cli_rc, pt)) ? pri_rc : cli_rc;  
+            */
             ( ( MINMAXINFO * )lParam )->ptMaxSize.x = ( WorkArea.right - WorkArea.left );  
             ( ( MINMAXINFO * )lParam )->ptMaxSize.y = ( WorkArea.bottom - WorkArea.top );  
-            ( ( MINMAXINFO * )lParam )->ptMaxPosition.x = WorkArea.left;  
-            ( ( MINMAXINFO * )lParam )->ptMaxPosition.y = WorkArea.top;  
+            ( ( MINMAXINFO * )lParam )->ptMaxPosition.x = 0;//WorkArea.left;  
+            ( ( MINMAXINFO * )lParam )->ptMaxPosition.y = 0;//WorkArea.top;  
             return 0;  
         }
         case WM_TIMER:
