@@ -3715,7 +3715,7 @@ static int TranslateKey(wintabitem* tabitem, UINT message, WPARAM wParam, LPARAM
 	    return 0;
 	}
 	if (wParam == VK_INSERT && shift_state == 1) {
-	    request_paste(NULL);
+	    request_paste(tabitem);
 	    return 0;
 	}
 	if (left_alt && wParam == VK_F4 && tabitem->cfg.alt_f4) {
