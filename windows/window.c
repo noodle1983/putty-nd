@@ -749,10 +749,10 @@ void update_specials_menu(void *frontend)
 	new_menu = NULL;
 	tabitem->n_specials = 0;
     }
-
+    /* not show the special menu 
     for (j = 0; j < lenof(popup_menus); j++) {
 	if (tabitem->specials_menu) {
-	    /* XXX does this free up all submenus? */
+	    // XXX does this free up all submenus? 
 	    DeleteMenu(popup_menus[j].menu, (UINT)specials_menu, MF_BYCOMMAND);
 	    DeleteMenu(popup_menus[j].menu, IDM_SPECIALSEP, MF_BYCOMMAND);
 	}
@@ -763,7 +763,7 @@ void update_specials_menu(void *frontend)
 	    InsertMenu(popup_menus[j].menu, IDM_SHOWLOG,
 		       MF_BYCOMMAND | MF_SEPARATOR, IDM_SPECIALSEP, 0);
 	}
-    }
+    }*/
     tabitem->specials_menu = new_menu;
 }
 
