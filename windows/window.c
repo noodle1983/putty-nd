@@ -76,7 +76,7 @@ static int get_fullscreen_rect(RECT * ss);
 
 static int kbd_codepage;
 static int reconfiguring = FALSE;
-static HMENU specials_menu = NULL;
+//static HMENU specials_menu = NULL;
 
 static wchar_t *clipboard_contents;
 static size_t clipboard_length;
@@ -703,7 +703,7 @@ void update_specials_menu(void *frontend)
 
     wintabitem *tabitem = (wintabitem*) frontend;
     HMENU new_menu;
-    int i, j;
+    int i;//, j;
 
     if (tabitem->back)
 	tabitem->specials = tabitem->back->get_specials(tabitem->backhandle);
@@ -2753,8 +2753,15 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
             RECT WorkArea;
             if (fullscr_on_max)
                 GetWindowRect(GetDesktopWindow(), &WorkArea);
-            else
-                SystemParametersInfo( SPI_GETWORKAREA, 0, &WorkArea, 0 );  
+            else{
+                SystemParametersInfo( SPI_GETWORKAREA, 0, &WorkArea, 0 ); 
+                RECT rc;
+                GetWindowRect(hwnd, &rc);
+                POINT pt = {(rc.left + rc.right)/2, (rc.top + rc.bottom)/2};
+                if (!PtInRect(&WorkArea, pt))
+                    GetWindowRect(GetDesktopWindow(), &WorkArea);
+                
+            }
             ( ( MINMAXINFO * )lParam )->ptMaxSize.x = ( WorkArea.right - WorkArea.left );  
             ( ( MINMAXINFO * )lParam )->ptMaxSize.y = ( WorkArea.bottom - WorkArea.top );  
             ( ( MINMAXINFO * )lParam )->ptMaxPosition.x = WorkArea.left;  
