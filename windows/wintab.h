@@ -138,6 +138,10 @@ typedef struct {
     char *window_name, *icon_name;
 
     HANDLE close_mutex;
+
+    HWND logbox;
+    int nevents, negsize;
+    char **events;
 }wintabitem;
 
 typedef struct {

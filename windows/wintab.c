@@ -1016,6 +1016,10 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->ignore_clip = FALSE;
     tabitem->hRgn = NULL;
     tabitem->hCloserRgn = NULL;
+    tabitem->logbox = NULL;
+    tabitem->nevents = 0;
+    tabitem->negsize = 0;
+    tabitem->events = NULL;
     tabitem->window_name = tabitem->icon_name = NULL;
     set_title(tabitem, cfg->session_name);
     set_icon(tabitem, cfg->session_name);
@@ -1060,6 +1064,7 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
 
 void wintabitem_fini(wintabitem *tabitem)
 {
+    int i = 0;
     wintabitem_close_session(tabitem);
 
     CloseHandle(tabitem->close_mutex);
@@ -1083,6 +1088,10 @@ void wintabitem_fini(wintabitem *tabitem)
     	crypto_wrapup();
 #endif
     }
+    
+    for (i = 0; i < tabitem->nevents; i++)
+        sfree(tabitem->events[i]);
+    sfree(tabitem->events);
 
 }
 //-----------------------------------------------------------------------

@@ -42,8 +42,6 @@ static struct controlbox *ctrlbox;
 static struct winctrls ctrls_base, ctrls_panel;
 static struct dlgparam dp;
 
-static char **events = NULL;
-static int nevents = 0, negsize = 0;
 
 static char pre_session[256] = {0};
 static HMENU st_popup_menus[3];
@@ -147,6 +145,10 @@ static int CALLBACK LogProc(HWND hwnd, UINT msg,
 			    WPARAM wParam, LPARAM lParam)
 {
     int i;
+    wintabitem* tabitem = win_get_data(hwnd);
+    if (tabitem == NULL){
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
 
     switch (msg) {
       case WM_INITDIALOG:
@@ -160,15 +162,15 @@ static int CALLBACK LogProc(HWND hwnd, UINT msg,
 	    SendDlgItemMessage(hwnd, IDN_LIST, LB_SETTABSTOPS, 2,
 			       (LPARAM) tabs);
 	}
-	for (i = 0; i < nevents; i++)
+	for (i = 0; i < tabitem->nevents; i++)
 	    SendDlgItemMessage(hwnd, IDN_LIST, LB_ADDSTRING,
-			       0, (LPARAM) events[i]);
+			       0, (LPARAM) tabitem->events[i]);
 	return 1;
       case WM_COMMAND:
 	switch (LOWORD(wParam)) {
 	  case IDOK:
 	  case IDCANCEL:
-	    logbox = NULL;
+	    tabitem->logbox = NULL;
 	    SetActiveWindow(GetParent(hwnd));
 	    DestroyWindow(hwnd);
 	    return 0;
@@ -203,13 +205,13 @@ static int CALLBACK LogProc(HWND hwnd, UINT msg,
 		    size = 0;
 		    for (i = 0; i < count; i++)
 			size +=
-			    strlen(events[selitems[i]]) + sizeof(sel_nl);
+			    strlen(tabitem->events[selitems[i]]) + sizeof(sel_nl);
 
 		    clipdata = snewn(size, char);
 		    if (clipdata) {
 			char *p = clipdata;
 			for (i = 0; i < count; i++) {
-			    char *q = events[selitems[i]];
+			    char *q = tabitem->events[selitems[i]];
 			    int qlen = strlen(q);
 			    memcpy(p, q, qlen);
 			    p += qlen;
@@ -221,7 +223,7 @@ static int CALLBACK LogProc(HWND hwnd, UINT msg,
 		    }
 		    sfree(selitems);
 
-		    for (i = 0; i < nevents; i++)
+		    for (i = 0; i < tabitem->nevents; i++)
 			SendDlgItemMessage(hwnd, IDN_LIST, LB_SETSEL,
 					   FALSE, i);
 		}
@@ -229,11 +231,12 @@ static int CALLBACK LogProc(HWND hwnd, UINT msg,
 	    return 0;
 	}
 	return 0;
-      case WM_CLOSE:
-	logbox = NULL;
+      case WM_CLOSE:{
+	tabitem->logbox = NULL;
 	SetActiveWindow(GetParent(hwnd));
 	DestroyWindow(hwnd);
 	return 0;
+      }
     }
     return 0;
 }
@@ -1618,42 +1621,50 @@ int do_reconfig(HWND hwnd, int protcfginfo)
 
 void logevent(void *frontend, const char *string)
 {
-    assert (frontend != NULL);
+    if (frontend == NULL){
+        debug(("%s\n", string));
+    }
     wintabitem *tabitem = (wintabitem*) frontend;
     char timebuf[40];
     struct tm tm;
+    int i;
 
     log_eventlog(tabitem->logctx, string);
 
-    if (nevents >= negsize) {
-	negsize += 64;
-	events = sresize(events, negsize, char *);
+    if (tabitem->nevents >= tabitem->negsize) {
+    	tabitem->negsize += 64;
+    	tabitem->events = sresize(tabitem->events, tabitem->negsize, char *);
+        for (i = tabitem->nevents + 1; i < tabitem->negsize; i++)
+            tabitem->events[i] = NULL;
     }
 
     tm=ltime();
     strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S\t", &tm);
 
-    events[nevents] = snewn(strlen(timebuf) + strlen(string) + 1, char);
-    strcpy(events[nevents], timebuf);
-    strcat(events[nevents], string);
-    if (logbox) {
+    tabitem->events[tabitem->nevents] = snewn(strlen(timebuf) + strlen(string) + 1, char);
+    strcpy(tabitem->events[tabitem->nevents], timebuf);
+    strcat(tabitem->events[tabitem->nevents], string);
+    if (tabitem->logbox) {
 	int count;
-	SendDlgItemMessage(logbox, IDN_LIST, LB_ADDSTRING,
-			   0, (LPARAM) events[nevents]);
-	count = SendDlgItemMessage(logbox, IDN_LIST, LB_GETCOUNT, 0, 0);
-	SendDlgItemMessage(logbox, IDN_LIST, LB_SETTOPINDEX, count - 1, 0);
+	SendDlgItemMessage(tabitem->logbox, IDN_LIST, LB_ADDSTRING,
+			   0, (LPARAM) tabitem->events[tabitem->nevents]);
+	count = SendDlgItemMessage(tabitem->logbox, IDN_LIST, LB_GETCOUNT, 0, 0);
+	SendDlgItemMessage(tabitem->logbox, IDN_LIST, LB_SETTOPINDEX, count - 1, 0);
     }
-    nevents++;
+    tabitem->nevents++;
 }
 
-void showeventlog(HWND hwnd)
+void showeventlog(void* frontend, HWND hwnd)
 {
-    if (!logbox) {
-	logbox = CreateDialog(hinst, MAKEINTRESOURCE(IDD_LOGBOX),
+    assert (frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
+    if (!tabitem->logbox) {
+	tabitem->logbox = CreateDialog(hinst, MAKEINTRESOURCE(IDD_LOGBOX),
 			      hwnd, LogProc);
-	ShowWindow(logbox, SW_SHOWNORMAL);
+    win_bind_data(tabitem->logbox, tabitem);
+	ShowWindow(tabitem->logbox, SW_SHOWNORMAL);
     }
-    SetActiveWindow(logbox);
+    SetActiveWindow(tabitem->logbox);
 }
 
 void showabout(HWND hwnd)

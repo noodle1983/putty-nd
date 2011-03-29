@@ -604,9 +604,9 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     	    if (msg.message == WM_QUIT)
     		goto finished;	       /* two-level break */
 
-    	    if (!(IsWindow(logbox) && IsDialogMessage(logbox, &msg))){ 
+    	    //if (!(IsWindow(logbox) && IsDialogMessage(logbox, &msg))){ 
                 DispatchMessage(&msg);
-    	    }
+    	    //}
     	    /* Send the paste buffer if there's anything to send */
     	    wintab_term_paste(&tab);
     	    /* If there's nothing new in the queue then we can do everything
@@ -1967,7 +1967,7 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
 {
     switch (wParam & ~0xF) {       /* low 4 bits reserved to Windows */
         case IDM_SHOWLOG:
-            showeventlog(hwnd);
+            showeventlog(tabitem, hwnd);
             break;
         case IDM_NEWSESS:
         case IDM_DUPSESS:
@@ -1987,7 +1987,7 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
             }
             wintabitem_close_session(tabitem);
             if (!tabitem->back) {
-            logevent(NULL, "----- Session restarted -----");
+            logevent(tabitem, "----- Session restarted -----");
             term_pwron(tabitem->term, FALSE);
             wintabitem_start_backend(tabitem);
             }
