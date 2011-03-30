@@ -280,10 +280,19 @@ int wintab_swith_tab(wintab *wintab)
     SetWindowText(hwnd, wintab->items[wintab->cur]->window_name);
     
     //init the extra size
-    RECT rc;
+    wintabitem *tabitem = wintab->items[wintab->cur];
+    RECT rc, cr;
     GetClientRect(wintab->hwndParent, &rc);    
     wintab_resize(wintab, &rc);
-    reset_window(wintab->items[wintab->cur], 0);
+    if (tabitem->cfg.resize_action != RESIZE_TERM)
+        reset_window(tabitem, 0);
+    else{
+        GetClientRect(tabitem->page.hwndCtrl, &cr);
+        int win_width  = cr.right - cr.left;
+        int win_height = cr.bottom - cr.top;
+        term_size(tabitem->term, win_height/tabitem->font_height, win_width/tabitem->font_width,
+                	  tabitem->cfg.savelines);
+    }
     return 0;
 }
 //-----------------------------------------------------------------------
