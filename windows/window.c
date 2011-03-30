@@ -61,9 +61,6 @@ static void clear_full_screen(wintabitem* tabitem);
 static void flip_full_screen(void);
 int process_clipdata(HGLOBAL clipdata, int unicode);
 
-/* Window layout information */
-static void reset_window(wintabitem* tabitem, int);
-
 static int was_zoomed = 0;
   
 static int pending_netevent = 0;
@@ -1440,7 +1437,7 @@ void request_resize(void *frontend, int w, int h)
     InvalidateRect(hwnd, NULL, TRUE);
 }
 
-static void reset_window(wintabitem* tabitem, int reinit) {
+void reset_window(wintabitem* tabitem, int reinit) {
     /*
      * This function decides how to resize or redraw when the 
      * user changes something. 

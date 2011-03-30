@@ -172,6 +172,8 @@ typedef struct {
 void win_bind_data(HWND hwnd, void *data);
 void* win_get_data(HWND hwnd);
 int win_fullscr_on_max();
+/* Window layout information */
+void reset_window(wintabitem* tabitem, int);
 //-----------------------------------------------------------------------
 // tabbar related
 //-----------------------------------------------------------------------

@@ -283,6 +283,7 @@ int wintab_swith_tab(wintab *wintab)
     RECT rc;
     GetClientRect(wintab->hwndParent, &rc);    
     wintab_resize(wintab, &rc);
+    reset_window(wintab->items[wintab->cur], 0);
     return 0;
 }
 //-----------------------------------------------------------------------
