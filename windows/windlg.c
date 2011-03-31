@@ -1623,7 +1623,7 @@ void logevent(void *frontend, const char *string)
 {
     if (frontend == NULL){
         debug(("%s\n", string));
-        return 0;
+        return;
     }
     wintabitem *tabitem = (wintabitem*) frontend;
     char timebuf[40];
