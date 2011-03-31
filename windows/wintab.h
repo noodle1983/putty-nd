@@ -185,6 +185,7 @@ int wintab_create_toolbar(wintab *wintab);
 int wintab_swith_tab(wintab *wintab);
 int wintab_resize(wintab *wintab, const RECT *rc);
 void wintab_onsize(wintab *wintab, HWND hwndParent, LPARAM lParam);
+int  wintab_is_logboxmsg(wintab *wintab, MSG *msg);
 int  wintab_can_close(wintab *wintab);
 void wintab_check_closed_session(wintab *wintab);
 void wintab_term_paste(wintab *wintab);

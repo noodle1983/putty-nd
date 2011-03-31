@@ -381,6 +381,19 @@ void wintab_onsize(wintab *wintab, HWND hwndParent, LPARAM lParam)
     return;
 }
 //-----------------------------------------------------------------------
+int  wintab_is_logboxmsg(wintab *wintab, MSG *msg)
+{
+    int index = 0;
+    for (; index < wintab->end; index++){
+        wintabitem *tabitem = wintab->items[index];
+        if (IsWindow(tabitem->logbox) && IsDialogMessage(tabitem->logbox, msg))
+            return TRUE;
+    }
+    return FALSE;
+
+}
+
+//-----------------------------------------------------------------------
 
 int  wintab_can_close(wintab *wintab)
 {

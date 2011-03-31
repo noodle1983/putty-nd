@@ -601,9 +601,9 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     	    if (msg.message == WM_QUIT)
     		goto finished;	       /* two-level break */
 
-    	    //if (!(IsWindow(logbox) && IsDialogMessage(logbox, &msg))){ 
+    	    if (!(wintab_is_logboxmsg(&tab, &msg))){ 
                 DispatchMessage(&msg);
-    	    //}
+    	    }
     	    /* Send the paste buffer if there's anything to send */
     	    wintab_term_paste(&tab);
     	    /* If there's nothing new in the queue then we can do everything
