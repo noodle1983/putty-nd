@@ -5223,11 +5223,11 @@ char *get_window_title(void *frontend, int icon)
  */
 static int is_full_screen()
 {
-    if (!IsZoomed(hwnd))
+    //if (!IsZoomed(hwnd))
+	//return FALSE;
+    //if (!(GetMenuState(popup_menus[0].menu, IDM_FULLSCREEN,MF_BYCOMMAND) & MF_CHECKED))
 	return FALSE;
-    if (!(GetMenuState(popup_menus[0].menu, IDM_FULLSCREEN,MF_BYCOMMAND) & MF_CHECKED))
-	return FALSE;
-    return TRUE;
+    //return TRUE;
 }
 
 /* Get the rect/size of a full screen window using the nearest available
