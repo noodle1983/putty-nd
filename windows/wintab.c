@@ -354,6 +354,7 @@ void wintab_split_client_rect(wintab *wintab)
     wintab->rcTabBar.right = rc.right - border - 100;
     wintab->rcTabBar.bottom = IsZoomed(hwnd) ? 
         (wintab->rcTabBar.top + 25) : (wintab->rcTabBar.top + 35);
+    wintab->rcTabBar.right -= (IsZoomed(hwnd)) ? 12 : 2;;
 
     wintab->rcSysBtn = wintab->rcTabBar;
     wintab->rcSysBtn.left = wintab->rcTabBar.right;
