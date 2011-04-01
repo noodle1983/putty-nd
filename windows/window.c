@@ -1930,7 +1930,7 @@ int on_reconfig(wintabitem* tabitem, UINT message,
 	    init_lvl = 2;
 	}
 
-	set_title(NULL, tabitem->cfg.wintitle);
+	set_title(tabitem, tabitem->cfg.wintitle);
 	if (IsIconic(hwnd)) {
 	    SetWindowText(hwnd,
 			  tabitem->cfg.win_name_always ? tabitem->window_name :
