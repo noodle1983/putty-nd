@@ -1930,7 +1930,7 @@ int on_reconfig(wintabitem* tabitem, UINT message,
 	    init_lvl = 2;
 	}
 
-	set_title(tabitem, tabitem->cfg.wintitle);
+	//set_title(tabitem, tabitem->cfg.wintitle);
 	if (IsIconic(hwnd)) {
 	    SetWindowText(hwnd,
 			  tabitem->cfg.win_name_always ? tabitem->window_name :
@@ -4312,6 +4312,7 @@ static int TranslateKey(wintabitem* tabitem, UINT message, WPARAM wParam, LPARAM
 void set_title(void *frontend, char *title)
 {
     assert (frontend != NULL);
+    if (!title || !*title) return;
     wintabitem *tabitem = (wintabitem*) frontend;
     sfree(tabitem->window_name);
     tabitem->window_name = snewn(1 + strlen(title), char);
@@ -4323,6 +4324,7 @@ void set_title(void *frontend, char *title)
 void set_icon(void *frontend, char *title)
 {
     assert (frontend != NULL);
+    if (!title || !*title) return;
     wintabitem *tabitem = (wintabitem*) frontend;
     sfree(tabitem->icon_name);
     tabitem->icon_name = snewn(1 + strlen(title), char);
