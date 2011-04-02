@@ -1,0 +1,80 @@
+RELEASE NOTE
+============
+--------------------------------
+putty6.0_nd1.4
+--------------------------------
+1. Bugs fixed
+    1.1. do not reset win_title after re-configured. 
+    1.2. resize the length of the tabbar, to avoid covered by the system botton.
+	
+--------------------------------
+putty6.0_nd1.3
+--------------------------------
+1. Bugs fixed
+    1.1. assert failed when reconfig. 
+    1.2. fullscreen is not supported yet, fix a scrollbar issue when zoomed.
+	
+--------------------------------
+putty6.0_nd1.2
+--------------------------------
+1. Bugs fixed
+    1.1. LICENSE. 
+    1.2. resize term when swith tab.
+
+--------------------------------
+putty6.0_nd1.1
+--------------------------------
+1. Bugs fixed
+    1.1. crash when paste by shift+insert. 
+    1.2. not to show special menu when right click on the page.
+    1.3. fix bug when maximize on multi-monitor.
+    1.4. bind logevent to a tab; if not appliable, dump to debug log.
+
+--------------------------------
+putty6.0_nd1.0
+--------------------------------
+1. New Features
+    1. tabbar
+
+2. Other changes
+    2.1 merge from putty6.0_nd0.3
+
+3. Bugs fixed
+    3.1. window's title is not set. 
+    3.2. It only has a left-top archor when sizing.
+    3.3. no right click memu
+
+--------------------------------
+putty6.0_nd0.3
+-------------------------------- 
+1. Bugs Fix
+    1.1 rename the last session and do some changes and open, the cfg is saved as previous session.
+
+--------------------------------
+putty6.0_nd1.0-pre
+--------------------------------
+1. New Features
+    1. tabbar
+
+2. Other changes
+    2.1 merge from putty6.0_nd0.2
+
+3. Bugs remains
+    3.1. window's title is not set. 
+    3.2. It only has a left-top archor when sizing.
+    3.3. no right click memu
+
+--------------------------------
+putty6.0_nd0.2
+-------------------------------- 
+1. Bugs Fix
+    2.1 automate logon does not work sometimes.
+    
+
+--------------------------------
+putty6.0_nd0.1
+--------------------------------
+1. New Features
+    1.1 Session Management.
+    1.2 Automate Logon.
+    1.3 Scroll lines can be configured when the middle button of the mouse is scrolled. The default lines' number is 3.
