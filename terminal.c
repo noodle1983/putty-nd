@@ -5188,11 +5188,103 @@ static void clip_addchar(clip_workbuf *b, wchar_t chr, int attr)
     b->bufpos++;
 }
 
+void term_get_a_word(Terminal *term, termline *ldata, pos *top, clip_workbuf *buf)
+{
+#if 0
+    char cbuf[16], *p;
+    sprintf(cbuf, "<U+%04x>", (ldata[top.x] & 0xFFFF));
+#else
+    wchar_t cbuf[16], *p;
+    int set, c;
+    int x = top->x;
+    int attr;
+    if (x >= ldata->cols)
+        return;
+
+    if (ldata->chars[x].chr == UCSWIDE) {
+    	top->x++;
+    	return;
+    }
+
+    while (1) {
+        int uc = ldata->chars[x].chr;
+        attr = ldata->chars[x].attr;
+
+		switch (uc & CSET_MASK) {
+            case CSET_LINEDRW:
+    		    if (!term->cfg.rawcnp) {
+        			uc = term->ucsdata->unitab_xterm[uc & 0xFF];
+        			break;
+    		    }
+            case CSET_ASCII:
+    		    uc = term->ucsdata->unitab_line[uc & 0xFF];
+    		    break;
+            case CSET_SCOACS:
+    		    uc = term->ucsdata->unitab_scoacs[uc&0xFF];
+    		    break;
+		}
+		switch (uc & CSET_MASK) {
+            case CSET_ACP:
+    		    uc = term->ucsdata->unitab_font[uc & 0xFF];
+    		    break;
+            case CSET_OEMCP:
+    		    uc = term->ucsdata->unitab_oemcp[uc & 0xFF];
+    		    break;
+		}
+
+		set = (uc & CSET_MASK);
+		c = (uc & ~CSET_MASK);
+#ifdef PLATFORM_IS_UTF16
+		if (uc > 0x10000 && uc < 0x110000) {
+		    cbuf[0] = 0xD800 | ((uc - 0x10000) >> 10);
+		    cbuf[1] = 0xDC00 | ((uc - 0x10000) & 0x3FF);
+		    cbuf[2] = 0;
+		} else
+#endif
+		{
+		    cbuf[0] = uc;
+		    cbuf[1] = 0;
+		}
+
+		if (DIRECT_FONT(uc)) {
+		    if (c >= ' ' && c != 0x7F) {
+			char buf[4];
+			WCHAR wbuf[4];
+			int rv;
+			if (is_dbcs_leadbyte(term->ucsdata->font_codepage, (BYTE) c)) {
+			    buf[0] = c;
+			    buf[1] = (char) (0xFF & ldata->chars[top->x + 1].chr);
+			    rv = mb_to_wc(term->ucsdata->font_codepage, 0, buf, 2, wbuf, 4);
+			    top->x++;
+			} else {
+			    buf[0] = c;
+			    rv = mb_to_wc(term->ucsdata->font_codepage, 0, buf, 1, wbuf, 4);
+			}
+
+			if (rv > 0) {
+			    memcpy(cbuf, wbuf, rv * sizeof(wchar_t));
+			    cbuf[rv] = 0;
+			}
+		    }
+		}
+#endif
+
+		for (p = cbuf; *p; p++)
+		    clip_addchar(buf, *p, attr);
+
+		if (ldata->chars[x].cc_next)
+		    x += ldata->chars[x].cc_next;
+		else
+		    break;
+    }
+    top->x++;
+
+}
+
 static void clipme(Terminal *term, pos top, pos bottom, int rect, int desel)
 {
     clip_workbuf buf;
     int old_top_x;
-    int attr;
 
     buf.buflen = 5120;			
     buf.bufpos = 0;
@@ -5247,91 +5339,7 @@ static void clipme(Terminal *term, pos top, pos bottom, int rect, int desel)
 	}
 
 	while (poslt(top, bottom) && poslt(top, nlpos)) {
-#if 0
-	    char cbuf[16], *p;
-	    sprintf(cbuf, "<U+%04x>", (ldata[top.x] & 0xFFFF));
-#else
-	    wchar_t cbuf[16], *p;
-	    int set, c;
-	    int x = top.x;
-
-	    if (ldata->chars[x].chr == UCSWIDE) {
-		top.x++;
-		continue;
-	    }
-
-	    while (1) {
-		int uc = ldata->chars[x].chr;
-                attr = ldata->chars[x].attr;
-
-		switch (uc & CSET_MASK) {
-		  case CSET_LINEDRW:
-		    if (!term->cfg.rawcnp) {
-			uc = term->ucsdata->unitab_xterm[uc & 0xFF];
-			break;
-		    }
-		  case CSET_ASCII:
-		    uc = term->ucsdata->unitab_line[uc & 0xFF];
-		    break;
-		  case CSET_SCOACS:
-		    uc = term->ucsdata->unitab_scoacs[uc&0xFF];
-		    break;
-		}
-		switch (uc & CSET_MASK) {
-		  case CSET_ACP:
-		    uc = term->ucsdata->unitab_font[uc & 0xFF];
-		    break;
-		  case CSET_OEMCP:
-		    uc = term->ucsdata->unitab_oemcp[uc & 0xFF];
-		    break;
-		}
-
-		set = (uc & CSET_MASK);
-		c = (uc & ~CSET_MASK);
-#ifdef PLATFORM_IS_UTF16
-		if (uc > 0x10000 && uc < 0x110000) {
-		    cbuf[0] = 0xD800 | ((uc - 0x10000) >> 10);
-		    cbuf[1] = 0xDC00 | ((uc - 0x10000) & 0x3FF);
-		    cbuf[2] = 0;
-		} else
-#endif
-		{
-		    cbuf[0] = uc;
-		    cbuf[1] = 0;
-		}
-
-		if (DIRECT_FONT(uc)) {
-		    if (c >= ' ' && c != 0x7F) {
-			char buf[4];
-			WCHAR wbuf[4];
-			int rv;
-			if (is_dbcs_leadbyte(term->ucsdata->font_codepage, (BYTE) c)) {
-			    buf[0] = c;
-			    buf[1] = (char) (0xFF & ldata->chars[top.x + 1].chr);
-			    rv = mb_to_wc(term->ucsdata->font_codepage, 0, buf, 2, wbuf, 4);
-			    top.x++;
-			} else {
-			    buf[0] = c;
-			    rv = mb_to_wc(term->ucsdata->font_codepage, 0, buf, 1, wbuf, 4);
-			}
-
-			if (rv > 0) {
-			    memcpy(cbuf, wbuf, rv * sizeof(wchar_t));
-			    cbuf[rv] = 0;
-			}
-		    }
-		}
-#endif
-
-		for (p = cbuf; *p; p++)
-		    clip_addchar(&buf, *p, attr);
-
-		if (ldata->chars[x].cc_next)
-		    x += ldata->chars[x].cc_next;
-		else
-		    break;
-	    }
-	    top.x++;
+	    term_get_a_word(term, ldata, &top, &buf);
 	}
 	if (nl) {
 	    int i;
