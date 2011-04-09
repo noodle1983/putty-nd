@@ -5372,6 +5372,149 @@ void term_copyall(Terminal *term)
     clipme(term, top, bottom, 0, TRUE);
 }
 
+typedef enum {
+    FOUND_NONE = 0, 
+    FOUND_BEG = 1,
+    FOUND_MID = 2,
+    FOUND_END = 3
+} found_status;
+
+void term_find(Terminal *term, const wchar_t* const str, int direct, pos *startpos)
+{
+    if (!str || !str[0])
+        return;
+    
+    //get the area to find
+    pos top;
+    pos bottom;
+    tree234 *screen = term->screen;
+    top.y = -sblines(term);
+    top.x = 0;
+    bottom.y = find_last_nonempty_line(term, screen);
+    bottom.x = term->cols;
+    if (startpos){
+        if (!direct)
+            top = *startpos;
+        else 
+            bottom = *startpos;
+    }
+
+    clip_workbuf buf;
+    buf.buflen = 16;			
+    buf.bufpos = 0;
+    buf.textptr = buf.textbuf = snewn(buf.buflen, wchar_t);
+    buf.attrptr = buf.attrbuf = snewn(buf.buflen, int);
+
+    int found_status = FOUND_NONE;
+    int i_str = 0;
+    pos back_pos = {0, 0};
+    pos found_beg;
+    pos found_end;
+
+    while (poslt(top, bottom) && found_status != FOUND_END) {
+        int nl = FALSE;
+    	termline *ldata = lineptr(top.y);
+    	pos nlpos;
+
+    	/*
+    	 * nlpos will point at the maximum position on this line we
+    	 * should copy up to. So we start it at the end of the
+    	 * line...
+    	 */
+    	nlpos.y = top.y;
+    	nlpos.x = term->cols;
+
+    	/*
+    	 * ... move it backwards if there's unused space at the end
+    	 * of the line 
+    	 */
+    	if (!(ldata->lattr & LATTR_WRAPPED)) {
+    	    while (nlpos.x &&
+    		   IS_SPACE_CHR(ldata->chars[nlpos.x - 1].chr) &&
+    		   !ldata->chars[nlpos.x - 1].cc_next &&
+    		   poslt(top, nlpos))
+    		decpos(nlpos);
+            if (poslt(nlpos, bottom))
+                nl = TRUE;
+    	} else if (ldata->lattr & LATTR_WRAPPED2) {
+    	    /* Ignore the last char on the line in a WRAPPED2 line. */
+    	    decpos(nlpos);
+    	}
+
+    	while (poslt(top, bottom) && poslt(top, nlpos) && found_status != FOUND_END) {
+            pos pre_top = top;
+    	    term_get_a_word(term, ldata, &top, &buf);
+            int strlen = wcslen(str) - i_str;
+            int cmplen = buf.bufpos > strlen ? strlen : buf.bufpos;
+            debug(("%c\t", *buf.textbuf));
+            if (!wcsncmp(&str[i_str], buf.textbuf, cmplen)){
+                debug(("%s\n", "match"));
+                /* equal */
+                i_str += cmplen;
+                if (found_status == FOUND_NONE) {
+                    found_status = FOUND_BEG;
+                    found_beg = pre_top;
+                }else if (found_status == FOUND_BEG){
+                    found_status = FOUND_MID;
+                }
+                if (i_str >= wcslen(str)){
+                    found_status = FOUND_END;
+                }
+                if (found_status == FOUND_MID 
+                    && str[0] == buf.textbuf[0]
+                    && back_pos.x == 0 && back_pos.y == 0){
+                    back_pos = pre_top;
+                }
+                
+                if (found_status == FOUND_END){
+                    found_end = top;
+                    term->selstate = SELECTED;
+                    term->selmode = SM_WORD;
+                    term->seltype = SM_CHAR;
+                    term->selstart = term->selanchor = found_beg;
+                    term->selend = found_end;
+                    term_scroll_to_selection(term, 0);
+                    term_update(term);
+                    if (startpos)
+                        *startpos = direct ?  found_beg : found_end;
+                    debug(("found in (%d, %d) -- (%d, %d)\n", found_beg.y, found_beg.x
+                        ,found_end.y, found_end.x));
+                }
+                
+
+            }else{
+                debug(("%s  expect: %c\n", "unmatch", str[i_str]));
+                if (found_status == FOUND_MID 
+                    && str[0] == buf.textbuf[0]
+                    && back_pos.x == 0 && back_pos.y == 0){
+                    back_pos = pre_top;
+                }
+                
+                if (back_pos.x != 0 || back_pos.y != 0)
+                    top = back_pos;
+                found_status = FOUND_NONE;
+                i_str = 0;
+                back_pos.x = 0; back_pos.y = 0;
+            }
+
+            buf.bufpos = 0;
+            buf.textptr = buf.textbuf;
+            buf.attrptr = buf.attrbuf;
+    	}
+        if (nl){
+    		found_status = FOUND_NONE;
+            i_str = 0;
+            back_pos.x = 0; back_pos.y = 0;
+        }
+    	top.y++;
+    	top.x = 0;
+
+    	unlineptr(ldata);
+    }
+    sfree(buf.textbuf);
+    sfree(buf.attrbuf);
+}
+
 /*
  * The wordness array is mainly for deciding the disposition of the
  * US-ASCII characters.
