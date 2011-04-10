@@ -882,6 +882,8 @@ void term_paste(Terminal *);
 void term_nopaste(Terminal *);
 int term_ldisc(Terminal *, int option);
 void term_copyall(Terminal *);
+void term_find(Terminal *term, const wchar_t* const str, int direct);
+void term_free_hits(Terminal *term);
 void term_reconfig(Terminal *, Config *);
 void term_seen_key_event(Terminal *); 
 int term_data(Terminal *, int is_stderr, const char *data, int len);

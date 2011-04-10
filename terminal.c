@@ -1497,6 +1497,9 @@ Terminal *term_init(Config *mycfg, struct unicode_data *ucsdata,
     term->basic_erase_char.attr = ATTR_DEFAULT;
     term->basic_erase_char.cc_next = 0;
     term->erase_char = term->basic_erase_char;
+    term->hits_head = NULL;
+    term->hits_tail = NULL;
+    memset(term->search_str, 0, sizeof(term->search_str));
 
     return term;
 }
@@ -1541,6 +1544,7 @@ void term_free(Terminal *term)
     }
     sfree(term->pre_bidi_cache);
     sfree(term->post_bidi_cache);
+    term_free_hits(term);
 
     expire_timer_context(term);
 
@@ -5379,8 +5383,42 @@ typedef enum {
     FOUND_END = 3
 } found_status;
 
-void term_find(Terminal *term, const wchar_t* const str, int direct, pos *startpos)
+void term_free_hits(Terminal *term)
 {
+    hit_pos *pos = term->hits_head;
+    while (pos){
+        hit_pos *to_free = pos;
+        pos = pos->next;
+        sfree(to_free);
+    }
+    term->hits_head = NULL;
+    term->hits_tail = NULL;
+    term->last_hit = NULL;
+    memset(term->search_str, 0, sizeof(term->search_str));
+}
+
+void term_insert_hit(Terminal *term, pos *begin, pos *end)
+{
+    hit_pos* insert_pos = snew(hit_pos);
+    insert_pos->next = NULL;
+    insert_pos->rnext = term->hits_tail;
+    insert_pos->begin = *begin;
+    insert_pos->end = *end;
+    
+    if (term->hits_head == NULL)
+        term->hits_head = insert_pos;
+    
+    if (term->hits_tail != NULL)
+        term->hits_tail->next = insert_pos;
+    
+    term->hits_tail = insert_pos;
+}
+
+void term_find_all(Terminal *term)
+{
+    const wchar_t* const str = term->search_str;
+    assert(term->hits_head == NULL);
+    assert(term->hits_tail == NULL);
     if (!str || !str[0])
         return;
     
@@ -5392,12 +5430,6 @@ void term_find(Terminal *term, const wchar_t* const str, int direct, pos *startp
     top.x = 0;
     bottom.y = find_last_nonempty_line(term, screen);
     bottom.x = term->cols;
-    if (startpos){
-        if (!direct)
-            top = *startpos;
-        else 
-            bottom = *startpos;
-    }
 
     clip_workbuf buf;
     buf.buflen = 16;			
@@ -5411,7 +5443,7 @@ void term_find(Terminal *term, const wchar_t* const str, int direct, pos *startp
     pos found_beg;
     pos found_end;
 
-    while (poslt(top, bottom) && found_status != FOUND_END) {
+    while (poslt(top, bottom)) {
         int nl = FALSE;
     	termline *ldata = lineptr(top.y);
     	pos nlpos;
@@ -5441,14 +5473,14 @@ void term_find(Terminal *term, const wchar_t* const str, int direct, pos *startp
     	    decpos(nlpos);
     	}
 
-    	while (poslt(top, bottom) && poslt(top, nlpos) && found_status != FOUND_END) {
+    	while (poslt(top, bottom) && poslt(top, nlpos)) {
             pos pre_top = top;
     	    term_get_a_word(term, ldata, &top, &buf);
             int strlen = wcslen(str) - i_str;
             int cmplen = buf.bufpos > strlen ? strlen : buf.bufpos;
-            debug(("%c\t", *buf.textbuf));
+            //debug(("count:%d, char: %c\t", cmplen,  *buf.textbuf));
             if (!wcsncmp(&str[i_str], buf.textbuf, cmplen)){
-                debug(("%s\n", "match"));
+                //debug(("%s\n", "match"));
                 /* equal */
                 i_str += cmplen;
                 if (found_status == FOUND_NONE) {
@@ -5468,22 +5500,17 @@ void term_find(Terminal *term, const wchar_t* const str, int direct, pos *startp
                 
                 if (found_status == FOUND_END){
                     found_end = top;
-                    term->selstate = SELECTED;
-                    term->selmode = SM_WORD;
-                    term->seltype = SM_CHAR;
-                    term->selstart = term->selanchor = found_beg;
-                    term->selend = found_end;
-                    term_scroll_to_selection(term, 0);
-                    term_update(term);
-                    if (startpos)
-                        *startpos = direct ?  found_beg : found_end;
-                    debug(("found in (%d, %d) -- (%d, %d)\n", found_beg.y, found_beg.x
-                        ,found_end.y, found_end.x));
+                    term_insert_hit(term, &found_beg, &found_end);
+                    found_status = FOUND_NONE;
+                    i_str = 0;
+                    back_pos.x = 0; back_pos.y = 0;
+                    //debug(("found in (%d, %d) -- (%d, %d)\n", found_beg.y, found_beg.x
+                    //    ,found_end.y, found_end.x));
                 }
                 
 
             }else{
-                debug(("%s  expect: %c\n", "unmatch", str[i_str]));
+                //debug(("%s  expect: %c\n", "unmatch", str[i_str]));
                 if (found_status == FOUND_MID 
                     && str[0] == buf.textbuf[0]
                     && back_pos.x == 0 && back_pos.y == 0){
@@ -5513,6 +5540,36 @@ void term_find(Terminal *term, const wchar_t* const str, int direct, pos *startp
     }
     sfree(buf.textbuf);
     sfree(buf.attrbuf);
+}
+
+/*
+ * direct == 0, from top to bottom, direct != 0, from bottom to top
+ * reset != 0, find the first/last depending on the direct
+ */
+void term_find(Terminal *term, const wchar_t* const str, int direct)
+{    
+    if (wcscmp(str, term->search_str)){
+        term_free_hits(term);
+        wcsncpy(term->search_str, str, sizeof(term->search_str)/sizeof(wchar_t));
+        term_find_all(term);
+    }
+
+    hit_pos *hit = (direct && term->last_hit) ? term->last_hit->rnext
+                    : (!direct && term->last_hit) ? term->last_hit->next
+                    : direct ? term->hits_tail
+                    :          term->hits_head;
+    if (hit == NULL)
+        return;
+    term->last_hit = hit;
+    term->selstate = SELECTED;
+    term->selmode = SM_WORD;
+    term->seltype = SM_CHAR;
+    term->selstart = term->selanchor = hit->begin;
+    term->selend = hit->end;
+    term_scroll_to_selection(term, 0);
+    term_update(term);
+                    
+    
 }
 
 /*

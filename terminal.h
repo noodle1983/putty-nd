@@ -71,6 +71,13 @@ struct bidi_cache_entry {
     int *forward, *backward;	       /* the permutations of line positions */
 };
 
+typedef struct{
+    void* next;
+    void* rnext;
+    pos begin;
+    pos end;
+} hit_pos;
+
 struct terminal_tag {
 
     int compatibility_level;
@@ -273,6 +280,9 @@ struct terminal_tag {
     int wcFromTo_size;
     struct bidi_cache_entry *pre_bidi_cache, *post_bidi_cache;
     int bidi_cache_size;
+
+    hit_pos *hits_head, *hits_tail, *last_hit;
+    wchar_t search_str[128];
 };
 
 #define in_utf(term) ((term)->utf || (term)->ucsdata->line_codepage==CP_UTF8)
