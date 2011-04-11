@@ -87,6 +87,7 @@ int wintab_init(wintab *wintab, HWND hwndParent)
         wintab->hSysRgn[i] = NULL;
     wintab_create_toolbar(wintab);
     wintab_create_sysbtn(wintab);
+    wintab_create_searchbar(wintab);
  
     if (wintabitem_creat(wintab, &cfg) != 0){
         ErrorExit("wintabitem_creat(...)"); 
@@ -231,6 +232,39 @@ int wintab_create_toolbar(wintab *wintab)
 
 //-----------------------------------------------------------------------
 
+int wintab_create_searchbar(wintab *wintab)
+{
+    wintab->hSearchEdit = CreateWindowEx(
+        WS_EX_TOPMOST | WS_EX_CLIENTEDGE,
+        WC_EDIT, NULL,
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP, 
+        0, 0, 0, 0,
+        wintab->hwndTab, (HMENU)0, hinst, NULL);
+    wintab->hSearchPreBtn = CreateWindowEx(
+        WS_EX_TOPMOST ,
+        WC_BUTTON, "",
+        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON , 
+        0, 0, 20, 20,
+        wintab->hwndTab, (HMENU)0, hinst, NULL); 
+    wintab->hSearchNextBtn = CreateWindowEx(
+        WS_EX_TOPMOST ,
+        WC_BUTTON, "",
+        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON , 
+        0, 0, 20, 20,
+        wintab->hwndTab, (HMENU)0, hinst, NULL); 
+    wintab->hSearchResetBtn = CreateWindowEx(
+        WS_EX_TOPMOST ,
+        WC_BUTTON, "",
+        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON , 
+        0, 0, 20, 20,
+        wintab->hwndTab, (HMENU)0, hinst, NULL); 
+
+    return 0;
+}
+
+
+//-----------------------------------------------------------------------
+
 int wintab_del_tab(wintab *wintab, const int index)
 { 
     int i;
@@ -327,6 +361,37 @@ int wintab_resize(wintab *wintab, const RECT *rc)
         wintab->rcToolBar.left, wintab->rcToolBar.top, 
         wintab->rcToolBar.right - wintab->rcToolBar.left,
         wintab->rcToolBar.bottom - wintab->rcToolBar.top, SWP_NOZORDER);
+
+
+    //search bar
+    if (wintab->rcSearchBar.left){
+        int left = wintab->rcSearchBar.right - 20;
+        SetWindowPos(wintab->hSearchResetBtn, 0, 
+            left, wintab->rcSearchBar.top + 2, 0, 0, SWP_NOZORDER|SWP_NOSIZE|SWP_SHOWWINDOW);
+
+        left -= 20;
+        SetWindowPos(wintab->hSearchNextBtn, 0, 
+            left, wintab->rcSearchBar.top + 2, 0, 0, SWP_NOZORDER|SWP_NOSIZE|SWP_SHOWWINDOW);
+
+        left -= 20;
+        SetWindowPos(wintab->hSearchPreBtn, 0, 
+            left, wintab->rcSearchBar.top + 2, 0, 0, SWP_NOZORDER|SWP_NOSIZE|SWP_SHOWWINDOW);
+
+        SetWindowPos(wintab->hSearchEdit, 0, 
+            wintab->rcSearchBar.left, wintab->rcSearchBar.top + 1, 
+            left - wintab->rcSearchBar.left, 23, SWP_NOZORDER|SWP_SHOWWINDOW);
+
+    }else{
+        SetWindowPos(wintab->hSearchResetBtn, 0, 0, 0, 0, 0, 
+            SWP_NOZORDER|SWP_NOSIZE|SWP_HIDEWINDOW);
+        SetWindowPos(wintab->hSearchNextBtn, 0, 0, 0, 0, 0, 
+            SWP_NOZORDER|SWP_NOSIZE|SWP_HIDEWINDOW);
+        SetWindowPos(wintab->hSearchPreBtn,0, 0, 0, 0, 0, 
+            SWP_NOZORDER|SWP_NOSIZE|SWP_HIDEWINDOW);
+        SetWindowPos(wintab->hSearchEdit, 0, 0, 0, 0, 0, 
+            SWP_NOZORDER|SWP_NOSIZE|SWP_HIDEWINDOW);
+    }
+    
     wintabpage_resize(&wintab->items[index]->page, &wintab->rcPage, wintab->items[index]->cfg.window_border);
     return 0;
 }
@@ -368,6 +433,15 @@ void wintab_split_client_rect(wintab *wintab)
     wintab->rcPage = wintab->rcToolBar;
     wintab->rcPage.top = wintab->rcToolBar.bottom;
     wintab->rcPage.bottom = rc.bottom - border;
+
+    if (wintab->rcToolBar.right - wintab->rcToolBar.left >= 500){
+        wintab->rcSearchBar = wintab->rcToolBar;
+        wintab->rcSearchBar.left = wintab->rcSearchBar.right - 200;
+        wintab->rcToolBar.right = wintab->rcSearchBar.left;
+    }else{
+        wintab->rcSearchBar.left = wintab->rcSearchBar.right
+            = wintab->rcSearchBar.top = wintab->rcSearchBar.bottom = 0;
+    }
      
 }
 
@@ -546,7 +620,7 @@ int wintab_drawitems(wintab *wintab)
         curRc.left+3, curRc.bottom-1, wintab->bd_col);
     int spread = ((float)(curRc.bottom - curRc.top)) * 2/3;
     DrawLinec(hdc, curRc.right + spread-2, curRc.bottom-1,
-        wintab->rcToolBar.right, wintab->rcTabBar.bottom-1, wintab->bd_col);
+        wintab->rcPage.right, wintab->rcTabBar.bottom-1, wintab->bd_col);
     ReleaseDC(wintab->hwndTab, hdc);
     return 0;
 }
@@ -625,7 +699,7 @@ int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
     hPen = CreatePen(PS_SOLID, 1, wintab->sel_col);
     hOldPen = SelectObject(hdc, hPen); 
     RoundRect(hdc, wintab->rcToolBar.left+1, wintab->rcToolBar.top,
-        wintab->rcToolBar.right+1, wintab->rcPage.bottom, 5, 5);
+        wintab->rcPage.right+1, wintab->rcPage.bottom, 5, 5);
     
     SelectObject(hdc, hOldBrush); 
     DeleteObject(hBrush);
@@ -638,6 +712,10 @@ int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
     EndPaint(hwnd, &p);
 
     InvalidateRect(wintab->hToolBar, NULL, TRUE);
+    InvalidateRect(wintab->hSearchEdit, NULL, TRUE);
+    InvalidateRect(wintab->hSearchPreBtn, NULL, TRUE);
+    InvalidateRect(wintab->hSearchNextBtn, NULL, TRUE);
+    InvalidateRect(wintab->hSearchResetBtn, NULL, TRUE);
     InvalidateRect(wintab->hMaxBtn, NULL, TRUE);
     InvalidateRect(wintab->hMinBtn, NULL, TRUE);
     InvalidateRect(wintab->hClsBtn, NULL, TRUE);
@@ -782,7 +860,7 @@ int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
     HWND hitBtn = (HWND)lParam;
-    if (hitBtn == NULL) return 0;
+    if (hitBtn == NULL) return -1;
     
     if (hitBtn == wintab->hMinBtn){
         ShowWindow(hwnd, SW_MINIMIZE);
@@ -790,6 +868,8 @@ int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
         ShowWindow(hwnd, IsZoomed(hwnd)?SW_RESTORE:SW_MAXIMIZE);
     }else if (hitBtn == wintab->hClsBtn){
         PostMessage(hwnd, WM_CLOSE, 0, 0L);
+    }else if (hitBtn == wintab->hSearchEdit){
+        return 0;
     }else {
         on_menu(wintab_get_active_item(wintab), hWnd, message, wParam, lParam);
     }
@@ -965,8 +1045,8 @@ LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
 { 
     wintab* tab = win_get_data(hWnd);
     if (tab == NULL) return 0;
-    //debug(("[WintabWndProc]%s:%s\n", hWnd == tab->hwndTab? "TabMsg"
-    //                        : "UnknowMsg", TranslateWMessage(message))); 
+    debug(("[WintabWndProc]%s:%s\n", hWnd == tab->hwndTab? "TabMsg"
+                            : "UnknowMsg", TranslateWMessage(message))); 
     
     switch (message) {
         case WM_DRAWITEM:

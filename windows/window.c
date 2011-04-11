@@ -2063,9 +2063,10 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
 #define TO_CHR_X(x) ((((x)<0 ? (x)-tabitem->font_width+1 : (x))-tabitem->offset_width) / tabitem->font_width)
 #define TO_CHR_Y(y) ((((y)<0 ? (y)-tabitem->font_height+1: (y))-tabitem->offset_height) / tabitem->font_height)
  
-int on_button(wintabitem* tabitem, HWND hwnd, UINT message,
+int on_button(wintabitem* tabitem, HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
+    SetFocus(hwnd);
     if (message == WM_RBUTTONDOWN &&
     	    ((wParam & MK_CONTROL) || (tabitem->cfg.mouse_is_xterm == 2))) {
 	    POINT cursorpos;
@@ -2075,7 +2076,7 @@ int on_button(wintabitem* tabitem, HWND hwnd, UINT message,
 	    TrackPopupMenu(popup_menus[CTXMENU].menu,
 			   TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON,
 			   cursorpos.x, cursorpos.y,
-			   0, hwnd, NULL);
+			   0, hWnd, NULL);
 	    return 0;
 	}
     {
@@ -2151,7 +2152,7 @@ int on_button(wintabitem* tabitem, HWND hwnd, UINT message,
 #endif
 		if (is_full_screen() && press &&
 		    button == MBT_LEFT && mouse_on_hotspot) {
-		    SendMessage(hwnd, WM_SYSCOMMAND, SC_MOUSEMENU,
+		    SendMessage(hWnd, WM_SYSCOMMAND, SC_MOUSEMENU,
 				MAKELPARAM(pt.x, pt.y));
 		    return 0;
 		}
@@ -2736,10 +2737,10 @@ int on_default(wintabitem* tabitem, HWND hwnd, UINT message,
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    //debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
-    //                        :hwnd == tab.hwndTab ? "TabBarMsg"
-    //                        :hwnd == tab.items[0]->page.hwndCtrl ? "PageMsg"
-    //                        : "UnknowMsg", TranslateWMessage(message)));
+    debug(("[WndProc]%s:%s\n", hwnd == hwnd ? "DialogMsg"
+                            :hwnd == tab.hwndTab ? "TabBarMsg"
+                            :hwnd == tab.items[0]->page.hwndCtrl ? "PageMsg"
+                            : "UnknowMsg", TranslateWMessage(message)));
 
     wintabitem *tabitem = wintab_get_active_item(&tab);
 

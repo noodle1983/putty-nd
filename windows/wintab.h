@@ -161,7 +161,13 @@ typedef struct {
     HWND hToolBar;
     HWND hImageList;
 
+    HWND hSearchEdit;
+    HWND hSearchPreBtn;
+    HWND hSearchNextBtn;
+    HWND hSearchResetBtn;
+
     RECT rcTabBar, rcSysBtn, rcToolBar, rcPage;
+    RECT rcSearchBar;
 
     LRESULT CALLBACK (*defWndProc)(HWND,UINT,WPARAM,LPARAM);
 }wintab;
@@ -182,6 +188,7 @@ int wintab_fini(wintab *wintab);
 int wintab_create_tab(wintab *wintab, Config *cfg);
 int wintab_create_sysbtn(wintab *wintab);
 int wintab_create_toolbar(wintab *wintab);
+int wintab_create_searchbar(wintab *wintab);
 int wintab_swith_tab(wintab *wintab);
 int wintab_resize(wintab *wintab, const RECT *rc);
 void wintab_onsize(wintab *wintab, HWND hwndParent, LPARAM lParam);
