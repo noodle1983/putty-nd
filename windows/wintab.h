@@ -170,6 +170,7 @@ typedef struct {
     RECT rcTabBar, rcSysBtn, rcToolBar, rcPage;
     RECT rcSearchBar;
 
+    LRESULT CALLBACK (*SearchEditDefWndProc)(HWND,UINT,WPARAM,LPARAM);
     LRESULT CALLBACK (*defWndProc)(HWND,UINT,WPARAM,LPARAM);
 }wintab;
 
@@ -210,6 +211,8 @@ int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
 int wintab_hit_tab(wintab *wintab, const int x, const int y);
 int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK SearchEditWndProc(HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);

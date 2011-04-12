@@ -601,8 +601,10 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     	    if (msg.message == WM_QUIT)
     		goto finished;	       /* two-level break */
 
-    	    if (!(wintab_is_logboxmsg(&tab, &msg)) && (!IsDialogMessage(hwnd, &msg))){ 
-                DispatchMessage(&msg);
+    	    if (!(wintab_is_logboxmsg(&tab, &msg)) ){ 
+                if ((msg.message == WM_KEYDOWN && msg.wParam == VK_RETURN)
+                    ||(!IsDialogMessage(hwnd, &msg)))
+                    DispatchMessage(&msg);
     	    }
     	    /* Send the paste buffer if there's anything to send */
     	    wintab_term_paste(&tab);

@@ -246,6 +246,8 @@ int wintab_create_searchbar(wintab *wintab)
         wintab->hwndTab, (HMENU)0, hinst, NULL);
     SendMessage(wintab->hSearchEdit, WM_SETFONT, (int)wintab->hEditFont, MAKELPARAM(TRUE, 0));
     Edit_LimitText(wintab->hSearchEdit, 127);
+    win_bind_data(wintab->hSearchEdit, wintab);
+    wintab->SearchEditDefWndProc = (WNDPROC)SetWindowLongPtr(wintab->hSearchEdit, GWL_WNDPROC, (long)SearchEditWndProc);
     
     wintab->hSearchPreBtn = CreateWindowEx(
         WS_EX_TOPMOST ,
@@ -863,6 +865,28 @@ int wintab_on_drawbtn(wintab* wintab, HWND hWnd, UINT message,
 
 //-----------------------------------------------------------------------
 
+LRESULT CALLBACK SearchEditWndProc(HWND hWnd, UINT message,
+				WPARAM wParam, LPARAM lParam)
+{
+    debug(("[SearchEditWndProc]"));
+    wintab* tab = win_get_data(hWnd);
+    if (tab == NULL) 
+        return 0; 
+    debug(("[SearchEditWndProc]%s:%s\n", hWnd == tab->hSearchEdit? "SearchEditMsg"
+                            : "UnknowMsg", TranslateWMessage(message)));
+    switch (message) {
+        case WM_KEYDOWN:
+            if (wParam == VK_RETURN){
+                SendMessage(tab->hwndTab, WM_COMMAND, 0, tab->hSearchPreBtn);
+                return 0;
+            }
+            break;
+    }
+    return( CallWindowProc( tab->SearchEditDefWndProc, hWnd, message, wParam, lParam));
+}
+
+//-----------------------------------------------------------------------
+
 int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
@@ -888,10 +912,12 @@ int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
         wchar_t str[256] = {0};
         GetWindowTextW(wintab->hSearchEdit, str, 128);
         term_find(tabitem->term, str, 1);
+        return 0;
     }else if (hitBtn == wintab->hSearchNextBtn){
         wchar_t str[128] = {0};
         GetWindowTextW(wintab->hSearchEdit, str, 128);
         term_find(tabitem->term, str, 0);
+        return 0;
     }else {
         on_menu(tabitem, hWnd, message, wParam, lParam);
     }
