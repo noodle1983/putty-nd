@@ -234,6 +234,8 @@ int wintab_create_toolbar(wintab *wintab)
 
 int wintab_create_searchbar(wintab *wintab)
 {   
+    HICON hicon; 
+    
     wintab->hEditFont = CreateFont (18, 0, 0, 0, FW_THIN, FALSE, FALSE, FALSE, 
 			   DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, 
 		       CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
@@ -252,21 +254,29 @@ int wintab_create_searchbar(wintab *wintab)
     wintab->hSearchPreBtn = CreateWindowEx(
         WS_EX_TOPMOST ,
         WC_BUTTON, "",
-        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON , 
+        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON | BS_FLAT , 
         0, 0, 20, 20,
         wintab->hwndTab, (HMENU)0, hinst, NULL); 
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SEARCH_PRE));
+    SendMessage(wintab->hSearchPreBtn, BM_SETIMAGE, IMAGE_ICON, (LPARAM)hicon);
+    
     wintab->hSearchNextBtn = CreateWindowEx(
         WS_EX_TOPMOST ,
         WC_BUTTON, "",
-        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON , 
+        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON | BS_FLAT, 
         0, 0, 20, 20,
         wintab->hwndTab, (HMENU)0, hinst, NULL); 
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SEARCH_NEXT));
+    SendMessage(wintab->hSearchNextBtn, BM_SETIMAGE, IMAGE_ICON, (LPARAM)hicon);
+    
     wintab->hSearchResetBtn = CreateWindowEx(
         WS_EX_TOPMOST ,
         WC_BUTTON, "",
-        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON , 
+        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON | BS_FLAT, 
         0, 0, 20, 20,
         wintab->hwndTab, (HMENU)0, hinst, NULL); 
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SEARCH_RESET));
+    SendMessage(wintab->hSearchResetBtn, BM_SETIMAGE, IMAGE_ICON, (LPARAM)hicon);
 
     return 0;
 }
@@ -877,7 +887,7 @@ LRESULT CALLBACK SearchEditWndProc(HWND hWnd, UINT message,
     switch (message) {
         case WM_KEYDOWN:
             if (wParam == VK_RETURN){
-                SendMessage(tab->hwndTab, WM_COMMAND, 0, tab->hSearchPreBtn);
+                SendMessage(tab->hwndTab, WM_COMMAND, 0, (LPARAM)tab->hSearchPreBtn);
                 return 0;
             }
             break;

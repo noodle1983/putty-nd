@@ -17,6 +17,9 @@
 #define IDI_CLEAR_SB     209
 #define IDI_FULL_SCREEN  210
 #define IDI_ABOUT        211
+#define IDI_SEARCH_PRE   212
+#define IDI_SEARCH_NEXT  213
+#define IDI_SEARCH_RESET 214
 
 #define IDD_MAINBOX      102
 #define IDD_LOGBOX       110
