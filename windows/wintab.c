@@ -238,9 +238,9 @@ int wintab_create_searchbar(wintab *wintab)
 			   DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, 
 		       CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
 			   FIXED_PITCH | FF_DONTCARE, "Courier New");
-    wintab->hSearchEdit = CreateWindowEx(
+    wintab->hSearchEdit = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_CLIENTEDGE,
-        WC_EDIT, NULL,
+        L"EDIT", NULL,
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 
         0, 0, 0, 0,
         wintab->hwndTab, (HMENU)0, hinst, NULL);
@@ -868,6 +868,8 @@ int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
 {
     HWND hitBtn = (HWND)lParam;
     if (hitBtn == NULL) return -1;
+
+    wintabitem *tabitem = wintab_get_active_item(wintab);
     
     if (hitBtn == wintab->hMinBtn){
         ShowWindow(hwnd, SW_MINIMIZE);
@@ -880,8 +882,18 @@ int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
             PostMessage(wintab->hSearchEdit, EM_SETSEL, 0, -1);
         }
         return( CallWindowProc( wintab->defWndProc, hWnd, message, wParam, lParam));
+    }else if (hitBtn == wintab->hSearchResetBtn){
+        term_free_hits(tabitem->term);
+    }else if (hitBtn == wintab->hSearchPreBtn){
+        wchar_t str[256] = {0};
+        GetWindowTextW(wintab->hSearchEdit, str, 128);
+        term_find(tabitem->term, str, 1);
+    }else if (hitBtn == wintab->hSearchNextBtn){
+        wchar_t str[128] = {0};
+        GetWindowTextW(wintab->hSearchEdit, str, 128);
+        term_find(tabitem->term, str, 0);
     }else {
-        on_menu(wintab_get_active_item(wintab), hWnd, message, wParam, lParam);
+        on_menu(tabitem, hWnd, message, wParam, lParam);
     }
     //button would hold the focus
     SetFocus(hwnd);

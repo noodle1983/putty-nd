@@ -5548,6 +5548,9 @@ void term_find_all(Terminal *term)
  */
 void term_find(Terminal *term, const wchar_t* const str, int direct)
 {    
+    if (!str || !str[0])
+        return;
+    
     if (wcscmp(str, term->search_str)){
         term_free_hits(term);
         wcsncpy(term->search_str, str, sizeof(term->search_str)/sizeof(wchar_t));
