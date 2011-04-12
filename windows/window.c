@@ -601,7 +601,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     	    if (msg.message == WM_QUIT)
     		goto finished;	       /* two-level break */
 
-    	    if (!(wintab_is_logboxmsg(&tab, &msg))){ 
+    	    if (!(wintab_is_logboxmsg(&tab, &msg)) && (!IsDialogMessage(hwnd, &msg))){ 
                 DispatchMessage(&msg);
     	    }
     	    /* Send the paste buffer if there's anything to send */

@@ -233,13 +233,20 @@ int wintab_create_toolbar(wintab *wintab)
 //-----------------------------------------------------------------------
 
 int wintab_create_searchbar(wintab *wintab)
-{
+{   
+    wintab->hEditFont = CreateFont (18, 0, 0, 0, FW_THIN, FALSE, FALSE, FALSE, 
+			   DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, 
+		       CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
+			   FIXED_PITCH | FF_DONTCARE, "Courier New");
     wintab->hSearchEdit = CreateWindowEx(
         WS_EX_TOPMOST | WS_EX_CLIENTEDGE,
         WC_EDIT, NULL,
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP, 
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 
         0, 0, 0, 0,
         wintab->hwndTab, (HMENU)0, hinst, NULL);
+    SendMessage(wintab->hSearchEdit, WM_SETFONT, (int)wintab->hEditFont, MAKELPARAM(TRUE, 0));
+    Edit_LimitText(wintab->hSearchEdit, 127);
+    
     wintab->hSearchPreBtn = CreateWindowEx(
         WS_EX_TOPMOST ,
         WC_BUTTON, "",
@@ -869,7 +876,10 @@ int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
     }else if (hitBtn == wintab->hClsBtn){
         PostMessage(hwnd, WM_CLOSE, 0, 0L);
     }else if (hitBtn == wintab->hSearchEdit){
-        return 0;
+        if (HIWORD(wParam) == EN_SETFOCUS){
+            PostMessage(wintab->hSearchEdit, EM_SETSEL, 0, -1);
+        }
+        return( CallWindowProc( wintab->defWndProc, hWnd, message, wParam, lParam));
     }else {
         on_menu(wintab_get_active_item(wintab), hWnd, message, wParam, lParam);
     }

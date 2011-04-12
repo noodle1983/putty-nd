@@ -161,6 +161,7 @@ typedef struct {
     HWND hToolBar;
     HWND hImageList;
 
+    HFONT hEditFont;
     HWND hSearchEdit;
     HWND hSearchPreBtn;
     HWND hSearchNextBtn;
