@@ -158,7 +158,7 @@ int wintab_create_toolbar(wintab *wintab)
     wintab->hToolBar = CreateWindowEx(
         WS_EX_TOPMOST,
         TOOLBARCLASSNAME, "",
-        WS_CHILD | TBSTYLE_TRANSPARENT | CCS_NORESIZE | CCS_NOPARENTALIGN | CCS_NODIVIDER, 
+        WS_CHILD | TBSTYLE_TRANSPARENT | CCS_NORESIZE | CCS_NOPARENTALIGN | CCS_NODIVIDER |  TBSTYLE_TOOLTIPS, 
         0, 0, 100, 23,
         wintab->hwndTab, NULL, hinst, NULL); 
 
@@ -281,6 +281,68 @@ int wintab_create_searchbar(wintab *wintab)
     return 0;
 }
 
+//-----------------------------------------------------------------------
+int wintab_set_tooltips(LPTOOLTIPTEXT lpttt)
+{
+    UINT_PTR idButton = lpttt->hdr.idFrom; 
+
+    lpttt->hinst = NULL; 
+    
+    switch (idButton) {
+        case IDM_SHOWLOG:	
+            wcsncpy((wchar_t *)lpttt->szText, L"show logs", 80);    
+            break;
+        case IDM_NEWSESS:	
+            wcsncpy((wchar_t *)lpttt->szText, L"new a session", 80);    
+            break;
+        case IDM_DUPSESS:	
+            wcsncpy((wchar_t *)lpttt->szText, L"duplicate current session", 80);    
+            break;
+        case IDM_RESTART:	
+            wcsncpy((wchar_t *)lpttt->szText, L"restart current session", 80);  
+            break;
+        case IDM_RECONF:	
+            wcsncpy((wchar_t *)lpttt->szText, L"config current session", 80);   
+            break;
+        case IDM_CLRSB:	    
+            wcsncpy((wchar_t *)lpttt->szText, L"clear the scroll bar", 80); 
+            break;
+        case IDM_RESET:	    
+            wcsncpy((wchar_t *)lpttt->szText, L"reset term", 80);   
+            break;
+        case IDM_HELP:	    
+            wcsncpy((wchar_t *)lpttt->szText, L"help", 80); 
+            break;
+        case IDM_ABOUT:	    
+            wcsncpy((wchar_t *)lpttt->szText, L"about", 80);    
+            break;
+        case IDM_SAVEDSESS:	
+            wcsncpy((wchar_t *)lpttt->szText, L"save session", 80); 
+            break;
+        case IDM_COPYALL:	
+            wcsncpy((wchar_t *)lpttt->szText, L"copy all", 80); 
+            break;
+        case IDM_FULLSCREEN:
+            wcsncpy((wchar_t *)lpttt->szText, L"full screen", 80);  
+            break;
+        case IDM_PASTE:	    
+            wcsncpy((wchar_t *)lpttt->szText, L"paste", 80);    
+            break;
+        case IDM_SFTP:	    
+            wcsncpy((wchar_t *)lpttt->szText, L"create sftp channel", 80);  
+            break;
+        case IDM_SEARCH_P:	
+            wcsncpy((wchar_t *)lpttt->szText, L"search upper", 80); 
+            break;
+        case IDM_SEARCH_N:	
+            wcsncpy((wchar_t *)lpttt->szText, L"search lower", 80); 
+            break;
+        case IDM_SEARCH_R:	
+            wcsncpy((wchar_t *)lpttt->szText, L"reset search, applicable for the term lines are changed", 80);  
+            break;
+    }
+    return 0;
+}
 
 //-----------------------------------------------------------------------
 
@@ -1143,6 +1205,16 @@ LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
         case WM_COMMAND:
             wintab_handle_button(tab, hWnd, message, wParam, lParam);
             return 0;
+            
+        case WM_NOTIFY: 
+            switch (((LPNMHDR) lParam)->code){ 
+                case TTN_GETDISPINFOW: 
+                    wintab_set_tooltips((LPTOOLTIPTEXT)lParam);
+                    break;
+                case TTN_GETDISPINFOA:
+                    break;
+            }
+            break;
     }
     return( CallWindowProc( tab->defWndProc, hWnd, message, wParam, lParam));
 }
