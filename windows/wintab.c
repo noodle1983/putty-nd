@@ -633,8 +633,17 @@ void wintab_require_resize(wintab *wintab, int tab_width, int tab_height)
     SetWindowPos(wintab->hwndTab, NULL, 0, 0, 
         tab_width, tab_height, SWP_NOMOVE | SWP_NOZORDER); 
 
-    SetWindowPos(wintab->hToolBar, NULL, 0, 0, 
-        tab_width - 6, 25, SWP_NOMOVE | SWP_NOZORDER);
+    if (tab_width - 6 >= 550){
+        SetWindowPos(wintab->hToolBar, NULL, 0, 0, 
+            tab_width - 6 - 250, 25, SWP_NOMOVE | SWP_NOZORDER);
+    }else{
+        SetWindowPos(wintab->hToolBar, NULL, 0, 0, 
+            tab_width - 6, 25, SWP_NOMOVE | SWP_NOZORDER);
+        SetWindowPos(wintab->hSearchBar, 0, 0, 0, 0, 0, 
+            SWP_NOZORDER|SWP_NOSIZE|SWP_HIDEWINDOW);
+        SetWindowPos(wintab->hSearchEdit, 0, 0, 0, 0, 0, 
+            SWP_NOZORDER|SWP_NOSIZE|SWP_HIDEWINDOW);
+    }
 
     int xPos = tab_width - border - CLS_BTN_WIDTH;
     SetWindowPos(wintab->hClsBtn, 0, xPos, 0, 
