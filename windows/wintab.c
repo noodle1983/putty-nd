@@ -154,6 +154,7 @@ int wintab_create_toolbar(wintab *wintab)
     const DWORD buttonStyles = BTNS_AUTOSIZE;
     const int bitmapSize = 16;
     HICON hicon; 
+    HIMAGELIST hImageList;
     
     wintab->hToolBar = CreateWindowEx(
         WS_EX_TOPMOST,
@@ -163,35 +164,34 @@ int wintab_create_toolbar(wintab *wintab)
         wintab->hwndTab, NULL, hinst, NULL); 
 
     // Create the imagelist.
-    wintab->hImageList = 
-        (HWND)ImageList_Create(bitmapSize, bitmapSize, ILC_MASK, 7, 0);
+    hImageList = ImageList_Create(bitmapSize, bitmapSize, ILC_MASK, 11, 0);
 
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_MAINICON)); 
-    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);  
+    ImageList_AddIcon(hImageList, hicon);  
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_DUP_SESS)); 
-    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SESS_CFG    )); 
-    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_RESET_SESS  )); 
-    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SFTP        )); 
-    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SHOW_LOG    )); 
-    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_COYP_ALL    )); 
-    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_PASTE       )); 
-    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_CLEAR_SB    )); 
-    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_FULL_SCREEN )); 
-    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_ABOUT       )); 
-    ImageList_AddIcon((HIMAGELIST)wintab->hImageList, hicon);
+    ImageList_AddIcon(hImageList, hicon);
     
     // Set the image list.
     SendMessage(wintab->hToolBar, TB_SETIMAGELIST, (WPARAM)ImageListID, 
-        (LPARAM)wintab->hImageList);
+        (LPARAM)hImageList);
 
     // Load the button images.
     SendMessage(wintab->hToolBar, TB_LOADIMAGES, (WPARAM)IDB_STD_SMALL_COLOR, 
@@ -234,8 +234,6 @@ int wintab_create_toolbar(wintab *wintab)
 
 int wintab_create_searchbar(wintab *wintab)
 {   
-    HICON hicon; 
-    
     wintab->hEditFont = CreateFont (18, 0, 0, 0, FW_THIN, FALSE, FALSE, FALSE, 
 			   DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, 
 		       CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
@@ -251,32 +249,49 @@ int wintab_create_searchbar(wintab *wintab)
     win_bind_data(wintab->hSearchEdit, wintab);
     wintab->SearchEditDefWndProc = (WNDPROC)SetWindowLongPtr(wintab->hSearchEdit, GWL_WNDPROC, (long)SearchEditWndProc);
     
-    wintab->hSearchPreBtn = CreateWindowEx(
-        WS_EX_TOPMOST ,
-        WC_BUTTON, "",
-        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON | BS_FLAT , 
-        0, 0, 20, 20,
-        wintab->hwndTab, (HMENU)0, hinst, NULL); 
-    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SEARCH_PRE));
-    SendMessage(wintab->hSearchPreBtn, BM_SETIMAGE, IMAGE_ICON, (LPARAM)hicon);
+    const int ImageListID = 0;
+    const DWORD buttonStyles = BTNS_AUTOSIZE;
+    const int bitmapSize = 16;
+    HICON hicon; ;
+    HIMAGELIST hImageList;
     
-    wintab->hSearchNextBtn = CreateWindowEx(
-        WS_EX_TOPMOST ,
-        WC_BUTTON, "",
-        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON | BS_FLAT, 
-        0, 0, 20, 20,
-        wintab->hwndTab, (HMENU)0, hinst, NULL); 
-    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SEARCH_NEXT));
-    SendMessage(wintab->hSearchNextBtn, BM_SETIMAGE, IMAGE_ICON, (LPARAM)hicon);
+    wintab->hSearchBar = CreateWindowEx(
+        WS_EX_TOPMOST,
+        TOOLBARCLASSNAME, "",
+        WS_CHILD | TBSTYLE_TRANSPARENT | CCS_NORESIZE | CCS_NOPARENTALIGN | CCS_NODIVIDER |  TBSTYLE_TOOLTIPS, 
+        0, 0, 70, 23,
+        wintab->hwndTab, NULL, hinst, NULL); 
+    // Create the imagelist.
+    hImageList = ImageList_Create(bitmapSize, bitmapSize, ILC_MASK, 3, 0);
+
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SEARCH_PRE)); 
+    ImageList_AddIcon(hImageList, hicon);  
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SEARCH_NEXT)); 
+    ImageList_AddIcon(hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SEARCH_RESET)); 
+    ImageList_AddIcon(hImageList, hicon);
     
-    wintab->hSearchResetBtn = CreateWindowEx(
-        WS_EX_TOPMOST ,
-        WC_BUTTON, "",
-        WS_CHILD | WS_VISIBLE | BS_ICON | WS_TABSTOP | BS_PUSHBUTTON | BS_FLAT, 
-        0, 0, 20, 20,
-        wintab->hwndTab, (HMENU)0, hinst, NULL); 
-    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_SEARCH_RESET));
-    SendMessage(wintab->hSearchResetBtn, BM_SETIMAGE, IMAGE_ICON, (LPARAM)hicon);
+    // Set the image list.
+    SendMessage(wintab->hSearchBar, TB_SETIMAGELIST, (WPARAM)ImageListID, 
+        (LPARAM)hImageList);
+
+    // Load the button images.
+    SendMessage(wintab->hSearchBar, TB_LOADIMAGES, (WPARAM)IDB_STD_SMALL_COLOR, 
+        (LPARAM)HINST_COMMCTRL);
+
+    // Initialize button info.
+    TBBUTTON tbButtons[] = {
+        { 0, IDM_SEARCH_P, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL },
+        { 1, IDM_SEARCH_N, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 2, IDM_SEARCH_R, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
+    };
+
+    // Add buttons.
+    const int numButtons = sizeof(tbButtons)/sizeof(TBBUTTON);
+    SendMessage(wintab->hSearchBar, TB_BUTTONSTRUCTSIZE, 
+        (WPARAM)sizeof(TBBUTTON), 0);
+    SendMessage(wintab->hSearchBar, TB_ADDBUTTONS, (WPARAM)numButtons, 
+        (LPARAM)&tbButtons);
 
     return 0;
 }
@@ -338,7 +353,7 @@ int wintab_set_tooltips(LPTOOLTIPTEXT lpttt)
             wcsncpy((wchar_t *)lpttt->szText, L"search lower", 80); 
             break;
         case IDM_SEARCH_R:	
-            wcsncpy((wchar_t *)lpttt->szText, L"reset search, applicable for the term lines are changed", 80);  
+            wcsncpy((wchar_t *)lpttt->szText, L"reset search, applicable for that the term lines are changed", 80);  
             break;
     }
     return 0;
@@ -446,28 +461,16 @@ int wintab_resize(wintab *wintab, const RECT *rc)
 
     //search bar
     if (wintab->rcSearchBar.left){
-        int left = wintab->rcSearchBar.right - 20;
-        SetWindowPos(wintab->hSearchResetBtn, 0, 
-            left, wintab->rcSearchBar.top + 2, 0, 0, SWP_NOZORDER|SWP_NOSIZE|SWP_SHOWWINDOW);
-
-        left -= 20;
-        SetWindowPos(wintab->hSearchNextBtn, 0, 
-            left, wintab->rcSearchBar.top + 2, 0, 0, SWP_NOZORDER|SWP_NOSIZE|SWP_SHOWWINDOW);
-
-        left -= 20;
-        SetWindowPos(wintab->hSearchPreBtn, 0, 
-            left, wintab->rcSearchBar.top + 2, 0, 0, SWP_NOZORDER|SWP_NOSIZE|SWP_SHOWWINDOW);
+        int left = wintab->rcSearchBar.right - 70;
+        SetWindowPos(wintab->hSearchBar, 0, 
+            left, wintab->rcSearchBar.top, 0, 0, SWP_NOZORDER|SWP_NOSIZE|SWP_SHOWWINDOW);
 
         SetWindowPos(wintab->hSearchEdit, 0, 
             wintab->rcSearchBar.left, wintab->rcSearchBar.top + 1, 
             left - wintab->rcSearchBar.left, 23, SWP_NOZORDER|SWP_SHOWWINDOW);
 
     }else{
-        SetWindowPos(wintab->hSearchResetBtn, 0, 0, 0, 0, 0, 
-            SWP_NOZORDER|SWP_NOSIZE|SWP_HIDEWINDOW);
-        SetWindowPos(wintab->hSearchNextBtn, 0, 0, 0, 0, 0, 
-            SWP_NOZORDER|SWP_NOSIZE|SWP_HIDEWINDOW);
-        SetWindowPos(wintab->hSearchPreBtn,0, 0, 0, 0, 0, 
+        SetWindowPos(wintab->hSearchBar, 0, 0, 0, 0, 0, 
             SWP_NOZORDER|SWP_NOSIZE|SWP_HIDEWINDOW);
         SetWindowPos(wintab->hSearchEdit, 0, 0, 0, 0, 0, 
             SWP_NOZORDER|SWP_NOSIZE|SWP_HIDEWINDOW);
@@ -515,9 +518,9 @@ void wintab_split_client_rect(wintab *wintab)
     wintab->rcPage.top = wintab->rcToolBar.bottom;
     wintab->rcPage.bottom = rc.bottom - border;
 
-    if (wintab->rcToolBar.right - wintab->rcToolBar.left >= 500){
+    if (wintab->rcToolBar.right - wintab->rcToolBar.left >= 550){
         wintab->rcSearchBar = wintab->rcToolBar;
-        wintab->rcSearchBar.left = wintab->rcSearchBar.right - 200;
+        wintab->rcSearchBar.left = wintab->rcSearchBar.right - 250;
         wintab->rcToolBar.right = wintab->rcSearchBar.left;
     }else{
         wintab->rcSearchBar.left = wintab->rcSearchBar.right
@@ -794,9 +797,7 @@ int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
 
     InvalidateRect(wintab->hToolBar, NULL, TRUE);
     InvalidateRect(wintab->hSearchEdit, NULL, TRUE);
-    InvalidateRect(wintab->hSearchPreBtn, NULL, TRUE);
-    InvalidateRect(wintab->hSearchNextBtn, NULL, TRUE);
-    InvalidateRect(wintab->hSearchResetBtn, NULL, TRUE);
+    InvalidateRect(wintab->hSearchBar, NULL, TRUE);
     InvalidateRect(wintab->hMaxBtn, NULL, TRUE);
     InvalidateRect(wintab->hMinBtn, NULL, TRUE);
     InvalidateRect(wintab->hClsBtn, NULL, TRUE);
@@ -949,7 +950,7 @@ LRESULT CALLBACK SearchEditWndProc(HWND hWnd, UINT message,
     switch (message) {
         case WM_KEYDOWN:
             if (wParam == VK_RETURN){
-                SendMessage(tab->hwndTab, WM_COMMAND, 0, (LPARAM)tab->hSearchPreBtn);
+                SendMessage(tab->hwndTab, WM_COMMAND, IDM_SEARCH_P, 0);
                 return 0;
             }
             break;
@@ -963,7 +964,6 @@ int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
     HWND hitBtn = (HWND)lParam;
-    if (hitBtn == NULL) return -1;
 
     wintabitem *tabitem = wintab_get_active_item(wintab);
     
@@ -978,14 +978,14 @@ int wintab_handle_button(wintab* wintab, HWND hWnd, UINT message,
             PostMessage(wintab->hSearchEdit, EM_SETSEL, 0, -1);
         }
         return( CallWindowProc( wintab->defWndProc, hWnd, message, wParam, lParam));
-    }else if (hitBtn == wintab->hSearchResetBtn){
+    }else if ((wParam & ~0xF) == IDM_SEARCH_R){
         term_free_hits(tabitem->term);
-    }else if (hitBtn == wintab->hSearchPreBtn){
+    }else if ((wParam & ~0xF) == IDM_SEARCH_P){
         wchar_t str[256] = {0};
         GetWindowTextW(wintab->hSearchEdit, str, 128);
         term_find(tabitem->term, str, 1);
         return 0;
-    }else if (hitBtn == wintab->hSearchNextBtn){
+    }else if ((wParam & ~0xF) == IDM_SEARCH_N){
         wchar_t str[128] = {0};
         GetWindowTextW(wintab->hSearchEdit, str, 128);
         term_find(tabitem->term, str, 0);

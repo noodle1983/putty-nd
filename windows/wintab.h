@@ -25,9 +25,9 @@
 #define IDM_PASTE     0x0190
 #define IDM_SFTP      0x0200
 #define IDM_SPECIALSEP 0x0210
-#define IDM_SEARCH_P  0x0211
-#define IDM_SEARCH_N  0x0212
-#define IDM_SEARCH_R  0x0213
+#define IDM_SEARCH_P  0x0220
+#define IDM_SEARCH_N  0x0230
+#define IDM_SEARCH_R  0x0240
 
 #define IDM_SPECIAL_MIN 0x0400
 #define IDM_SPECIAL_MAX 0x0800
@@ -166,9 +166,7 @@ typedef struct {
 
     HFONT hEditFont;
     HWND hSearchEdit;
-    HWND hSearchPreBtn;
-    HWND hSearchNextBtn;
-    HWND hSearchResetBtn;
+    HWND hSearchBar;
 
     RECT rcTabBar, rcSysBtn, rcToolBar, rcPage;
     RECT rcSearchBar;
