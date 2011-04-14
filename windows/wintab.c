@@ -241,7 +241,7 @@ int wintab_create_searchbar(wintab *wintab)
     wintab->hSearchEdit = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_CLIENTEDGE,
         L"EDIT", NULL,
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 
+        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 
         0, 0, 0, 0,
         wintab->hwndTab, (HMENU)0, hinst, NULL);
     SendMessage(wintab->hSearchEdit, WM_SETFONT, (int)wintab->hEditFont, MAKELPARAM(TRUE, 0));

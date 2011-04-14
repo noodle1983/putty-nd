@@ -602,7 +602,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     		goto finished;	       /* two-level break */
 
     	    if (!(wintab_is_logboxmsg(&tab, &msg)) ){ 
-                if ((msg.message == WM_KEYDOWN && msg.wParam == VK_RETURN)
+                if ((msg.message == WM_KEYDOWN)
                     ||(!IsDialogMessage(hwnd, &msg)))
                     DispatchMessage(&msg);
     	    }
