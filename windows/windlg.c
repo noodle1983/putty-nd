@@ -115,6 +115,8 @@ extern Config cfg;		       /* defined in window.c */
 
 #define PRINTER_DISABLED_STRING "None (printing disabled)"
 
+#define GRP_COLLAPSE_SETTING "GroupCollapse"
+
 static void refresh_session_treeview(
     HWND sessionview, struct treeview_faff* tvfaff, 
     const char* select_session);
@@ -409,9 +411,7 @@ static HTREEITEM session_treeview_insert(struct treeview_faff *faff,
 	ins.INSITEM.iImage = (flags == SESSION_GROUP) ? 1 : 0;
 	ins.INSITEM.iSelectedImage = (flags == SESSION_GROUP) ? 2 : 0;
     newitem = TreeView_InsertItem(faff->treeview, &ins);
-    if (level > 0)
-	TreeView_Expand(faff->treeview, faff->lastat[level - 1],
-			(level > 1 ? TVE_COLLAPSE : TVE_EXPAND));
+    
     faff->lastat[level] = newitem;
     for (i = level + 1; i < 4; i++)
 		faff->lastat[i] = NULL;
@@ -855,6 +855,9 @@ static void refresh_session_treeview(
 	char itemstr[64];
     struct sesslist sesslist;
     int is_select;
+    char session[256] = {0};
+    HTREEITEM pre_grp_item = NULL;
+    int pre_grp_collapse = 0;
 	
     memset(tvfaff->lastat, 0, sizeof(tvfaff->lastat));
 	TreeView_DeleteAllItems(tvfaff->treeview);
@@ -864,6 +867,7 @@ static void refresh_session_treeview(
 		if (!sesslist.sessions[i][0])
 			continue;
         is_select = !strcmp(sesslist.sessions[i], select_session);
+        strncpy(session, sesslist.sessions[i], sizeof(session));
         
 		level = 0;
 		b = 0;
@@ -881,6 +885,19 @@ static void refresh_session_treeview(
 					strncpy(itemstr, sesslist.sessions[i]+b, len);
 					itemstr[len] = '\0';
 					item = session_treeview_insert(tvfaff, level-1, itemstr, SESSION_GROUP);
+
+                    //we can only expand a group with a child
+                    //so we expand the previous group
+                    //leave the group in tail alone.
+                    if (pre_grp_item){
+                        TreeView_Expand(tvfaff->treeview, pre_grp_item,
+                    			(pre_grp_collapse ? TVE_COLLAPSE : TVE_EXPAND));
+                    }
+                    pre_grp_item = item;
+                    char grp_session[256] = {0};
+                    strncpy(grp_session, session, j + 1);
+                    pre_grp_collapse = load_isetting(grp_session, GRP_COLLAPSE_SETTING, 1);
+                	
 				}
 				b = j + 1;
 			}
@@ -891,6 +908,12 @@ static void refresh_session_treeview(
 			continue;
 		}
         item = session_treeview_insert(tvfaff, level, sesslist.sessions[i]+b, SESSION_ITEM);
+        if (pre_grp_item){
+            TreeView_Expand(tvfaff->treeview, pre_grp_item,
+        			(pre_grp_collapse ? TVE_COLLAPSE : TVE_EXPAND));
+            pre_grp_item = NULL;
+        }
+        
         if (is_select) hfirst = item;
         
 	    if (!hfirst)
@@ -1481,6 +1504,16 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 			drag_session_treeview(((LPNMHDR) lParam)->hwndFrom
 				, DRAG_BEGIN, wParam, lParam);
 			break;
+
+        case TVN_ITEMEXPANDED:{
+            HWND treeview = GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW);
+            char session[256] = {0};
+            LPNMTREEVIEW pnmtv = (LPNMTREEVIEW) lParam;
+            if (SESSION_GROUP == conv_tv_to_sess(treeview, 
+                    pnmtv->itemNew.hItem, session, sizeof(session)))
+                save_isetting(session, GRP_COLLAPSE_SETTING, pnmtv->action == 1);
+            break;
+        }
 		default:
 			break;
 

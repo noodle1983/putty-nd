@@ -287,6 +287,21 @@ char *save_settings(const char *section, Config * cfg)
     return NULL;
 }
 
+char *save_isetting(const char *section, char* setting, int value)
+{
+    void *sesskey;
+    char *errmsg;
+
+    if (!strcmp(section, DEFAULT_SESSION_NAME) || !setting || !*setting) 
+        return NULL;
+    sesskey = open_settings_w(section, &errmsg);
+    if (!sesskey)
+	return errmsg;
+    write_setting_i(sesskey, setting, value);
+    close_settings_w(sesskey);
+    return NULL;
+}
+
 void save_open_settings(void *sesskey, Config *cfg)
 {
     int i;
@@ -532,6 +547,17 @@ void load_settings(const char *section, Config * cfg)
     if (cfg_launchable(cfg))
         add_session_to_jumplist(section);
 
+}
+
+int load_isetting(const char *section, char* setting, int defvalue)
+{
+    void *sesskey;
+    int res = 0;
+
+    sesskey = open_settings_r(section);
+    gppi(sesskey, setting, defvalue, &res);
+    close_settings_r(sesskey);
+    return res;
 }
 
 void load_open_settings(void *sesskey, Config *cfg)
