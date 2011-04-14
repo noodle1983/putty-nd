@@ -1,6 +1,16 @@
 RELEASE NOTE
 ============
 --------------------------------
+putty6.0_nd1.5
+--------------------------------
+1. New Features
+    1. searchbar
+
+2. Other changes
+    1. Add tooltips for the toolbar buttons.
+	2. In the session manager, save the expanding status of the session group.
+
+--------------------------------
 putty6.0_nd1.4
 --------------------------------
 1. Bugs fixed
