@@ -950,12 +950,11 @@ int wintab_on_drawbtn(wintab* wintab, HWND hWnd, UINT message,
 LRESULT CALLBACK SearchEditWndProc(HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    debug(("[SearchEditWndProc]"));
     wintab* tab = win_get_data(hWnd);
     if (tab == NULL) 
         return 0; 
-    debug(("[SearchEditWndProc]%s:%s\n", hWnd == tab->hSearchEdit? "SearchEditMsg"
-                            : "UnknowMsg", TranslateWMessage(message)));
+    //debug(("[SearchEditWndProc]%s:%s\n", hWnd == tab->hSearchEdit? "SearchEditMsg"
+    //                        : "UnknowMsg", TranslateWMessage(message)));
     switch (message) {
         case WM_KEYDOWN:
             if (wParam == VK_RETURN){
@@ -1174,8 +1173,8 @@ LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
 { 
     wintab* tab = win_get_data(hWnd);
     if (tab == NULL) return 0;
-    debug(("[WintabWndProc]%s:%s\n", hWnd == tab->hwndTab? "TabMsg"
-                            : "UnknowMsg", TranslateWMessage(message))); 
+    //debug(("[WintabWndProc]%s:%s\n", hWnd == tab->hwndTab? "TabMsg"
+    //                        : "UnknowMsg", TranslateWMessage(message))); 
     
     switch (message) {
         case WM_DRAWITEM:
