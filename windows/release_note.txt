@@ -1,3 +1,9 @@
+My comments
+============
+Any comment is appreciated. Please let me know it is good or not.
+I have created a twitter account: putty_nd. Maybe it is more easier for you to leave a message.
+I have my job myself. Not sure I can rely all the time.
+
 RELEASE NOTE
 ============
 --------------------------------
@@ -8,7 +14,7 @@ putty6.0_nd1.5
 
 2. Other changes
     1. Add tooltips for the toolbar buttons.
-	2. In the session manager, save the expanding status of the session group.
+    2. In the session manager, save the expanding status of the session group.
 
 --------------------------------
 putty6.0_nd1.4
