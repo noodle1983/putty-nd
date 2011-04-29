@@ -1966,6 +1966,11 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
     switch (wParam & ~0xF) {       /* low 4 bits reserved to Windows */
+        case IDM_SFTP:
+            assert (tabitem != NULL);
+            cfg = tabitem->cfg;
+            wintabsftp_create(&tab, &cfg);
+            break;
         case IDM_SHOWLOG:
             showeventlog(tabitem, hwnd);
             break;
@@ -2538,7 +2543,7 @@ int on_key(wintabitem* tabitem, HWND hwnd, UINT message,
 	    unsigned char buf[20];
 	    int len;
 
-	    if (wParam == VK_PROCESSKEY) { /* IME PROCESS key */
+	    if (wParam == VK_PROCESSKEY || wintab_is_sftp(tabitem)) { /* IME PROCESS key */
 		if (message == WM_KEYDOWN) {
 		    MSG m;
 		    m.hwnd = hwnd;
@@ -2570,8 +2575,10 @@ int on_key(wintabitem* tabitem, HWND hwnd, UINT message,
 		     * we're sent.
 		     */
 		    term_seen_key_event(tabitem->term);
-		    if (tabitem->ldisc)
-			ldisc_send(tabitem->ldisc, buf, len, 1);
+            if (tabitem->ldisc){
+        		ldisc_send(tabitem->ldisc, buf, len, 1);
+            }
+            
 		    show_mouseptr(tabitem, 0);
 		}
 	    }
@@ -2640,6 +2647,11 @@ int on_ime_char(wintabitem* tabitem, HWND hwnd, UINT message,
 int on_char(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
+    if (wintab_is_sftp(tabitem)){
+        from_backend(tabitem, 0, &wParam, 1);
+        debug(("[%d,%c]\n", wParam, wParam));
+        return 0;
+    }
     /*
 	 * Nevertheless, we are prepared to deal with WM_CHAR
 	 * messages, should they crop up. So if someone wants to

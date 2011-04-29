@@ -260,6 +260,13 @@ int wintabpage_register();
 int wintabpage_unregister();
 LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
+
+//-----------------------------------------------------------------------
+//sftp handling
+//-----------------------------------------------------------------------
+int wintabsftp_create(wintab *wintab, Config *cfg);
+int wintab_is_sftp(wintabitem *tabitem);
+
 //-----------------------------------------------------------------------
 //Config post handling
 //-----------------------------------------------------------------------

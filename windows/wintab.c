@@ -37,6 +37,8 @@ extern int on_key(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
 extern int on_button(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
+extern int on_char(wintabitem* tabitem, HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
 
 const char* const WINTAB_PAGE_CLASS = "WintabPage";
 int wintabpage_registed = 0;
@@ -205,7 +207,7 @@ int wintab_create_toolbar(wintab *wintab)
         { 5, 0, TBSTATE_ENABLED, TBSTYLE_SEP, {0}, 0, (INT_PTR)NULL},
         { 2, IDM_RECONF, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 3, IDM_RESTART, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
-        { 4, IDM_SFTP, 0,  buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 4, IDM_SFTP, TBSTATE_ENABLED,  buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 5, IDM_SHOWLOG, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 5, 0, TBSTATE_ENABLED, TBSTYLE_SEP, {0}, 0, (INT_PTR)NULL},
         { 6, IDM_COPYALL, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
@@ -2281,10 +2283,87 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
         case WM_SYSKEYUP:
 	        if (on_key(tabitem, hwnd, message,wParam, lParam))
                 break;
+        case WM_CHAR:
+        case WM_SYSCHAR:
+	        on_char(tabitem, hwnd, message,wParam, lParam);
+        	return 0;
         default:
             break;
     }
     return DefWindowProc(hwnd, message, wParam, lParam);
+}
+
+//-----------------------------------------------------------------------
+//sftp handling
+//-----------------------------------------------------------------------
+
+
+int wintabsftp_create(wintab *wintab, Config *cfg)
+{
+    Config sftp_cfg = *cfg;
+    if (sftp_cfg.protocol != PROT_SSH) {
+        return -1;
+    }
+
+    /*
+     * If saved session / Default Settings says SSH-1 (`1 only' or `1'),
+     * then change it to SSH-2, on the grounds that that's more likely to
+     * work for SFTP. (Can be overridden with `-1' option.)
+     * But if it says `2 only' or `2', respect which.
+     */
+    if (sftp_cfg.sshprot != 2 && sftp_cfg.sshprot != 3)
+    	sftp_cfg.sshprot = 2;
+
+    /*
+     * Disable scary things which shouldn't be enabled for simple
+     * things like SCP and SFTP: agent forwarding, port forwarding,
+     * X forwarding.
+     */
+    sftp_cfg.x11_forward = 0;
+    sftp_cfg.agentfwd = 0;
+    sftp_cfg.portfwd[0] = sftp_cfg.portfwd[1] = '\0';
+    sftp_cfg.ssh_simple = TRUE;
+
+    /* Set up subsystem name. */
+    strcpy(sftp_cfg.remote_cmd, "sftp");
+    sftp_cfg.ssh_subsys = TRUE;
+    sftp_cfg.nopty = TRUE;
+
+    /*
+     * Set up fallback option, for SSH-1 servers or servers with the
+     * sftp subsystem not enabled but the server binary installed
+     * in the usual place. We only support fallback on Unix
+     * systems, and we use a kludgy piece of shellery which should
+     * try to find sftp-server in various places (the obvious
+     * systemwide spots /usr/lib and /usr/local/lib, and then the
+     * user's PATH) and finally give up.
+     * 
+     *   test -x /usr/lib/sftp-server && exec /usr/lib/sftp-server
+     *   test -x /usr/local/lib/sftp-server && exec /usr/local/lib/sftp-server
+     *   exec sftp-server
+     * 
+     * the idea being that this will attempt to use either of the
+     * obvious pathnames and then give up, and when it does give up
+     * it will print the preferred pathname in the error messages.
+     */
+    sftp_cfg.remote_cmd_ptr2 =
+	"test -x /usr/lib/sftp-server && exec /usr/lib/sftp-server\n"
+	"test -x /usr/local/lib/sftp-server && exec /usr/local/lib/sftp-server\n"
+	"exec sftp-server";
+    sftp_cfg.ssh_subsys2 = FALSE;
+
+    if (-1 == wintabitem_creat(wintab, &sftp_cfg))
+        return -1;
+
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+
+int wintab_is_sftp(wintabitem *tabitem)
+{
+    return (tabitem->cfg.ssh_subsys && 
+        strcmp(tabitem->cfg.remote_cmd, "sftp") == 0);
 }
 
 //-----------------------------------------------------------------------
