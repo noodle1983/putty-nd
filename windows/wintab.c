@@ -1263,6 +1263,9 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->negsize = 0;
     tabitem->events = NULL;
     tabitem->window_name = tabitem->icon_name = NULL;
+    tabitem->ldisc = NULL;  
+    tabitem->pal = NULL;
+    tabitem->logpal = NULL;
     set_title(tabitem, cfg->session_name);
     set_icon(tabitem, cfg->session_name);
     tabitem->close_mutex= CreateMutex(NULL, FALSE, NULL);
@@ -1296,8 +1299,6 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     ShowWindow(tabitem->page.hwndCtrl, SW_SHOW);
 //    SetForegroundWindow(tabitem->page.hwndCtrl);
 
-    tabitem->pal = NULL;
-    tabitem->logpal = NULL;
     wintabitem_init_palette(tabitem);
     term_set_focus(tabitem->term, TRUE);
     return 0;
