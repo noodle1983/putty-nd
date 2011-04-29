@@ -2400,7 +2400,10 @@ void ErrorExit(char * str)
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
         (LPTSTR) &lpMsgBuf,
         0, NULL );
-    buf = dupprintf("%s failed with error %d: %s", str, dw, lpMsgBuf);
+    if (dw)
+        buf = dupprintf("fatal error:%s failed with error (%d: %s)", str, dw, lpMsgBuf);
+    else
+        buf = dupprintf("fatal error:%s failed", str);
 
     MessageBox(NULL, (LPCTSTR)buf, TEXT("Error"), MB_OK); 
 
