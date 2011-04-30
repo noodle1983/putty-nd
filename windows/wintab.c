@@ -723,7 +723,7 @@ int wintab_drawitems(wintab *wintab)
 int wintab_drawitem(wintab *wintab, HDC hdc, const int index)
 {
     RECT rc;
-    COLORREF col, old_col;
+    COLORREF col, old_col, old_txt_col;
     
     //TabCtrl_GetItemRect(wintab->hwndTab, index, &rc);
     wintabitem* tabitem = wintab->items[index];
@@ -736,7 +736,13 @@ int wintab_drawitem(wintab *wintab, HDC hdc, const int index)
     HRGN hRgn = DrawChromeFrame(hdc, &rc,  wintab->bd_col, col);
     wintabitem_set_rgn(tabitem, hRgn);
     old_col = SetBkColor(hdc, col);
-    TextOut(hdc, rc.left, rc.top + 4, name, name_len);
+    if (tabitem->session_closed){
+        old_txt_col = SetTextColor(hdc, RGB(150, 150, 150));
+        TextOut(hdc, rc.left, rc.top + 4, name, name_len);
+        SetTextColor(hdc, old_txt_col);
+    }else{
+        TextOut(hdc, rc.left, rc.top + 4, name, name_len);
+    }
     SetBkColor(hdc, old_col);
 
     hRgn = DrawCloseButton(hdc, rc.right-4, (rc.top + rc.bottom)/2, 
@@ -1826,6 +1832,8 @@ void wintabitem_close_session(wintabitem *tabitem)
 	//	   IDM_RESTART, "&Restart Session");
     //}
     ReleaseMutex(tabitem->close_mutex);
+    wintab *wintab = tabitem->parentTab;
+    PostMessage(wintab->hwndTab, WM_PAINT, 0, 0);
 }
 
 //-----------------------------------------------------------------------
