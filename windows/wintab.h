@@ -145,6 +145,9 @@ typedef struct {
     HWND logbox;
     int nevents, negsize;
     char **events;
+
+    //sftp
+    char *pwd, *homedir;
 }wintabitem;
 
 typedef struct {

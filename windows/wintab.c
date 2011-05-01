@@ -1274,6 +1274,8 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->ldisc = NULL;  
     tabitem->pal = NULL;
     tabitem->logpal = NULL;
+    tabitem->pwd = NULL;
+    tabitem->homedir = NULL;
     set_title(tabitem, cfg->session_name);
     set_icon(tabitem, cfg->session_name);
     tabitem->close_mutex= CreateMutex(NULL, FALSE, NULL);
@@ -1343,6 +1345,15 @@ void wintabitem_fini(wintabitem *tabitem)
     for (i = 0; i < tabitem->nevents; i++)
         sfree(tabitem->events[i]);
     sfree(tabitem->events);
+
+    if (tabitem->pwd) {
+    	sfree(tabitem->pwd);
+    	tabitem->pwd = NULL;
+    }
+    if (tabitem->homedir) {
+    	sfree(tabitem->homedir);
+    	tabitem->homedir = NULL;
+    }
 
 }
 //-----------------------------------------------------------------------
@@ -2305,7 +2316,41 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
 //-----------------------------------------------------------------------
 //sftp handling
 //-----------------------------------------------------------------------
+int wintabsftp_init(wintabitem *tabitem)
+{
+    struct sftp_packet *pktin;
+    struct sftp_request *req, *rreq;
 
+    /*
+     * Do protocol initialisation. 
+     */
+    if (!fxp_init()) {
+    	fprintf(stderr,
+    		"Fatal: unable to initialise SFTP: %s\n", fxp_error());
+    	return 1;		       /* failure */
+    }
+
+    /*
+     * Find out where our home directory is.
+     */
+    sftp_register(req = fxp_realpath_send("."));
+    rreq = sftp_find_request(pktin = sftp_recv());
+    assert(rreq == req);
+    tabitem->homedir = fxp_realpath_recv(pktin, rreq);
+
+    if (!tabitem->homedir) {
+    	fprintf(stderr,
+    		"Warning: failed to resolve home directory: %s\n",
+    		fxp_error());
+    	tabitem->homedir = dupstr(".");
+    } else {
+    	printf("Remote working directory is %s\n", tabitem->homedir);
+    }
+    tabitem->pwd = dupstr(tabitem->homedir);
+    return 0;
+}
+
+//-----------------------------------------------------------------------
 
 int wintabsftp_create(wintab *wintab, Config *cfg)
 {
