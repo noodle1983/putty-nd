@@ -2376,6 +2376,15 @@ int wintab_is_sftp(wintabitem *tabitem)
 }
 
 //-----------------------------------------------------------------------
+
+int wintabsftp_on_char(wintabitem *tabitem, const char *data, int len)
+{
+    from_backend(tabitem, 0, data, len);
+    debug(("[%d,%c]\n", *data, *data));
+    return 0;
+}
+
+//-----------------------------------------------------------------------
 //Config post handling
 //-----------------------------------------------------------------------
 

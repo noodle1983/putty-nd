@@ -266,7 +266,7 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
 //-----------------------------------------------------------------------
 int wintabsftp_create(wintab *wintab, Config *cfg);
 int wintab_is_sftp(wintabitem *tabitem);
-
+int wintabsftp_on_char(wintabitem *tabitem, const char *data, int len);
 //-----------------------------------------------------------------------
 //Config post handling
 //-----------------------------------------------------------------------

@@ -2651,8 +2651,7 @@ int on_char(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
     if (wintab_is_sftp(tabitem)){
-        from_backend(tabitem, 0, &wParam, 1);
-        debug(("[%d,%c]\n", wParam, wParam));
+        wintabsftp_on_char(tabitem, (const char*)&wParam, 1);
         return 0;
     }
     /*
