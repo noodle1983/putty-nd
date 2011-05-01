@@ -2575,10 +2575,13 @@ int on_key(wintabitem* tabitem, HWND hwnd, UINT message,
 		     * we're sent.
 		     */
 		    term_seen_key_event(tabitem->term);
+            if (tabitem->session_closed && (*buf) == 0x0d){
+                SendMessage(hwnd, WM_COMMAND, IDM_RESTART, 0);
+                return 0;
+            }
             if (tabitem->ldisc){
         		ldisc_send(tabitem->ldisc, buf, len, 1);
             }
-            
 		    show_mouseptr(tabitem, 0);
 		}
 	    }

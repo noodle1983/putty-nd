@@ -9303,12 +9303,17 @@ static const char *ssh_init(void *frontend_handle, void **backend_handle,
 #ifndef NO_GSSAPI
     ssh->gsslibs = NULL;
 #endif
+    /*
+     * move random_ref() before connect_to_host in putty-nd
+     * if connect failed, unref will be tried
+     * then crash can be avoided.
+     */
+    random_ref();
 
     p = connect_to_host(ssh, host, port, realhost, nodelay, keepalive);
     if (p != NULL)
 	return p;
 
-    random_ref();
 
     return NULL;
 }

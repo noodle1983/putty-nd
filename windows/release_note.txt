@@ -1,11 +1,23 @@
 My comments
 ============
-Any comment is appreciated. Please let me know it is good or not.
-I have created a twitter account: putty_nd. Maybe it is more easier for you to leave a message.
-I have my job myself. Not sure I can rely all the time.
+Any comment is appreciated.
+email: noodle1983@126.com 
+twitter account: putty_nd.
+I have my job myself. Not sure I can reply all the time.
 
 RELEASE NOTE
 ============
+--------------------------------
+putty6.0_nd1.6
+--------------------------------
+1. Bug fixed
+    1. crash at exit when one of the session's hostname can't be resolved. the 
+crash only happens when the process exits.
+
+2. Other changes
+    1. when enter key is typed on a closed session, it restarts the session.
+    2. tab title shows gray if session is closed.
+
 --------------------------------
 putty6.0_nd1.5
 --------------------------------

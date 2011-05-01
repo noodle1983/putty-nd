@@ -725,7 +725,7 @@ int wintab_drawitems(wintab *wintab)
 int wintab_drawitem(wintab *wintab, HDC hdc, const int index)
 {
     RECT rc;
-    COLORREF col, old_col;
+    COLORREF col, old_col, old_txt_col;
     
     //TabCtrl_GetItemRect(wintab->hwndTab, index, &rc);
     wintabitem* tabitem = wintab->items[index];
@@ -738,7 +738,13 @@ int wintab_drawitem(wintab *wintab, HDC hdc, const int index)
     HRGN hRgn = DrawChromeFrame(hdc, &rc,  wintab->bd_col, col);
     wintabitem_set_rgn(tabitem, hRgn);
     old_col = SetBkColor(hdc, col);
-    TextOut(hdc, rc.left, rc.top + 4, name, name_len);
+    if (tabitem->session_closed){
+        old_txt_col = SetTextColor(hdc, RGB(150, 150, 150));
+        TextOut(hdc, rc.left, rc.top + 4, name, name_len);
+        SetTextColor(hdc, old_txt_col);
+    }else{
+        TextOut(hdc, rc.left, rc.top + 4, name, name_len);
+    }
     SetBkColor(hdc, old_col);
 
     hRgn = DrawCloseButton(hdc, rc.right-4, (rc.top + rc.bottom)/2, 
@@ -1265,6 +1271,9 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->negsize = 0;
     tabitem->events = NULL;
     tabitem->window_name = tabitem->icon_name = NULL;
+    tabitem->ldisc = NULL;  
+    tabitem->pal = NULL;
+    tabitem->logpal = NULL;
     set_title(tabitem, cfg->session_name);
     set_icon(tabitem, cfg->session_name);
     tabitem->close_mutex= CreateMutex(NULL, FALSE, NULL);
@@ -1298,8 +1307,6 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     ShowWindow(tabitem->page.hwndCtrl, SW_SHOW);
 //    SetForegroundWindow(tabitem->page.hwndCtrl);
 
-    tabitem->pal = NULL;
-    tabitem->logpal = NULL;
     wintabitem_init_palette(tabitem);
     term_set_focus(tabitem->term, TRUE);
     return 0;
@@ -1827,6 +1834,8 @@ void wintabitem_close_session(wintabitem *tabitem)
 	//	   IDM_RESTART, "&Restart Session");
     //}
     ReleaseMutex(tabitem->close_mutex);
+    wintab *wintab = tabitem->parentTab;
+    PostMessage(wintab->hwndTab, WM_PAINT, 0, 0);
 }
 
 //-----------------------------------------------------------------------
@@ -2479,7 +2488,10 @@ void ErrorExit(char * str)
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
         (LPTSTR) &lpMsgBuf,
         0, NULL );
-    buf = dupprintf("%s failed with error %d: %s", str, dw, lpMsgBuf);
+    if (dw)
+        buf = dupprintf("fatal error:%s failed with error (%d: %s)", str, dw, lpMsgBuf);
+    else
+        buf = dupprintf("fatal error:%s failed", str);
 
     MessageBox(NULL, (LPCTSTR)buf, TEXT("Error"), MB_OK); 
 
