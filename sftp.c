@@ -221,7 +221,7 @@ int sftp_send(struct sftp_packet *pkt)
     sftp_pkt_free(pkt);
     return ret;
 }
-struct sftp_packet *sftp_recv(void)
+struct sftp_packet *sftp_recv()
 {
     struct sftp_packet *pkt;
     char x[4];
@@ -285,7 +285,7 @@ static int sftp_reqfind(void *av, void *bv)
 
 static tree234 *sftp_requests;
 
-static struct sftp_request *sftp_alloc_request(void)
+static struct sftp_request *sftp_alloc_request()
 {
     unsigned low, high, mid;
     int tsize;
@@ -335,7 +335,7 @@ static struct sftp_request *sftp_alloc_request(void)
     return r;
 }
 
-void sftp_cleanup_request(void)
+void sftp_cleanup_request()
 {
     if (sftp_requests != NULL) {
 	freetree234(sftp_requests);
@@ -445,12 +445,12 @@ static void fxp_internal_error(char *msg)
     fxp_errtype = -1;
 }
 
-const char *fxp_error(void)
+const char *fxp_error()
 {
     return fxp_error_message;
 }
 
-int fxp_error_type(void)
+int fxp_error_type()
 {
     return fxp_errtype;
 }
@@ -458,7 +458,7 @@ int fxp_error_type(void)
 /*
  * Perform exchange of init/version packets. Return 0 on failure.
  */
-int fxp_init(void)
+int fxp_init()
 {
     struct sftp_packet *pktout, *pktin;
     unsigned long remotever;

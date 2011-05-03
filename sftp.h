@@ -70,7 +70,7 @@ int sftp_recvdata(char *data, int len);
 /*
  * Free sftp_requests
  */
-void sftp_cleanup_request(void);
+void sftp_cleanup_request();
 
 struct fxp_attrs {
     unsigned long flags;
@@ -100,13 +100,13 @@ struct fxp_names {
 struct sftp_request;
 struct sftp_packet;
 
-const char *fxp_error(void);
-int fxp_error_type(void);
+const char *fxp_error();
+int fxp_error_type();
 
 /*
  * Perform exchange of init/version packets. Return 0 on failure.
  */
-int fxp_init(void);
+int fxp_init();
 
 /*
  * Canonify a pathname. Concatenate the two given path elements
@@ -224,7 +224,7 @@ void fxp_set_userdata(struct sftp_request *req, void *data);
  */
 void sftp_register(struct sftp_request *req);
 struct sftp_request *sftp_find_request(struct sftp_packet *pktin);
-struct sftp_packet *sftp_recv(void);
+struct sftp_packet *sftp_recv();
 
 /*
  * A wrapper to go round fxp_read_* and fxp_write_*, which manages
