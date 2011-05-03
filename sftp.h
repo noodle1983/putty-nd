@@ -55,6 +55,9 @@
 
 #define SFTP_PROTO_VERSION 3
 
+typedef struct {
+
+} sftp_handle;
 /*
  * External references. The sftp client module sftp.c expects to be
  * able to get at these functions.
@@ -64,13 +67,13 @@
  * 
  * Both functions return 1 on success, 0 on failure.
  */
-int sftp_senddata(char *data, int len);
-int sftp_recvdata(char *data, int len);
+int sftp_senddata(sftp_handle* sftp, char *data, int len);
+int sftp_recvdata(sftp_handle* sftp, char *data, int len);
 
 /*
  * Free sftp_requests
  */
-void sftp_cleanup_request();
+void sftp_cleanup_request(sftp_handle* sftp);
 
 struct fxp_attrs {
     unsigned long flags;
@@ -100,83 +103,83 @@ struct fxp_names {
 struct sftp_request;
 struct sftp_packet;
 
-const char *fxp_error();
-int fxp_error_type();
+const char *fxp_error(sftp_handle* sftp);
+int fxp_error_type(sftp_handle* sftp);
 
 /*
  * Perform exchange of init/version packets. Return 0 on failure.
  */
-int fxp_init();
+int fxp_init(sftp_handle* sftp);
 
 /*
  * Canonify a pathname. Concatenate the two given path elements
  * with a separating slash, unless the second is NULL.
  */
-struct sftp_request *fxp_realpath_send(char *path);
-char *fxp_realpath_recv(struct sftp_packet *pktin, struct sftp_request *req);
+struct sftp_request *fxp_realpath_send(sftp_handle* sftp, char *path);
+char *fxp_realpath_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req);
 
 /*
  * Open a file.
  */
-struct sftp_request *fxp_open_send(char *path, int type);
+struct sftp_request *fxp_open_send(sftp_handle* sftp, char *path, int type);
 struct fxp_handle *fxp_open_recv(struct sftp_packet *pktin,
 				 struct sftp_request *req);
 
 /*
  * Open a directory.
  */
-struct sftp_request *fxp_opendir_send(char *path);
+struct sftp_request *fxp_opendir_send(sftp_handle* sftp, char *path);
 struct fxp_handle *fxp_opendir_recv(struct sftp_packet *pktin,
 				    struct sftp_request *req);
 
 /*
  * Close a file/dir.
  */
-struct sftp_request *fxp_close_send(struct fxp_handle *handle);
-void fxp_close_recv(struct sftp_packet *pktin, struct sftp_request *req);
+struct sftp_request *fxp_close_send(sftp_handle* sftp, struct fxp_handle *handle);
+void fxp_close_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req);
 
 /*
  * Make a directory.
  */
-struct sftp_request *fxp_mkdir_send(char *path);
-int fxp_mkdir_recv(struct sftp_packet *pktin, struct sftp_request *req);
+struct sftp_request *fxp_mkdir_send(sftp_handle* sftp, char *path);
+int fxp_mkdir_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req);
 
 /*
  * Remove a directory.
  */
-struct sftp_request *fxp_rmdir_send(char *path);
-int fxp_rmdir_recv(struct sftp_packet *pktin, struct sftp_request *req);
+struct sftp_request *fxp_rmdir_send(sftp_handle* sftp, char *path);
+int fxp_rmdir_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req);
 
 /*
  * Remove a file.
  */
-struct sftp_request *fxp_remove_send(char *fname);
-int fxp_remove_recv(struct sftp_packet *pktin, struct sftp_request *req);
+struct sftp_request *fxp_remove_send(sftp_handle* sftp, char *fname);
+int fxp_remove_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req);
 
 /*
  * Rename a file.
  */
-struct sftp_request *fxp_rename_send(char *srcfname, char *dstfname);
-int fxp_rename_recv(struct sftp_packet *pktin, struct sftp_request *req);
+struct sftp_request *fxp_rename_send(sftp_handle* sftp, char *srcfname, char *dstfname);
+int fxp_rename_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req);
 
 /*
  * Return file attributes.
  */
-struct sftp_request *fxp_stat_send(char *fname);
+struct sftp_request *fxp_stat_send(sftp_handle* sftp, char *fname);
 int fxp_stat_recv(struct sftp_packet *pktin, struct sftp_request *req,
 		  struct fxp_attrs *attrs);
-struct sftp_request *fxp_fstat_send(struct fxp_handle *handle);
+struct sftp_request *fxp_fstat_send(sftp_handle* sftp, struct fxp_handle *handle);
 int fxp_fstat_recv(struct sftp_packet *pktin, struct sftp_request *req,
 		   struct fxp_attrs *attrs);
 
 /*
  * Set file attributes.
  */
-struct sftp_request *fxp_setstat_send(char *fname, struct fxp_attrs attrs);
-int fxp_setstat_recv(struct sftp_packet *pktin, struct sftp_request *req);
+struct sftp_request *fxp_setstat_send(sftp_handle* sftp, char *fname, struct fxp_attrs attrs);
+int fxp_setstat_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req);
 struct sftp_request *fxp_fsetstat_send(struct fxp_handle *handle,
 				       struct fxp_attrs attrs);
-int fxp_fsetstat_recv(struct sftp_packet *pktin, struct sftp_request *req);
+int fxp_fsetstat_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req);
 
 /*
  * Read from a file.
@@ -191,40 +194,40 @@ int fxp_read_recv(struct sftp_packet *pktin, struct sftp_request *req,
  */
 struct sftp_request *fxp_write_send(struct fxp_handle *handle,
 				    char *buffer, uint64 offset, int len);
-int fxp_write_recv(struct sftp_packet *pktin, struct sftp_request *req);
+int fxp_write_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req);
 
 /*
  * Read from a directory.
  */
-struct sftp_request *fxp_readdir_send(struct fxp_handle *handle);
+struct sftp_request *fxp_readdir_send(sftp_handle* sftp, struct fxp_handle *handle);
 struct fxp_names *fxp_readdir_recv(struct sftp_packet *pktin,
 				   struct sftp_request *req);
 
 /*
  * Free up an fxp_names structure.
  */
-void fxp_free_names(struct fxp_names *names);
+void fxp_free_names(sftp_handle* sftp, struct fxp_names *names);
 
 /*
  * Duplicate and free fxp_name structures.
  */
-struct fxp_name *fxp_dup_name(struct fxp_name *name);
-void fxp_free_name(struct fxp_name *name);
+struct fxp_name *fxp_dup_name(sftp_handle* sftp, struct fxp_name *name);
+void fxp_free_name(sftp_handle* sftp, struct fxp_name *name);
 
 /*
  * Store user data in an sftp_request structure.
  */
-void *fxp_get_userdata(struct sftp_request *req);
-void fxp_set_userdata(struct sftp_request *req, void *data);
+void *fxp_get_userdata(sftp_handle* sftp, struct sftp_request *req);
+void fxp_set_userdata(sftp_handle* sftp, struct sftp_request *req, void *data);
 
 /*
  * These functions might well be temporary placeholders to be
  * replaced with more useful similar functions later. They form the
  * main dispatch loop for processing incoming SFTP responses.
  */
-void sftp_register(struct sftp_request *req);
-struct sftp_request *sftp_find_request(struct sftp_packet *pktin);
-struct sftp_packet *sftp_recv();
+void sftp_register(sftp_handle* sftp, struct sftp_request *req);
+struct sftp_request *sftp_find_request(sftp_handle* sftp, struct sftp_packet *pktin);
+struct sftp_packet *sftp_recv(sftp_handle* sftp);
 
 /*
  * A wrapper to go round fxp_read_* and fxp_write_*, which manages
@@ -233,16 +236,16 @@ struct sftp_packet *sftp_recv();
 
 struct fxp_xfer;
 
-struct fxp_xfer *xfer_download_init(struct fxp_handle *fh, uint64 offset);
-void xfer_download_queue(struct fxp_xfer *xfer);
-int xfer_download_gotpkt(struct fxp_xfer *xfer, struct sftp_packet *pktin);
-int xfer_download_data(struct fxp_xfer *xfer, void **buf, int *len);
+struct fxp_xfer *xfer_download_init(sftp_handle* sftp, struct fxp_handle *fh, uint64 offset);
+void xfer_download_queue(sftp_handle* sftp, struct fxp_xfer *xfer);
+int xfer_download_gotpkt(sftp_handle* sftp, struct fxp_xfer *xfer, struct sftp_packet *pktin);
+int xfer_download_data(sftp_handle* sftp, struct fxp_xfer *xfer, void **buf, int *len);
 
-struct fxp_xfer *xfer_upload_init(struct fxp_handle *fh, uint64 offset);
-int xfer_upload_ready(struct fxp_xfer *xfer);
-void xfer_upload_data(struct fxp_xfer *xfer, char *buffer, int len);
-int xfer_upload_gotpkt(struct fxp_xfer *xfer, struct sftp_packet *pktin);
+struct fxp_xfer *xfer_upload_init(sftp_handle* sftp, struct fxp_handle *fh, uint64 offset);
+int xfer_upload_ready(sftp_handle* sftp, struct fxp_xfer *xfer);
+void xfer_upload_data(sftp_handle* sftp, struct fxp_xfer *xfer, char *buffer, int len);
+int xfer_upload_gotpkt(sftp_handle* sftp, struct fxp_xfer *xfer, struct sftp_packet *pktin);
 
-int xfer_done(struct fxp_xfer *xfer);
-void xfer_set_error(struct fxp_xfer *xfer);
-void xfer_cleanup(struct fxp_xfer *xfer);
+int xfer_done(sftp_handle* sftp, struct fxp_xfer *xfer);
+void xfer_set_error(sftp_handle* sftp, struct fxp_xfer *xfer);
+void xfer_cleanup(sftp_handle* sftp, struct fxp_xfer *xfer);

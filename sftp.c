@@ -23,29 +23,29 @@ struct sftp_packet {
 static const char *fxp_error_message;
 static int fxp_errtype;
 
-static void fxp_internal_error(char *msg);
+static void fxp_internal_error(sftp_handle* sftp, char *msg);
 
 /* ----------------------------------------------------------------------
  * SFTP packet construction functions.
  */
-static void sftp_pkt_ensure(struct sftp_packet *pkt, int length)
+static void sftp_pkt_ensure(sftp_handle* sftp, struct sftp_packet *pkt, int length)
 {
     if ((int)pkt->maxlen < length) {
 	pkt->maxlen = length + 256;
 	pkt->data = sresize(pkt->data, pkt->maxlen, char);
     }
 }
-static void sftp_pkt_adddata(struct sftp_packet *pkt, void *data, int len)
+static void sftp_pkt_adddata(sftp_handle* sftp, struct sftp_packet *pkt, void *data, int len)
 {
     pkt->length += len;
     sftp_pkt_ensure(pkt, pkt->length);
     memcpy(pkt->data + pkt->length - len, data, len);
 }
-static void sftp_pkt_addbyte(struct sftp_packet *pkt, unsigned char byte)
+static void sftp_pkt_addbyte(sftp_handle* sftp, struct sftp_packet *pkt, unsigned char byte)
 {
     sftp_pkt_adddata(pkt, &byte, 1);
 }
-static struct sftp_packet *sftp_pkt_init(int pkt_type)
+static struct sftp_packet *sftp_pkt_init(sftp_handle* sftp, int pkt_type)
 {
     struct sftp_packet *pkt;
     pkt = snew(struct sftp_packet);
@@ -57,7 +57,7 @@ static struct sftp_packet *sftp_pkt_init(int pkt_type)
     return pkt;
 }
 /*
-static void sftp_pkt_addbool(struct sftp_packet *pkt, unsigned char value)
+static void sftp_pkt_addbool(sftp_handle* sftp, struct sftp_packet *pkt, unsigned char value)
 {
     sftp_pkt_adddata(pkt, &value, 1);
 }
@@ -69,19 +69,19 @@ static void sftp_pkt_adduint32(struct sftp_packet *pkt,
     PUT_32BIT(x, value);
     sftp_pkt_adddata(pkt, x, 4);
 }
-static void sftp_pkt_adduint64(struct sftp_packet *pkt, uint64 value)
+static void sftp_pkt_adduint64(sftp_handle* sftp, struct sftp_packet *pkt, uint64 value)
 {
     unsigned char x[8];
     PUT_32BIT(x, value.hi);
     PUT_32BIT(x + 4, value.lo);
     sftp_pkt_adddata(pkt, x, 8);
 }
-static void sftp_pkt_addstring_start(struct sftp_packet *pkt)
+static void sftp_pkt_addstring_start(sftp_handle* sftp, struct sftp_packet *pkt)
 {
     sftp_pkt_adduint32(pkt, 0);
     pkt->savedpos = pkt->length;
 }
-static void sftp_pkt_addstring_str(struct sftp_packet *pkt, char *data)
+static void sftp_pkt_addstring_str(sftp_handle* sftp, struct sftp_packet *pkt, char *data)
 {
     sftp_pkt_adddata(pkt, data, strlen(data));
     PUT_32BIT(pkt->data + pkt->savedpos - 4, pkt->length - pkt->savedpos);
@@ -92,12 +92,12 @@ static void sftp_pkt_addstring_data(struct sftp_packet *pkt,
     sftp_pkt_adddata(pkt, data, len);
     PUT_32BIT(pkt->data + pkt->savedpos - 4, pkt->length - pkt->savedpos);
 }
-static void sftp_pkt_addstring(struct sftp_packet *pkt, char *data)
+static void sftp_pkt_addstring(sftp_handle* sftp, struct sftp_packet *pkt, char *data)
 {
     sftp_pkt_addstring_start(pkt);
     sftp_pkt_addstring_str(pkt, data);
 }
-static void sftp_pkt_addattrs(struct sftp_packet *pkt, struct fxp_attrs attrs)
+static void sftp_pkt_addattrs(sftp_handle* sftp, struct sftp_packet *pkt, struct fxp_attrs attrs)
 {
     sftp_pkt_adduint32(pkt, attrs.flags);
     if (attrs.flags & SSH_FILEXFER_ATTR_SIZE) {
@@ -127,7 +127,7 @@ static void sftp_pkt_addattrs(struct sftp_packet *pkt, struct fxp_attrs attrs)
  * SFTP packet decode functions.
  */
 
-static int sftp_pkt_getbyte(struct sftp_packet *pkt, unsigned char *ret)
+static int sftp_pkt_getbyte(sftp_handle* sftp, struct sftp_packet *pkt, unsigned char *ret)
 {
     if (pkt->length - pkt->savedpos < 1)
 	return 0;
@@ -135,7 +135,7 @@ static int sftp_pkt_getbyte(struct sftp_packet *pkt, unsigned char *ret)
     pkt->savedpos++;
     return 1;
 }
-static int sftp_pkt_getuint32(struct sftp_packet *pkt, unsigned long *ret)
+static int sftp_pkt_getuint32(sftp_handle* sftp, struct sftp_packet *pkt, unsigned long *ret)
 {
     if (pkt->length - pkt->savedpos < 4)
 	return 0;
@@ -159,7 +159,7 @@ static int sftp_pkt_getstring(struct sftp_packet *pkt,
     pkt->savedpos += *length;
     return 1;
 }
-static int sftp_pkt_getattrs(struct sftp_packet *pkt, struct fxp_attrs *ret)
+static int sftp_pkt_getattrs(sftp_handle* sftp, struct sftp_packet *pkt, struct fxp_attrs *ret)
 {
     if (!sftp_pkt_getuint32(pkt, &ret->flags))
 	return 0;
@@ -202,7 +202,7 @@ static int sftp_pkt_getattrs(struct sftp_packet *pkt, struct fxp_attrs *ret)
     }
     return 1;
 }
-static void sftp_pkt_free(struct sftp_packet *pkt)
+static void sftp_pkt_free(sftp_handle* sftp, struct sftp_packet *pkt)
 {
     if (pkt->data)
 	sfree(pkt->data);
@@ -212,7 +212,7 @@ static void sftp_pkt_free(struct sftp_packet *pkt)
 /* ----------------------------------------------------------------------
  * Send and receive packet functions.
  */
-int sftp_send(struct sftp_packet *pkt)
+int sftp_send(sftp_handle* sftp, struct sftp_packet *pkt)
 {
     int ret;
     char x[4];
@@ -221,7 +221,7 @@ int sftp_send(struct sftp_packet *pkt)
     sftp_pkt_free(pkt);
     return ret;
 }
-struct sftp_packet *sftp_recv()
+struct sftp_packet *sftp_recv(sftp_handle* sftp)
 {
     struct sftp_packet *pkt;
     char x[4];
@@ -262,7 +262,7 @@ struct sftp_request {
     void *userdata;
 };
 
-static int sftp_reqcmp(void *av, void *bv)
+static int sftp_reqcmp(sftp_handle* sftp, void *av, void *bv)
 {
     struct sftp_request *a = (struct sftp_request *)av;
     struct sftp_request *b = (struct sftp_request *)bv;
@@ -272,7 +272,7 @@ static int sftp_reqcmp(void *av, void *bv)
 	return +1;
     return 0;
 }
-static int sftp_reqfind(void *av, void *bv)
+static int sftp_reqfind(sftp_handle* sftp, void *av, void *bv)
 {
     unsigned *a = (unsigned *) av;
     struct sftp_request *b = (struct sftp_request *)bv;
@@ -285,7 +285,7 @@ static int sftp_reqfind(void *av, void *bv)
 
 static tree234 *sftp_requests;
 
-static struct sftp_request *sftp_alloc_request()
+static struct sftp_request *sftp_alloc_request(sftp_handle* sftp)
 {
     unsigned low, high, mid;
     int tsize;
@@ -335,7 +335,7 @@ static struct sftp_request *sftp_alloc_request()
     return r;
 }
 
-void sftp_cleanup_request()
+void sftp_cleanup_request(sftp_handle* sftp)
 {
     if (sftp_requests != NULL) {
 	freetree234(sftp_requests);
@@ -343,12 +343,12 @@ void sftp_cleanup_request()
     }
 }
 
-void sftp_register(struct sftp_request *req)
+void sftp_register(sftp_handle* sftp, struct sftp_request *req)
 {
     req->registered = 1;
 }
 
-struct sftp_request *sftp_find_request(struct sftp_packet *pktin)
+struct sftp_request *sftp_find_request(sftp_handle* sftp, struct sftp_packet *pktin)
 {
     unsigned long id;
     struct sftp_request *req;
@@ -379,7 +379,7 @@ struct sftp_request *sftp_find_request(struct sftp_packet *pktin)
  * String handling routines.
  */
 
-static char *mkstr(char *s, int len)
+static char *mkstr(sftp_handle* sftp, char *s, int len)
 {
     char *p = snewn(len + 1, char);
     memcpy(p, s, len);
@@ -396,7 +396,7 @@ static char *mkstr(char *s, int len)
  * SSH_FX_OK, 0 if SSH_FX_EOF, and -1 for anything else (error).
  * Also place the status into fxp_errtype.
  */
-static int fxp_got_status(struct sftp_packet *pktin)
+static int fxp_got_status(sftp_handle* sftp, struct sftp_packet *pktin)
 {
     static const char *const messages[] = {
 	/* SSH_FX_OK. The only time we will display a _message_ for this
@@ -439,18 +439,18 @@ static int fxp_got_status(struct sftp_packet *pktin)
 	return -1;
 }
 
-static void fxp_internal_error(char *msg)
+static void fxp_internal_error(sftp_handle* sftp, char *msg)
 {
     fxp_error_message = msg;
     fxp_errtype = -1;
 }
 
-const char *fxp_error()
+const char *fxp_error(sftp_handle* sftp)
 {
     return fxp_error_message;
 }
 
-int fxp_error_type()
+int fxp_error_type(sftp_handle* sftp)
 {
     return fxp_errtype;
 }
@@ -458,7 +458,7 @@ int fxp_error_type()
 /*
  * Perform exchange of init/version packets. Return 0 on failure.
  */
-int fxp_init()
+int fxp_init(sftp_handle* sftp)
 {
     struct sftp_packet *pktout, *pktin;
     unsigned long remotever;
@@ -502,7 +502,7 @@ int fxp_init()
 /*
  * Canonify a pathname.
  */
-struct sftp_request *fxp_realpath_send(char *path)
+struct sftp_request *fxp_realpath_send(sftp_handle* sftp, char *path)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -516,7 +516,7 @@ struct sftp_request *fxp_realpath_send(char *path)
     return req;
 }
 
-char *fxp_realpath_recv(struct sftp_packet *pktin, struct sftp_request *req)
+char *fxp_realpath_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req)
 {
     sfree(req);
 
@@ -548,7 +548,7 @@ char *fxp_realpath_recv(struct sftp_packet *pktin, struct sftp_request *req)
 /*
  * Open a file.
  */
-struct sftp_request *fxp_open_send(char *path, int type)
+struct sftp_request *fxp_open_send(sftp_handle* sftp, char *path, int type)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -593,7 +593,7 @@ struct fxp_handle *fxp_open_recv(struct sftp_packet *pktin,
 /*
  * Open a directory.
  */
-struct sftp_request *fxp_opendir_send(char *path)
+struct sftp_request *fxp_opendir_send(sftp_handle* sftp, char *path)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -635,7 +635,7 @@ struct fxp_handle *fxp_opendir_recv(struct sftp_packet *pktin,
 /*
  * Close a file/dir.
  */
-struct sftp_request *fxp_close_send(struct fxp_handle *handle)
+struct sftp_request *fxp_close_send(sftp_handle* sftp, struct fxp_handle *handle)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -652,14 +652,14 @@ struct sftp_request *fxp_close_send(struct fxp_handle *handle)
     return req;
 }
 
-void fxp_close_recv(struct sftp_packet *pktin, struct sftp_request *req)
+void fxp_close_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req)
 {
     sfree(req);
     fxp_got_status(pktin);
     sftp_pkt_free(pktin);
 }
 
-struct sftp_request *fxp_mkdir_send(char *path)
+struct sftp_request *fxp_mkdir_send(sftp_handle* sftp, char *path)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -673,7 +673,7 @@ struct sftp_request *fxp_mkdir_send(char *path)
     return req;
 }
 
-int fxp_mkdir_recv(struct sftp_packet *pktin, struct sftp_request *req)
+int fxp_mkdir_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req)
 {
     int id;
     sfree(req);
@@ -685,7 +685,7 @@ int fxp_mkdir_recv(struct sftp_packet *pktin, struct sftp_request *req)
     return 1;
 }
 
-struct sftp_request *fxp_rmdir_send(char *path)
+struct sftp_request *fxp_rmdir_send(sftp_handle* sftp, char *path)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -698,7 +698,7 @@ struct sftp_request *fxp_rmdir_send(char *path)
     return req;
 }
 
-int fxp_rmdir_recv(struct sftp_packet *pktin, struct sftp_request *req)
+int fxp_rmdir_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req)
 {
     int id;
     sfree(req);
@@ -710,7 +710,7 @@ int fxp_rmdir_recv(struct sftp_packet *pktin, struct sftp_request *req)
     return 1;
 }
 
-struct sftp_request *fxp_remove_send(char *fname)
+struct sftp_request *fxp_remove_send(sftp_handle* sftp, char *fname)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -723,7 +723,7 @@ struct sftp_request *fxp_remove_send(char *fname)
     return req;
 }
 
-int fxp_remove_recv(struct sftp_packet *pktin, struct sftp_request *req)
+int fxp_remove_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req)
 {
     int id;
     sfree(req);
@@ -735,7 +735,7 @@ int fxp_remove_recv(struct sftp_packet *pktin, struct sftp_request *req)
     return 1;
 }
 
-struct sftp_request *fxp_rename_send(char *srcfname, char *dstfname)
+struct sftp_request *fxp_rename_send(sftp_handle* sftp, char *srcfname, char *dstfname)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -749,7 +749,7 @@ struct sftp_request *fxp_rename_send(char *srcfname, char *dstfname)
     return req;
 }
 
-int fxp_rename_recv(struct sftp_packet *pktin, struct sftp_request *req)
+int fxp_rename_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req)
 {
     int id;
     sfree(req);
@@ -765,7 +765,7 @@ int fxp_rename_recv(struct sftp_packet *pktin, struct sftp_request *req)
  * Retrieve the attributes of a file. We have fxp_stat which works
  * on filenames, and fxp_fstat which works on open file handles.
  */
-struct sftp_request *fxp_stat_send(char *fname)
+struct sftp_request *fxp_stat_send(sftp_handle* sftp, char *fname)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -797,7 +797,7 @@ int fxp_stat_recv(struct sftp_packet *pktin, struct sftp_request *req,
     }
 }
 
-struct sftp_request *fxp_fstat_send(struct fxp_handle *handle)
+struct sftp_request *fxp_fstat_send(sftp_handle* sftp, struct fxp_handle *handle)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -833,7 +833,7 @@ int fxp_fstat_recv(struct sftp_packet *pktin, struct sftp_request *req,
 /*
  * Set the attributes of a file.
  */
-struct sftp_request *fxp_setstat_send(char *fname, struct fxp_attrs attrs)
+struct sftp_request *fxp_setstat_send(sftp_handle* sftp, char *fname, struct fxp_attrs attrs)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -847,7 +847,7 @@ struct sftp_request *fxp_setstat_send(char *fname, struct fxp_attrs attrs)
     return req;
 }
 
-int fxp_setstat_recv(struct sftp_packet *pktin, struct sftp_request *req)
+int fxp_setstat_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req)
 {
     int id;
     sfree(req);
@@ -875,7 +875,7 @@ struct sftp_request *fxp_fsetstat_send(struct fxp_handle *handle,
     return req;
 }
 
-int fxp_fsetstat_recv(struct sftp_packet *pktin, struct sftp_request *req)
+int fxp_fsetstat_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req)
 {
     int id;
     sfree(req);
@@ -943,7 +943,7 @@ int fxp_read_recv(struct sftp_packet *pktin, struct sftp_request *req,
 /*
  * Read from a directory.
  */
-struct sftp_request *fxp_readdir_send(struct fxp_handle *handle)
+struct sftp_request *fxp_readdir_send(sftp_handle* sftp, struct fxp_handle *handle)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -1043,7 +1043,7 @@ struct sftp_request *fxp_write_send(struct fxp_handle *handle,
     return req;
 }
 
-int fxp_write_recv(struct sftp_packet *pktin, struct sftp_request *req)
+int fxp_write_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req)
 {
     sfree(req);
     fxp_got_status(pktin);
@@ -1054,7 +1054,7 @@ int fxp_write_recv(struct sftp_packet *pktin, struct sftp_request *req)
 /*
  * Free up an fxp_names structure.
  */
-void fxp_free_names(struct fxp_names *names)
+void fxp_free_names(sftp_handle* sftp, struct fxp_names *names)
 {
     int i;
 
@@ -1069,7 +1069,7 @@ void fxp_free_names(struct fxp_names *names)
 /*
  * Duplicate an fxp_name structure.
  */
-struct fxp_name *fxp_dup_name(struct fxp_name *name)
+struct fxp_name *fxp_dup_name(sftp_handle* sftp, struct fxp_name *name)
 {
     struct fxp_name *ret;
     ret = snew(struct fxp_name);
@@ -1082,7 +1082,7 @@ struct fxp_name *fxp_dup_name(struct fxp_name *name)
 /*
  * Free up an fxp_name structure.
  */
-void fxp_free_name(struct fxp_name *name)
+void fxp_free_name(sftp_handle* sftp, struct fxp_name *name)
 {
     sfree(name->filename);
     sfree(name->longname);
@@ -1092,12 +1092,12 @@ void fxp_free_name(struct fxp_name *name)
 /*
  * Store user data in an sftp_request structure.
  */
-void *fxp_get_userdata(struct sftp_request *req)
+void *fxp_get_userdata(sftp_handle* sftp, struct sftp_request *req)
 {
     return req->userdata;
 }
 
-void fxp_set_userdata(struct sftp_request *req, void *data)
+void fxp_set_userdata(sftp_handle* sftp, struct sftp_request *req, void *data)
 {
     req->userdata = data;
 }
@@ -1121,7 +1121,7 @@ struct fxp_xfer {
     struct req *head, *tail;
 };
 
-static struct fxp_xfer *xfer_init(struct fxp_handle *fh, uint64 offset)
+static struct fxp_xfer *xfer_init(sftp_handle* sftp, struct fxp_handle *fh, uint64 offset)
 {
     struct fxp_xfer *xfer = snew(struct fxp_xfer);
 
@@ -1137,7 +1137,7 @@ static struct fxp_xfer *xfer_init(struct fxp_handle *fh, uint64 offset)
     return xfer;
 }
 
-int xfer_done(struct fxp_xfer *xfer)
+int xfer_done(sftp_handle* sftp, struct fxp_xfer *xfer)
 {
     /*
      * We're finished if we've seen EOF _and_ there are no
@@ -1146,7 +1146,7 @@ int xfer_done(struct fxp_xfer *xfer)
     return (xfer->eof || xfer->err) && !xfer->head;
 }
 
-void xfer_download_queue(struct fxp_xfer *xfer)
+void xfer_download_queue(sftp_handle* sftp, struct fxp_xfer *xfer)
 {
     while (xfer->req_totalsize < xfer->req_maxsize &&
 	   !xfer->eof && !xfer->err) {
@@ -1183,7 +1183,7 @@ void xfer_download_queue(struct fxp_xfer *xfer)
     }
 }
 
-struct fxp_xfer *xfer_download_init(struct fxp_handle *fh, uint64 offset)
+struct fxp_xfer *xfer_download_init(sftp_handle* sftp, struct fxp_handle *fh, uint64 offset)
 {
     struct fxp_xfer *xfer = xfer_init(fh, offset);
 
@@ -1193,7 +1193,7 @@ struct fxp_xfer *xfer_download_init(struct fxp_handle *fh, uint64 offset)
     return xfer;
 }
 
-int xfer_download_gotpkt(struct fxp_xfer *xfer, struct sftp_packet *pktin)
+int xfer_download_gotpkt(sftp_handle* sftp, struct fxp_xfer *xfer, struct sftp_packet *pktin)
 {
     struct sftp_request *rreq;
     struct req *rr;
@@ -1270,12 +1270,12 @@ int xfer_download_gotpkt(struct fxp_xfer *xfer, struct sftp_packet *pktin)
     return 1;
 }
 
-void xfer_set_error(struct fxp_xfer *xfer)
+void xfer_set_error(sftp_handle* sftp, struct fxp_xfer *xfer)
 {
     xfer->err = 1;
 }
 
-int xfer_download_data(struct fxp_xfer *xfer, void **buf, int *len)
+int xfer_download_data(sftp_handle* sftp, struct fxp_xfer *xfer, void **buf, int *len)
 {
     void *retbuf = NULL;
     int retlen = 0;
@@ -1316,7 +1316,7 @@ int xfer_download_data(struct fxp_xfer *xfer, void **buf, int *len)
 	return 0;
 }
 
-struct fxp_xfer *xfer_upload_init(struct fxp_handle *fh, uint64 offset)
+struct fxp_xfer *xfer_upload_init(sftp_handle* sftp, struct fxp_handle *fh, uint64 offset)
 {
     struct fxp_xfer *xfer = xfer_init(fh, offset);
 
@@ -1333,7 +1333,7 @@ struct fxp_xfer *xfer_upload_init(struct fxp_handle *fh, uint64 offset)
     return xfer;
 }
 
-int xfer_upload_ready(struct fxp_xfer *xfer)
+int xfer_upload_ready(sftp_handle* sftp, struct fxp_xfer *xfer)
 {
     if (xfer->req_totalsize < xfer->req_maxsize)
 	return 1;
@@ -1341,7 +1341,7 @@ int xfer_upload_ready(struct fxp_xfer *xfer)
 	return 0;
 }
 
-void xfer_upload_data(struct fxp_xfer *xfer, char *buffer, int len)
+void xfer_upload_data(sftp_handle* sftp, struct fxp_xfer *xfer, char *buffer, int len)
 {
     struct req *rr;
     struct sftp_request *req;
@@ -1372,7 +1372,7 @@ void xfer_upload_data(struct fxp_xfer *xfer, char *buffer, int len)
 #endif
 }
 
-int xfer_upload_gotpkt(struct fxp_xfer *xfer, struct sftp_packet *pktin)
+int xfer_upload_gotpkt(sftp_handle* sftp, struct fxp_xfer *xfer, struct sftp_packet *pktin)
 {
     struct sftp_request *rreq;
     struct req *rr, *prev, *next;
@@ -1409,7 +1409,7 @@ int xfer_upload_gotpkt(struct fxp_xfer *xfer, struct sftp_packet *pktin)
     return 1;
 }
 
-void xfer_cleanup(struct fxp_xfer *xfer)
+void xfer_cleanup(sftp_handle* sftp, struct fxp_xfer *xfer)
 {
     struct req *rr;
     while (xfer->head) {
