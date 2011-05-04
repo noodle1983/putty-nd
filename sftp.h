@@ -59,6 +59,7 @@
 typedef struct {
     Backend *back;
     void *backhandle;
+    Config cfg;
 
     int fxp_errtype;
     const char *fxp_error_message;

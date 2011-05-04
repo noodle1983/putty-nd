@@ -34,7 +34,6 @@ void do_sftp_cleanup();
  */
 
 char *pwd, *homedir;
-static Config cfg;
 /* ----------------------------------------------------------------------
  * Higher-level helper functions used in commands.
  */
@@ -2667,26 +2666,26 @@ static int psftp_connect(sftp_handle* sftp, char *userhost, char *user, int port
 	if (cfg2.host[0] != '\0') {
 	    /* Settings present and include hostname */
 	    /* Re-load data into the real config. */
-	    do_defaults(host, &cfg);
+	    do_defaults(host, &sftp->cfg);
 	} else {
 	    /* Session doesn't exist or mention a hostname. */
 	    /* Use `host' as a bare hostname. */
-	    strncpy(cfg.host, host, sizeof(cfg.host) - 1);
-	    cfg.host[sizeof(cfg.host) - 1] = '\0';
+	    strncpy(sftp->cfg.host, host, sizeof(sftp->cfg.host) - 1);
+	    sftp->cfg.host[sizeof(sftp->cfg.host) - 1] = '\0';
 	}
     } else {
 	/* Patch in hostname `host' to session details. */
-	strncpy(cfg.host, host, sizeof(cfg.host) - 1);
-	cfg.host[sizeof(cfg.host) - 1] = '\0';
+	strncpy(sftp->cfg.host, host, sizeof(sftp->cfg.host) - 1);
+	sftp->cfg.host[sizeof(sftp->cfg.host) - 1] = '\0';
     }
 
     /*
      * Force use of SSH. (If they got the protocol wrong we assume the
      * port is useless too.)
      */
-    if (cfg.protocol != PROT_SSH) {
-        cfg.protocol = PROT_SSH;
-        cfg.port = 22;
+    if (sftp->cfg.protocol != PROT_SSH) {
+        sftp->cfg.protocol = PROT_SSH;
+        sftp->cfg.port = 22;
     }
 
     /*
@@ -2695,78 +2694,78 @@ static int psftp_connect(sftp_handle* sftp, char *userhost, char *user, int port
      * work for SFTP. (Can be overridden with `-1' option.)
      * But if it says `2 only' or `2', respect which.
      */
-    if (cfg.sshprot != 2 && cfg.sshprot != 3)
-	cfg.sshprot = 2;
+    if (sftp->cfg.sshprot != 2 && sftp->cfg.sshprot != 3)
+	sftp->cfg.sshprot = 2;
 
     /*
      * Enact command-line overrides.
      */
-    cmdline_run_saved(&cfg);
+    cmdline_run_saved(&sftp->cfg);
 
     /*
      * Trim leading whitespace off the hostname if it's there.
      */
     {
-	int space = strspn(cfg.host, " \t");
-	memmove(cfg.host, cfg.host+space, 1+strlen(cfg.host)-space);
+	int space = strspn(sftp->cfg.host, " \t");
+	memmove(sftp->cfg.host, sftp->cfg.host+space, 1+strlen(sftp->cfg.host)-space);
     }
 
     /* See if host is of the form user@host */
-    if (cfg.host[0] != '\0') {
-	char *atsign = strrchr(cfg.host, '@');
+    if (sftp->cfg.host[0] != '\0') {
+	char *atsign = strrchr(sftp->cfg.host, '@');
 	/* Make sure we're not overflowing the user field */
 	if (atsign) {
-	    if (atsign - cfg.host < sizeof cfg.username) {
-		strncpy(cfg.username, cfg.host, atsign - cfg.host);
-		cfg.username[atsign - cfg.host] = '\0';
+	    if (atsign - sftp->cfg.host < sizeof sftp->cfg.username) {
+		strncpy(sftp->cfg.username, sftp->cfg.host, atsign - sftp->cfg.host);
+		sftp->cfg.username[atsign - sftp->cfg.host] = '\0';
 	    }
-	    memmove(cfg.host, atsign + 1, 1 + strlen(atsign + 1));
+	    memmove(sftp->cfg.host, atsign + 1, 1 + strlen(atsign + 1));
 	}
     }
 
     /*
      * Trim a colon suffix off the hostname if it's there.
      */
-    cfg.host[strcspn(cfg.host, ":")] = '\0';
+    sftp->cfg.host[strcspn(sftp->cfg.host, ":")] = '\0';
 
     /*
      * Remove any remaining whitespace from the hostname.
      */
     {
 	int p1 = 0, p2 = 0;
-	while (cfg.host[p2] != '\0') {
-	    if (cfg.host[p2] != ' ' && cfg.host[p2] != '\t') {
-		cfg.host[p1] = cfg.host[p2];
+	while (sftp->cfg.host[p2] != '\0') {
+	    if (sftp->cfg.host[p2] != ' ' && sftp->cfg.host[p2] != '\t') {
+		sftp->cfg.host[p1] = sftp->cfg.host[p2];
 		p1++;
 	    }
 	    p2++;
 	}
-	cfg.host[p1] = '\0';
+	sftp->cfg.host[p1] = '\0';
     }
 
     /* Set username */
     if (user != NULL && user[0] != '\0') {
-	strncpy(cfg.username, user, sizeof(cfg.username) - 1);
-	cfg.username[sizeof(cfg.username) - 1] = '\0';
+	strncpy(sftp->cfg.username, user, sizeof(sftp->cfg.username) - 1);
+	sftp->cfg.username[sizeof(sftp->cfg.username) - 1] = '\0';
     }
 
     if (portnumber)
-	cfg.port = portnumber;
+	sftp->cfg.port = portnumber;
 
     /*
      * Disable scary things which shouldn't be enabled for simple
      * things like SCP and SFTP: agent forwarding, port forwarding,
      * X forwarding.
      */
-    cfg.x11_forward = 0;
-    cfg.agentfwd = 0;
-    cfg.portfwd[0] = cfg.portfwd[1] = '\0';
-    cfg.ssh_simple = TRUE;
+    sftp->cfg.x11_forward = 0;
+    sftp->cfg.agentfwd = 0;
+    sftp->cfg.portfwd[0] = sftp->cfg.portfwd[1] = '\0';
+    sftp->cfg.ssh_simple = TRUE;
 
     /* Set up subsystem name. */
-    strcpy(cfg.remote_cmd, "sftp");
-    cfg.ssh_subsys = TRUE;
-    cfg.nopty = TRUE;
+    strcpy(sftp->cfg.remote_cmd, "sftp");
+    sftp->cfg.ssh_subsys = TRUE;
+    sftp->cfg.nopty = TRUE;
 
     /*
      * Set up fallback option, for SSH-1 servers or servers with the
@@ -2785,21 +2784,21 @@ static int psftp_connect(sftp_handle* sftp, char *userhost, char *user, int port
      * obvious pathnames and then give up, and when it does give up
      * it will print the preferred pathname in the error messages.
      */
-    cfg.remote_cmd_ptr2 =
+    sftp->cfg.remote_cmd_ptr2 =
 	"test -x /usr/lib/sftp-server && exec /usr/lib/sftp-server\n"
 	"test -x /usr/local/lib/sftp-server && exec /usr/local/lib/sftp-server\n"
 	"exec sftp-server";
-    cfg.ssh_subsys2 = FALSE;
+    sftp->cfg.ssh_subsys2 = FALSE;
 
     sftp->back = &ssh_backend;
 
-    err = sftp->back->init(NULL, &sftp->backhandle, &cfg, cfg.host, cfg.port, &realhost,
-		     0, cfg.tcp_keepalives);
+    err = sftp->back->init(NULL, &sftp->backhandle, &sftp->cfg, sftp->cfg.host, sftp->cfg.port, &realhost,
+		     0, sftp->cfg.tcp_keepalives);
     if (err != NULL) {
 	fprintf(stderr, "ssh_init: %s\n", err);
 	return 1;
     }
-    logctx = log_init(NULL, &cfg);
+    logctx = log_init(NULL, &sftp->cfg);
     sftp->back->provide_logctx(sftp->backhandle, logctx);
     console_provide_logctx(logctx);
     while (!sftp->back->sendok(sftp->backhandle)) {
@@ -2855,7 +2854,7 @@ int psftp_main(int argc, char *argv[])
     userhost = user = NULL;
 
     /* Load Default Settings before doing anything else. */
-    do_defaults(NULL, &cfg);
+    do_defaults(NULL, &sftp->cfg);
     loaded_session = FALSE;
 
     errors = 0;
@@ -2868,7 +2867,7 @@ int psftp_main(int argc, char *argv[])
                 userhost = dupstr(argv[i]);
 	    continue;
 	}
-	ret = cmdline_process_param(argv[i], i+1<argc?argv[i+1]:NULL, 1, &cfg);
+	ret = cmdline_process_param(argv[i], i+1<argc?argv[i+1]:NULL, 1, &sftp->cfg);
 	if (ret == -2) {
 	    cmdline_error("option \"%s\" requires an argument", argv[i]);
 	} else if (ret == 2) {
@@ -2910,8 +2909,8 @@ int psftp_main(int argc, char *argv[])
      * otherwise been specified, pop it in `userhost' so that
      * `psftp -load sessname' is sufficient to start a session.
      */
-    if (!userhost && cfg.host[0] != '\0') {
-	userhost = dupstr(cfg.host);
+    if (!userhost && sftp->cfg.host[0] != '\0') {
+	userhost = dupstr(sftp->cfg.host);
     }
 
     /*
