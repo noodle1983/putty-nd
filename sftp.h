@@ -57,6 +57,9 @@
 
 typedef struct {
 
+    int fxp_errtype;
+    const char *fxp_error_message;
+    tree234 *sftp_requests;
 } sftp_handle;
 
 /*
