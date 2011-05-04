@@ -5,6 +5,10 @@
 #ifndef WINTAB_H
 #define WINTAB_H
 
+
+#include "sftp.h"
+#include "psftp.h"
+
 /* From MSDN: In the WM_SYSCOMMAND message, the four low-order bits of
  * wParam are used by Windows, and should be masked off, so we shouldn't
  * attempt to store information in them. Hence all these identifiers have
@@ -147,7 +151,8 @@ typedef struct {
     char **events;
 
     //sftp
-    char *pwd, *homedir;
+    sftp_handle _sftp;
+    sftp_handle* sftp;
 }wintabitem;
 
 typedef struct {

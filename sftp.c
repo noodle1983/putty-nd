@@ -38,6 +38,19 @@ void sftp_handle_init(sftp_handle* sftp){
     sftp->fxp_error_message = NULL;
     sftp->sftp_requests = NULL;
 }
+
+/* for tab usage only*/
+void sftp_handle_fini(sftp_handle* sftp){
+    if (sftp->pwd) {
+    	sfree(sftp->pwd);
+    	sftp->pwd = NULL;
+    }
+    if (sftp->homedir) {
+    	sfree(sftp->homedir);
+    	sftp->homedir = NULL;
+    }
+}
+
 /* ----------------------------------------------------------------------
  * SFTP packet construction functions.
  */
