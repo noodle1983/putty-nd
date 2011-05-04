@@ -2790,7 +2790,7 @@ static int psftp_connect(sftp_handle* sftp, char *userhost, char *user, int port
 	fprintf(stderr, "ssh_init: %s\n", err);
 	return 1;
     }
-    logctx = log_init(NULL, &sftp->cfg);
+    logctx = log_init(sftp, &sftp->cfg);
     sftp->back->provide_logctx(sftp->backhandle, logctx);
     console_provide_logctx(logctx);
     while (!sftp->back->sendok(sftp->backhandle)) {

@@ -28,7 +28,6 @@
 #include "int64.h"
 
 static int list = 0;
-static int verbose = 0;
 static int recursive = 0;
 static int preserve = 0;
 static int targetshouldbedirectory = 0;
@@ -158,16 +157,13 @@ void agent_schedule_callback(void (*callback)(void *, void *, int),
  * own trap in from_backend() to catch the data that comes sftp->back. We
  * do this until we have enough data.
  */
-
-static unsigned char *outptr;	       /* where to put the data */
-static unsigned outlen;		       /* how much data required */
-static unsigned char *pending = NULL;  /* any spare data */
-static unsigned pendlen = 0, pendsize = 0;	/* length and phys. size of buffer */
 int from_backend(void *frontend, int is_stderr, const char *data, int datalen)
 {
     unsigned char *p = (unsigned char *) data;
     unsigned len = (unsigned) datalen;
-
+    assert(frontend != NULL);
+    sftp_handle* sftp = frontend;
+    
     /*
      * stderr data is just spouted to local stderr and otherwise
      * ignored.
@@ -179,24 +175,24 @@ int from_backend(void *frontend, int is_stderr, const char *data, int datalen)
 	return 0;
     }
 
-    if ((outlen > 0) && (len > 0)) {
-	unsigned used = outlen;
+    if ((sftp->outlen > 0) && (len > 0)) {
+	unsigned used = sftp->outlen;
 	if (used > len)
 	    used = len;
-	memcpy(outptr, p, used);
-	outptr += used;
-	outlen -= used;
+	memcpy(sftp->outptr, p, used);
+	sftp->outptr += used;
+	sftp->outlen -= used;
 	p += used;
 	len -= used;
     }
 
     if (len > 0) {
-	if (pendsize < pendlen + len) {
-	    pendsize = pendlen + len + 4096;
-	    pending = sresize(pending, pendsize, unsigned char);
+	if (sftp->pendsize < sftp->pendlen + len) {
+	    sftp->pendsize = sftp->pendlen + len + 4096;
+	    sftp->pending = sresize(sftp->pending, sftp->pendsize, unsigned char);
 	}
-	memcpy(pending + pendlen, p, len);
-	pendlen += len;
+	memcpy(sftp->pending + sftp->pendlen, p, len);
+	sftp->pendlen += len;
     }
 
     return 0;
@@ -212,32 +208,32 @@ int from_backend_untrusted(void *frontend_handle, const char *data, int len)
 }
 static int ssh_scp_recv(sftp_handle* sftp, unsigned char *buf, int len)
 {
-    outptr = buf;
-    outlen = len;
+    sftp->outptr = buf;
+    sftp->outlen = len;
 
     /*
-     * See if the pending-input block contains some of what we
+     * See if the sftp->pending-input block contains some of what we
      * need.
      */
-    if (pendlen > 0) {
-	unsigned pendused = pendlen;
-	if (pendused > outlen)
-	    pendused = outlen;
-	memcpy(outptr, pending, pendused);
-	memmove(pending, pending + pendused, pendlen - pendused);
-	outptr += pendused;
-	outlen -= pendused;
-	pendlen -= pendused;
-	if (pendlen == 0) {
-	    pendsize = 0;
-	    sfree(pending);
-	    pending = NULL;
+    if (sftp->pendlen > 0) {
+	unsigned pendused = sftp->pendlen;
+	if (pendused > sftp->outlen)
+	    pendused = sftp->outlen;
+	memcpy(sftp->outptr, sftp->pending, pendused);
+	memmove(sftp->pending, sftp->pending + pendused, sftp->pendlen - pendused);
+	sftp->outptr += pendused;
+	sftp->outlen -= pendused;
+	sftp->pendlen -= pendused;
+	if (sftp->pendlen == 0) {
+	    sftp->pendsize = 0;
+	    sfree(sftp->pending);
+	    sftp->pending = NULL;
 	}
-	if (outlen == 0)
+	if (sftp->outlen == 0)
 	    return len;
     }
 
-    while (outlen > 0) {
+    while (sftp->outlen > 0) {
 	if (sftp->back->exitcode(sftp->backhandle) >= 0 || ssh_sftp_loop_iteration() < 0)
 	    return 0;		       /* doom */
     }
@@ -267,7 +263,7 @@ static void ssh_scp_init(sftp_handle* sftp)
     else
 	using_sftp = fallback_cmd_is_sftp;
 
-    if (verbose) {
+    if (sftp->verbose) {
 	if (using_sftp)
 	    tell_user(stderr, "Using SFTP");
 	else
@@ -407,7 +403,7 @@ static void do_cmd(sftp_handle* sftp, char *host, char *user, char *cmd)
 	if (!user)
 	    bump(sftp, "Empty user name");
 	else {
-	    if (verbose)
+	    if (sftp->verbose)
 		tell_user(stderr, "Guessing user name: %s", user);
 	    strncpy(sftp->cfg.username, user, sizeof(sftp->cfg.username) - 1);
 	    sftp->cfg.username[sizeof(sftp->cfg.username) - 1] = '\0';
@@ -464,15 +460,15 @@ static void do_cmd(sftp_handle* sftp, char *host, char *user, char *cmd)
 
     sftp->back = &ssh_backend;
 
-    err = sftp->back->init(NULL, &sftp->backhandle, &sftp->cfg, sftp->cfg.host, sftp->cfg.port, &realhost, 
+    err = sftp->back->init(sftp, &sftp->backhandle, &sftp->cfg, sftp->cfg.host, sftp->cfg.port, &realhost, 
 		     0, sftp->cfg.tcp_keepalives);
     if (err != NULL)
 	bump(sftp, "ssh_init: %s", err);
-    logctx = log_init(NULL, &sftp->cfg);
+    logctx = log_init(sftp, &sftp->cfg);
     sftp->back->provide_logctx(sftp->backhandle, logctx);
     console_provide_logctx(logctx);
     ssh_scp_init(sftp);
-    if (verbose && realhost != NULL && errs == 0)
+    if (sftp->verbose && realhost != NULL && errs == 0)
 	tell_user(stderr, "Connected to %s\n", realhost);
     sfree(realhost);
 }
@@ -1651,7 +1647,7 @@ static void source(sftp_handle* sftp, char *src)
 	    return;
     }
 
-    if (verbose) {
+    if (sftp->verbose) {
 	char sizestr[40];
 	uint64_decimal(size, sizestr);
 	tell_user(stderr, "Sending file %s, size=%s", last, sizestr);
@@ -1717,7 +1713,7 @@ static void rsource(sftp_handle* sftp, char *src)
 
     save_target = scp_save_remotepath();
 
-    if (verbose)
+    if (sftp->verbose)
 	tell_user(stderr, "Entering directory: %s", last);
     if (scp_send_dirname(sftp, last, 0755))
 	return;
@@ -1980,7 +1976,7 @@ static void toremote(sftp_handle* sftp, int argc, char *argv[])
     }
 
     cmd = dupprintf("scp%s%s%s%s -t %s",
-		    verbose ? " -v" : "",
+		    sftp->verbose ? " -v" : "",
 		    recursive ? " -r" : "",
 		    preserve ? " -p" : "",
 		    targetshouldbedirectory ? " -d" : "", targ);
@@ -2062,7 +2058,7 @@ static void tolocal(sftp_handle* sftp, int argc, char *argv[])
     }
 
     cmd = dupprintf("scp%s%s%s%s -f %s",
-		    verbose ? " -v" : "",
+		    sftp->verbose ? " -v" : "",
 		    recursive ? " -r" : "",
 		    preserve ? " -p" : "",
 		    targetshouldbedirectory ? " -d" : "", src);
@@ -2152,7 +2148,7 @@ static void usage(void)
     printf("  -p        preserve file attributes\n");
     printf("  -q        quiet, don't show statistics\n");
     printf("  -r        copy directories recursively\n");
-    printf("  -v        show verbose messages\n");
+    printf("  -v        show sftp->verbose messages\n");
     printf("  -load sessname  Load settings from saved session\n");
     printf("  -P port   connect to specified port\n");
     printf("  -l user   connect with specified username\n");
@@ -2235,7 +2231,7 @@ int psftp_main(int argc, char *argv[])
 	} else if (ret == 1) {
 	    /* We have our own verbosity in addition to `flags'. */
 	    if (flags & FLAG_VERBOSE)
-		verbose = 1;
+		sftp->verbose = 1;
         } else if (strcmp(argv[i], "-pgpfp") == 0) {
             pgp_fingerprints();
             return 1;
