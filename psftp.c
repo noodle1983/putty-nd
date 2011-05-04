@@ -2069,7 +2069,7 @@ static struct sftp_cmd_lookup {
 	    sftp_cmd_put
     },
     {
-	"sftp->pwd", TRUE, "print your remote working directory",
+	"pwd", TRUE, "print your remote working directory",
 	    "\n"
 	    "  Print the current remote working directory for your SFTP session.\n",
 	    sftp_cmd_pwd
