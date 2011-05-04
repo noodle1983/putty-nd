@@ -58,7 +58,7 @@
 #include "putty.h"
 typedef struct {
     Backend *back;
-
+    void *backhandle;
 
     int fxp_errtype;
     const char *fxp_error_message;

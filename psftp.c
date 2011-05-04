@@ -34,7 +34,6 @@ void do_sftp_cleanup();
  */
 
 char *pwd, *homedir;
-static void *backhandle;
 static Config cfg;
 sftp_handle* __sftp;
 /* ----------------------------------------------------------------------
@@ -966,9 +965,9 @@ int sftp_cmd_close(sftp_handle* sftp, struct sftp_command *cmd)
 	return 0;
     }
 
-    if (sftp->back != NULL && sftp->back->connected(backhandle)) {
+    if (sftp->back != NULL && sftp->back->connected(sftp->backhandle)) {
 	char ch;
-	sftp->back->special(backhandle, TS_EOF);
+	sftp->back->special(sftp->backhandle, TS_EOF);
 	sftp_recvdata(__sftp, &ch, 1);
     }
     do_sftp_cleanup();
@@ -2350,12 +2349,12 @@ void do_sftp_cleanup(sftp_handle* sftp)
 {
     char ch;
     if (sftp->back) {
-	sftp->back->special(backhandle, TS_EOF);
+	sftp->back->special(sftp->backhandle, TS_EOF);
 	sftp_recvdata(__sftp, &ch, 1);
-	sftp->back->free(backhandle);
+	sftp->back->free(sftp->backhandle);
 	sftp_cleanup_request(__sftp);
 	sftp->back = NULL;
-	backhandle = NULL;
+	sftp->backhandle = NULL;
     }
     if (pwd) {
 	sfree(pwd);
@@ -2587,7 +2586,7 @@ int sftp_recvdata(sftp_handle* sftp, char *buf, int len)
     }
 
     while (outlen > 0) {
-	if (sftp->back->exitcode(backhandle) >= 0 || ssh_sftp_loop_iteration() < 0)
+	if (sftp->back->exitcode(sftp->backhandle) >= 0 || ssh_sftp_loop_iteration() < 0)
 	    return 0;		       /* doom */
     }
 
@@ -2595,7 +2594,7 @@ int sftp_recvdata(sftp_handle* sftp, char *buf, int len)
 }
 int sftp_senddata(sftp_handle* sftp, char *buf, int len)
 {
-    sftp->back->send(backhandle, buf, len);
+    sftp->back->send(sftp->backhandle, buf, len);
     return 1;
 }
 
@@ -2795,17 +2794,17 @@ static int psftp_connect(sftp_handle* sftp, char *userhost, char *user, int port
 
     sftp->back = &ssh_backend;
 
-    err = sftp->back->init(NULL, &backhandle, &cfg, cfg.host, cfg.port, &realhost,
+    err = sftp->back->init(NULL, &sftp->backhandle, &cfg, cfg.host, cfg.port, &realhost,
 		     0, cfg.tcp_keepalives);
     if (err != NULL) {
 	fprintf(stderr, "ssh_init: %s\n", err);
 	return 1;
     }
     logctx = log_init(NULL, &cfg);
-    sftp->back->provide_logctx(backhandle, logctx);
+    sftp->back->provide_logctx(sftp->backhandle, logctx);
     console_provide_logctx(logctx);
-    while (!sftp->back->sendok(backhandle)) {
-	if (sftp->back->exitcode(backhandle) >= 0)
+    while (!sftp->back->sendok(sftp->backhandle)) {
+	if (sftp->back->exitcode(sftp->backhandle) >= 0)
 	    return 1;
 	if (ssh_sftp_loop_iteration() < 0) {
 	    fprintf(stderr, "ssh_init: error during SSH connection setup\n");
@@ -2935,9 +2934,9 @@ int psftp_main(int argc, char *argv[])
 
     do_sftp(sftp, mode, modeflags, batchfile);
 
-    if (sftp->back != NULL && sftp->back->connected(backhandle)) {
+    if (sftp->back != NULL && sftp->back->connected(sftp->backhandle)) {
 	char ch;
-	sftp->back->special(backhandle, TS_EOF);
+	sftp->back->special(sftp->backhandle, TS_EOF);
 	sftp_recvdata(__sftp, &ch, 1);
     }
     do_sftp_cleanup(sftp);
