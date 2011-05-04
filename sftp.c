@@ -25,6 +25,14 @@ static void fxp_internal_error(sftp_handle* sftp, char *msg);
 void sftp_handle_init(sftp_handle* sftp){
     sftp->back = NULL;
     sftp->backhandle = NULL;
+    sftp->pwd = NULL;
+    sftp->homedir = NULL;
+    sftp->verbose = 0;
+    sftp->outptr = NULL;	       /* where to put the data */
+    sftp->outlen = 0;		       /* how much data required */
+    sftp->pending = NULL;  /* any spare data */
+    sftp->pendlen = 0 ;
+    sftp->pendsize = 0;   /* length and phys. size of buffer */
 
     sftp->fxp_errtype= 0;
     sftp->fxp_error_message = NULL;

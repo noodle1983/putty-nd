@@ -33,13 +33,12 @@ void do_sftp_cleanup();
  * sftp client state.
  */
 
-char *pwd, *homedir;
 /* ----------------------------------------------------------------------
  * Higher-level helper functions used in commands.
  */
 
 /*
- * Attempt to canonify a pathname starting from the pwd. If
+ * Attempt to canonify a pathname starting from the sftp->pwd. If
  * canonification fails, at least fall sftp->back to returning a _valid_
  * pathname (though it may be ugly, eg /home/simon/../foobar).
  */
@@ -53,11 +52,11 @@ char *canonify(sftp_handle* sftp, char *name)
 	fullname = dupstr(name);
     } else {
 	char *slash;
-	if (pwd[strlen(pwd) - 1] == '/')
+	if (sftp->pwd[strlen(sftp->pwd) - 1] == '/')
 	    slash = "";
 	else
 	    slash = "/";
-	fullname = dupcat(pwd, slash, name, NULL);
+	fullname = dupcat(sftp->pwd, slash, name, NULL);
     }
 
     sftp_register(sftp, req = fxp_realpath_send(sftp, fullname));
@@ -974,7 +973,7 @@ int sftp_cmd_close(sftp_handle* sftp, struct sftp_command *cmd)
 }
 
 /*
- * List a directory. If no arguments are given, list pwd; otherwise
+ * List a directory. If no arguments are given, list sftp->pwd; otherwise
  * list the directory given in words[1].
  */
 int sftp_cmd_ls(sftp_handle* sftp, struct sftp_command *cmd)
@@ -1101,7 +1100,7 @@ int sftp_cmd_ls(sftp_handle* sftp, struct sftp_command *cmd)
 
 /*
  * Change directories. We do this by canonifying the new name, then
- * trying to OPENDIR it. Only if that succeeds do we set the new pwd.
+ * trying to OPENDIR it. Only if that succeeds do we set the new sftp->pwd.
  */
 int sftp_cmd_cd(sftp_handle* sftp, struct sftp_command *cmd)
 {
@@ -1116,7 +1115,7 @@ int sftp_cmd_cd(sftp_handle* sftp, struct sftp_command *cmd)
     }
 
     if (cmd->nwords < 2)
-	dir = dupstr(homedir);
+	dir = dupstr(sftp->homedir);
     else
 	dir = canonify(sftp, cmd->words[1]);
 
@@ -1141,9 +1140,9 @@ int sftp_cmd_cd(sftp_handle* sftp, struct sftp_command *cmd)
     assert(rreq == req);
     fxp_close_recv(sftp, pktin, rreq);
 
-    sfree(pwd);
-    pwd = dir;
-    printf("Remote directory is now %s\n", pwd);
+    sfree(sftp->pwd);
+    sftp->pwd = dir;
+    printf("Remote directory is now %s\n", sftp->pwd);
 
     return 1;
 }
@@ -1158,7 +1157,7 @@ int sftp_cmd_pwd(sftp_handle* sftp, struct sftp_command *cmd)
 	return 0;
     }
 
-    printf("Remote directory is %s\n", pwd);
+    printf("Remote directory is %s\n", sftp->pwd);
     return 1;
 }
 
@@ -2070,7 +2069,7 @@ static struct sftp_cmd_lookup {
 	    sftp_cmd_put
     },
     {
-	"pwd", TRUE, "print your remote working directory",
+	"sftp->pwd", TRUE, "print your remote working directory",
 	    "\n"
 	    "  Print the current remote working directory for your SFTP session.\n",
 	    sftp_cmd_pwd
@@ -2329,17 +2328,17 @@ static int do_sftp_init(sftp_handle* sftp)
     sftp_register(sftp, req = fxp_realpath_send(sftp, "."));
     rreq = sftp_find_request(sftp, pktin = sftp_recv(sftp));
     assert(rreq == req);
-    homedir = fxp_realpath_recv(sftp, pktin, rreq);
+    sftp->homedir = fxp_realpath_recv(sftp, pktin, rreq);
 
-    if (!homedir) {
+    if (!sftp->homedir) {
 	fprintf(stderr,
 		"Warning: failed to resolve home directory: %s\n",
 		fxp_error(sftp));
-	homedir = dupstr(".");
+	sftp->homedir = dupstr(".");
     } else {
-	printf("Remote working directory is %s\n", homedir);
+	printf("Remote working directory is %s\n", sftp->homedir);
     }
-    pwd = dupstr(homedir);
+    sftp->pwd = dupstr(sftp->homedir);
     return 0;
 }
 
@@ -2354,13 +2353,13 @@ void do_sftp_cleanup(sftp_handle* sftp)
 	sftp->back = NULL;
 	sftp->backhandle = NULL;
     }
-    if (pwd) {
-	sfree(pwd);
-	pwd = NULL;
+    if (sftp->pwd) {
+	sfree(sftp->pwd);
+	sftp->pwd = NULL;
     }
-    if (homedir) {
-	sfree(homedir);
-	homedir = NULL;
+    if (sftp->homedir) {
+	sfree(sftp->homedir);
+	sftp->homedir = NULL;
     }
 }
 
@@ -2417,11 +2416,6 @@ void do_sftp(sftp_handle* sftp, int mode, int modeflags, char *batchfile)
     }
 }
 
-/* ----------------------------------------------------------------------
- * Dirty bits: integration with PuTTY.
- */
-
-static int verbose = 0;
 
 /*
  *  Print an error message and perform a fatal exit.
@@ -2499,14 +2493,12 @@ void agent_schedule_callback(void (*callback)(void *, void *, int),
  * do this until we have enough data.
  */
 
-static unsigned char *outptr;	       /* where to put the data */
-static unsigned outlen;		       /* how much data required */
-static unsigned char *pending = NULL;  /* any spare data */
-static unsigned pendlen = 0, pendsize = 0;	/* length and phys. size of buffer */
 int from_backend(void *frontend, int is_stderr, const char *data, int datalen)
 {
     unsigned char *p = (unsigned char *) data;
     unsigned len = (unsigned) datalen;
+    assert(frontend != NULL);
+    sftp_handle* sftp = frontend;
 
     /*
      * stderr data is just spouted to local stderr and otherwise
@@ -2522,27 +2514,27 @@ int from_backend(void *frontend, int is_stderr, const char *data, int datalen)
     /*
      * If this is before the real session begins, just return.
      */
-    if (!outptr)
+    if (!sftp->outptr)
 	return 0;
 
-    if ((outlen > 0) && (len > 0)) {
-	unsigned used = outlen;
+    if ((sftp->outlen > 0) && (len > 0)) {
+	unsigned used = sftp->outlen;
 	if (used > len)
 	    used = len;
-	memcpy(outptr, p, used);
-	outptr += used;
-	outlen -= used;
+	memcpy(sftp->outptr, p, used);
+	sftp->outptr += used;
+	sftp->outlen -= used;
 	p += used;
 	len -= used;
     }
 
     if (len > 0) {
-	if (pendsize < pendlen + len) {
-	    pendsize = pendlen + len + 4096;
-	    pending = sresize(pending, pendsize, unsigned char);
+	if (sftp->pendsize < sftp->pendlen + len) {
+	    sftp->pendsize = sftp->pendlen + len + 4096;
+	    sftp->pending = sresize(sftp->pending, sftp->pendsize, unsigned char);
 	}
-	memcpy(pending + pendlen, p, len);
-	pendlen += len;
+	memcpy(sftp->pending + sftp->pendlen, p, len);
+	sftp->pendlen += len;
     }
 
     return 0;
@@ -2558,32 +2550,32 @@ int from_backend_untrusted(void *frontend_handle, const char *data, int len)
 }
 int sftp_recvdata(sftp_handle* sftp, char *buf, int len)
 {
-    outptr = (unsigned char *) buf;
-    outlen = len;
+    sftp->outptr = (unsigned char *) buf;
+    sftp->outlen = len;
 
     /*
-     * See if the pending-input block contains some of what we
+     * See if the sftp->pending-input block contains some of what we
      * need.
      */
-    if (pendlen > 0) {
-	unsigned pendused = pendlen;
-	if (pendused > outlen)
-	    pendused = outlen;
-	memcpy(outptr, pending, pendused);
-	memmove(pending, pending + pendused, pendlen - pendused);
-	outptr += pendused;
-	outlen -= pendused;
-	pendlen -= pendused;
-	if (pendlen == 0) {
-	    pendsize = 0;
-	    sfree(pending);
-	    pending = NULL;
+    if (sftp->pendlen > 0) {
+	unsigned pendused = sftp->pendlen;
+	if (pendused > sftp->outlen)
+	    pendused = sftp->outlen;
+	memcpy(sftp->outptr, sftp->pending, pendused);
+	memmove(sftp->pending, sftp->pending + pendused, sftp->pendlen - pendused);
+	sftp->outptr += pendused;
+	sftp->outlen -= pendused;
+	sftp->pendlen -= pendused;
+	if (sftp->pendlen == 0) {
+	    sftp->pendsize = 0;
+	    sfree(sftp->pending);
+	    sftp->pending = NULL;
 	}
-	if (outlen == 0)
+	if (sftp->outlen == 0)
 	    return 1;
     }
 
-    while (outlen > 0) {
+    while (sftp->outlen > 0) {
 	if (sftp->back->exitcode(sftp->backhandle) >= 0 || ssh_sftp_loop_iteration() < 0)
 	    return 0;		       /* doom */
     }
@@ -2610,7 +2602,7 @@ static void usage(void)
     printf("  -b file   use specified batchfile\n");
     printf("  -bc       output batchfile commands\n");
     printf("  -be       don't stop batchfile processing if errors\n");
-    printf("  -v        show verbose messages\n");
+    printf("  -v        show sftp->verbose messages\n");
     printf("  -load sessname  Load settings from saved session\n");
     printf("  -l user   connect with specified username\n");
     printf("  -P port   connect to specified port\n");
@@ -2792,7 +2784,7 @@ static int psftp_connect(sftp_handle* sftp, char *userhost, char *user, int port
 
     sftp->back = &ssh_backend;
 
-    err = sftp->back->init(NULL, &sftp->backhandle, &sftp->cfg, sftp->cfg.host, sftp->cfg.port, &realhost,
+    err = sftp->back->init(sftp, &sftp->backhandle, &sftp->cfg, sftp->cfg.host, sftp->cfg.port, &realhost,
 		     0, sftp->cfg.tcp_keepalives);
     if (err != NULL) {
 	fprintf(stderr, "ssh_init: %s\n", err);
@@ -2809,7 +2801,7 @@ static int psftp_connect(sftp_handle* sftp, char *userhost, char *user, int port
 	    return 1;
 	}
     }
-    if (verbose && realhost != NULL)
+    if (sftp->verbose && realhost != NULL)
 	printf("Connected to %s\n", realhost);
     if (realhost != NULL)
 	sfree(realhost);
@@ -2875,7 +2867,7 @@ int psftp_main(int argc, char *argv[])
 	} else if (ret == 1) {
 	    /* We have our own verbosity in addition to `flags'. */
 	    if (flags & FLAG_VERBOSE)
-		verbose = 1;
+		sftp->verbose = 1;
 	} else if (strcmp(argv[i], "-h") == 0 ||
 		   strcmp(argv[i], "-?") == 0) {
 	    usage();

@@ -60,6 +60,16 @@ typedef struct {
     Backend *back;
     void *backhandle;
     Config cfg;
+    char *pwd, *homedir;
+    /* ----------------------------------------------------------------------
+     * Dirty bits: integration with PuTTY.
+     */
+    int verbose;
+    
+    unsigned char *outptr;	       /* where to put the data */
+    unsigned outlen;		       /* how much data required */
+    unsigned char *pending;  /* any spare data */
+    unsigned pendlen, pendsize;	/* length and phys. size of buffer */
 
     int fxp_errtype;
     const char *fxp_error_message;
