@@ -21,6 +21,14 @@ struct sftp_packet {
 };
 static void fxp_internal_error(sftp_handle* sftp, char *msg);
 
+
+void sftp_handle_init(sftp_handle* sftp){
+    sftp->back = NULL;
+
+    sftp->fxp_errtype= 0;
+    sftp->fxp_error_message = NULL;
+    sftp->sftp_requests = NULL;
+}
 /* ----------------------------------------------------------------------
  * SFTP packet construction functions.
  */

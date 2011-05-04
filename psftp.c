@@ -2844,6 +2844,7 @@ int psftp_main(int argc, char *argv[])
     int errors = 0;
     sftp_handle _sftp;
     sftp_handle* sftp = &_sftp;
+    sftp_handle_init(sftp);
 
     flags = FLAG_STDERR | FLAG_INTERACTIVE
 #ifdef FLAG_SYNCAGENT

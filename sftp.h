@@ -65,6 +65,8 @@ typedef struct {
     tree234 *sftp_requests;
 } sftp_handle;
 
+void sftp_handle_init(sftp_handle* sftp);
+
 /*
  * External references. The sftp client module sftp.c expects to be
  * able to get at these functions.
