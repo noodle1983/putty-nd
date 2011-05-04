@@ -38,12 +38,12 @@ static void sftp_pkt_ensure(sftp_handle* sftp, struct sftp_packet *pkt, int leng
 static void sftp_pkt_adddata(sftp_handle* sftp, struct sftp_packet *pkt, void *data, int len)
 {
     pkt->length += len;
-    sftp_pkt_ensure(pkt, pkt->length);
+    sftp_pkt_ensure(sftp, pkt, pkt->length);
     memcpy(pkt->data + pkt->length - len, data, len);
 }
 static void sftp_pkt_addbyte(sftp_handle* sftp, struct sftp_packet *pkt, unsigned char byte)
 {
-    sftp_pkt_adddata(pkt, &byte, 1);
+    sftp_pkt_adddata(sftp, pkt, &byte, 1);
 }
 static struct sftp_packet *sftp_pkt_init(sftp_handle* sftp, int pkt_type)
 {
@@ -53,67 +53,67 @@ static struct sftp_packet *sftp_pkt_init(sftp_handle* sftp, int pkt_type)
     pkt->savedpos = -1;
     pkt->length = 0;
     pkt->maxlen = 0;
-    sftp_pkt_addbyte(pkt, (unsigned char) pkt_type);
+    sftp_pkt_addbyte(sftp, pkt, (unsigned char) pkt_type);
     return pkt;
 }
 /*
 static void sftp_pkt_addbool(sftp_handle* sftp, struct sftp_packet *pkt, unsigned char value)
 {
-    sftp_pkt_adddata(pkt, &value, 1);
+    sftp_pkt_adddata(sftp, pkt, &value, 1);
 }
 */
-static void sftp_pkt_adduint32(struct sftp_packet *pkt,
+static void sftp_pkt_adduint32(sftp_handle* sftp, struct sftp_packet *pkt,
 			       unsigned long value)
 {
     unsigned char x[4];
     PUT_32BIT(x, value);
-    sftp_pkt_adddata(pkt, x, 4);
+    sftp_pkt_adddata(sftp, pkt, x, 4);
 }
 static void sftp_pkt_adduint64(sftp_handle* sftp, struct sftp_packet *pkt, uint64 value)
 {
     unsigned char x[8];
     PUT_32BIT(x, value.hi);
     PUT_32BIT(x + 4, value.lo);
-    sftp_pkt_adddata(pkt, x, 8);
+    sftp_pkt_adddata(sftp, pkt, x, 8);
 }
 static void sftp_pkt_addstring_start(sftp_handle* sftp, struct sftp_packet *pkt)
 {
-    sftp_pkt_adduint32(pkt, 0);
+    sftp_pkt_adduint32(sftp, pkt, 0);
     pkt->savedpos = pkt->length;
 }
 static void sftp_pkt_addstring_str(sftp_handle* sftp, struct sftp_packet *pkt, char *data)
 {
-    sftp_pkt_adddata(pkt, data, strlen(data));
+    sftp_pkt_adddata(sftp, pkt, data, strlen(data));
     PUT_32BIT(pkt->data + pkt->savedpos - 4, pkt->length - pkt->savedpos);
 }
-static void sftp_pkt_addstring_data(struct sftp_packet *pkt,
+static void sftp_pkt_addstring_data(sftp_handle* sftp, struct sftp_packet *pkt,
 				    char *data, int len)
 {
-    sftp_pkt_adddata(pkt, data, len);
+    sftp_pkt_adddata(sftp, pkt, data, len);
     PUT_32BIT(pkt->data + pkt->savedpos - 4, pkt->length - pkt->savedpos);
 }
 static void sftp_pkt_addstring(sftp_handle* sftp, struct sftp_packet *pkt, char *data)
 {
-    sftp_pkt_addstring_start(pkt);
-    sftp_pkt_addstring_str(pkt, data);
+    sftp_pkt_addstring_start(sftp, pkt);
+    sftp_pkt_addstring_str(sftp, pkt, data);
 }
 static void sftp_pkt_addattrs(sftp_handle* sftp, struct sftp_packet *pkt, struct fxp_attrs attrs)
 {
-    sftp_pkt_adduint32(pkt, attrs.flags);
+    sftp_pkt_adduint32(sftp, pkt, attrs.flags);
     if (attrs.flags & SSH_FILEXFER_ATTR_SIZE) {
-	sftp_pkt_adduint32(pkt, attrs.size.hi);
-	sftp_pkt_adduint32(pkt, attrs.size.lo);
+	sftp_pkt_adduint32(sftp, pkt, attrs.size.hi);
+	sftp_pkt_adduint32(sftp, pkt, attrs.size.lo);
     }
     if (attrs.flags & SSH_FILEXFER_ATTR_UIDGID) {
-	sftp_pkt_adduint32(pkt, attrs.uid);
-	sftp_pkt_adduint32(pkt, attrs.gid);
+	sftp_pkt_adduint32(sftp, pkt, attrs.uid);
+	sftp_pkt_adduint32(sftp, pkt, attrs.gid);
     }
     if (attrs.flags & SSH_FILEXFER_ATTR_PERMISSIONS) {
-	sftp_pkt_adduint32(pkt, attrs.permissions);
+	sftp_pkt_adduint32(sftp, pkt, attrs.permissions);
     }
     if (attrs.flags & SSH_FILEXFER_ATTR_ACMODTIME) {
-	sftp_pkt_adduint32(pkt, attrs.atime);
-	sftp_pkt_adduint32(pkt, attrs.mtime);
+	sftp_pkt_adduint32(sftp, pkt, attrs.atime);
+	sftp_pkt_adduint32(sftp, pkt, attrs.mtime);
     }
     if (attrs.flags & SSH_FILEXFER_ATTR_EXTENDED) {
 	/*
@@ -161,32 +161,32 @@ static int sftp_pkt_getstring(struct sftp_packet *pkt,
 }
 static int sftp_pkt_getattrs(sftp_handle* sftp, struct sftp_packet *pkt, struct fxp_attrs *ret)
 {
-    if (!sftp_pkt_getuint32(pkt, &ret->flags))
+    if (!sftp_pkt_getuint32(sftp, pkt, &ret->flags))
 	return 0;
     if (ret->flags & SSH_FILEXFER_ATTR_SIZE) {
 	unsigned long hi, lo;
-	if (!sftp_pkt_getuint32(pkt, &hi) ||
-	    !sftp_pkt_getuint32(pkt, &lo))
+	if (!sftp_pkt_getuint32(sftp, pkt, &hi) ||
+	    !sftp_pkt_getuint32(sftp, pkt, &lo))
 	    return 0;
 	ret->size = uint64_make(hi, lo);
     }
     if (ret->flags & SSH_FILEXFER_ATTR_UIDGID) {
-	if (!sftp_pkt_getuint32(pkt, &ret->uid) ||
-	    !sftp_pkt_getuint32(pkt, &ret->gid))
+	if (!sftp_pkt_getuint32(sftp, pkt, &ret->uid) ||
+	    !sftp_pkt_getuint32(sftp, pkt, &ret->gid))
 	    return 0;
     }
     if (ret->flags & SSH_FILEXFER_ATTR_PERMISSIONS) {
-	if (!sftp_pkt_getuint32(pkt, &ret->permissions))
+	if (!sftp_pkt_getuint32(sftp, pkt, &ret->permissions))
 	    return 0;
     }
     if (ret->flags & SSH_FILEXFER_ATTR_ACMODTIME) {
-	if (!sftp_pkt_getuint32(pkt, &ret->atime) ||
-	    !sftp_pkt_getuint32(pkt, &ret->mtime))
+	if (!sftp_pkt_getuint32(sftp, pkt, &ret->atime) ||
+	    !sftp_pkt_getuint32(sftp, pkt, &ret->mtime))
 	    return 0;
     }
     if (ret->flags & SSH_FILEXFER_ATTR_EXTENDED) {
 	unsigned long count;
-	if (!sftp_pkt_getuint32(pkt, &count))
+	if (!sftp_pkt_getuint32(sftp, pkt, &count))
 	    return 0;
 	while (count--) {
 	    char *str;
@@ -217,8 +217,8 @@ int sftp_send(sftp_handle* sftp, struct sftp_packet *pkt)
     int ret;
     char x[4];
     PUT_32BIT(x, pkt->length);
-    ret = (sftp_senddata(x, 4) && sftp_senddata(pkt->data, pkt->length));
-    sftp_pkt_free(pkt);
+    ret = (sftp_senddata(sftp, x, 4) && sftp_senddata(sftp, pkt->data, pkt->length));
+    sftp_pkt_free(sftp, pkt);
     return ret;
 }
 struct sftp_packet *sftp_recv(sftp_handle* sftp)
@@ -227,7 +227,7 @@ struct sftp_packet *sftp_recv(sftp_handle* sftp)
     char x[4];
     unsigned char uc;
 
-    if (!sftp_recvdata(x, 4))
+    if (!sftp_recvdata(sftp, x, 4))
 	return NULL;
 
     pkt = snew(struct sftp_packet);
@@ -235,13 +235,13 @@ struct sftp_packet *sftp_recv(sftp_handle* sftp)
     pkt->length = pkt->maxlen = GET_32BIT(x);
     pkt->data = snewn(pkt->length, char);
 
-    if (!sftp_recvdata(pkt->data, pkt->length)) {
-	sftp_pkt_free(pkt);
+    if (!sftp_recvdata(sftp, pkt->data, pkt->length)) {
+	sftp_pkt_free(sftp, pkt);
 	return NULL;
     }
 
-    if (!sftp_pkt_getbyte(pkt, &uc)) {
-	sftp_pkt_free(pkt);
+    if (!sftp_pkt_getbyte(sftp, pkt, &uc)) {
+	sftp_pkt_free(sftp, pkt);
 	return NULL;
     } else {
 	pkt->type = uc;
@@ -262,7 +262,7 @@ struct sftp_request {
     void *userdata;
 };
 
-static int sftp_reqcmp(sftp_handle* sftp, void *av, void *bv)
+static int sftp_reqcmp(void *av, void *bv)
 {
     struct sftp_request *a = (struct sftp_request *)av;
     struct sftp_request *b = (struct sftp_request *)bv;
@@ -272,7 +272,7 @@ static int sftp_reqcmp(sftp_handle* sftp, void *av, void *bv)
 	return +1;
     return 0;
 }
-static int sftp_reqfind(sftp_handle* sftp, void *av, void *bv)
+static int sftp_reqfind(void *av, void *bv)
 {
     unsigned *a = (unsigned *) av;
     struct sftp_request *b = (struct sftp_request *)bv;
@@ -354,19 +354,19 @@ struct sftp_request *sftp_find_request(sftp_handle* sftp, struct sftp_packet *pk
     struct sftp_request *req;
 
     if (!pktin) {
-	fxp_internal_error("did not receive a valid SFTP packet\n");
+	fxp_internal_error(sftp, "did not receive a valid SFTP packet\n");
 	return NULL;
     }
 
-    if (!sftp_pkt_getuint32(pktin, &id)) {
-	fxp_internal_error("did not receive a valid SFTP packet\n");
+    if (!sftp_pkt_getuint32(sftp, pktin, &id)) {
+	fxp_internal_error(sftp, "did not receive a valid SFTP packet\n");
 	return NULL;
     }
     req = find234(sftp_requests, &id, sftp_reqfind);
 
     if (!req || !req->registered) {
-	fxp_internal_error("request ID mismatch\n");
-        sftp_pkt_free(pktin);
+	fxp_internal_error(sftp, "request ID mismatch\n");
+        sftp_pkt_free(sftp, pktin);
 	return NULL;
     }
 
@@ -418,7 +418,7 @@ static int fxp_got_status(sftp_handle* sftp, struct sftp_packet *pktin)
 	fxp_errtype = -1;
     } else {
 	unsigned long ul;
-	if (!sftp_pkt_getuint32(pktin, &ul)) {
+	if (!sftp_pkt_getuint32(sftp, pktin, &ul)) {
 	    fxp_error_message = "malformed FXP_STATUS packet";
 	    fxp_errtype = -1;
 	} else {
@@ -463,29 +463,29 @@ int fxp_init(sftp_handle* sftp)
     struct sftp_packet *pktout, *pktin;
     unsigned long remotever;
 
-    pktout = sftp_pkt_init(SSH_FXP_INIT);
-    sftp_pkt_adduint32(pktout, SFTP_PROTO_VERSION);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_INIT);
+    sftp_pkt_adduint32(sftp, pktout, SFTP_PROTO_VERSION);
+    sftp_send(sftp, pktout);
 
-    pktin = sftp_recv();
+    pktin = sftp_recv(sftp);
     if (!pktin) {
-	fxp_internal_error("could not connect");
+	fxp_internal_error(sftp, "could not connect");
 	return 0;
     }
     if (pktin->type != SSH_FXP_VERSION) {
-	fxp_internal_error("did not receive FXP_VERSION");
-        sftp_pkt_free(pktin);
+	fxp_internal_error(sftp, "did not receive FXP_VERSION");
+        sftp_pkt_free(sftp, pktin);
 	return 0;
     }
-    if (!sftp_pkt_getuint32(pktin, &remotever)) {
-	fxp_internal_error("malformed FXP_VERSION packet");
-        sftp_pkt_free(pktin);
+    if (!sftp_pkt_getuint32(sftp, pktin, &remotever)) {
+	fxp_internal_error(sftp, "malformed FXP_VERSION packet");
+        sftp_pkt_free(sftp, pktin);
 	return 0;
     }
     if (remotever > SFTP_PROTO_VERSION) {
 	fxp_internal_error
-	    ("remote protocol is more advanced than we support");
-        sftp_pkt_free(pktin);
+	    (sftp, "remote protocol is more advanced than we support");
+        sftp_pkt_free(sftp, pktin);
 	return 0;
     }
     /*
@@ -494,7 +494,7 @@ int fxp_init(sftp_handle* sftp)
      * we recognise. In practice we don't currently do so because
      * we know we don't recognise _any_.
      */
-    sftp_pkt_free(pktin);
+    sftp_pkt_free(sftp, pktin);
 
     return 1;
 }
@@ -504,14 +504,14 @@ int fxp_init(sftp_handle* sftp)
  */
 struct sftp_request *fxp_realpath_send(sftp_handle* sftp, char *path)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_REALPATH);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring_start(pktout);
-    sftp_pkt_addstring_str(pktout, path);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_REALPATH);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring_start(sftp, pktout);
+    sftp_pkt_addstring_str(sftp, pktout, path);
+    sftp_send(sftp, pktout);
 
     return req;
 }
@@ -525,22 +525,22 @@ char *fxp_realpath_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sft
 	char *path;
 	int len;
 
-	if (!sftp_pkt_getuint32(pktin, &count) || count != 1) {
-	    fxp_internal_error("REALPATH did not return name count of 1\n");
-            sftp_pkt_free(pktin);
+	if (!sftp_pkt_getuint32(sftp, pktin, &count) || count != 1) {
+	    fxp_internal_error(sftp, "REALPATH did not return name count of 1\n");
+            sftp_pkt_free(sftp, pktin);
 	    return NULL;
 	}
 	if (!sftp_pkt_getstring(pktin, &path, &len)) {
-	    fxp_internal_error("REALPATH returned malformed FXP_NAME\n");
-            sftp_pkt_free(pktin);
+	    fxp_internal_error(sftp, "REALPATH returned malformed FXP_NAME\n");
+            sftp_pkt_free(sftp, pktin);
 	    return NULL;
 	}
-	path = mkstr(path, len);
-	sftp_pkt_free(pktin);
+	path = mkstr(sftp, path, len);
+	sftp_pkt_free(sftp, pktin);
 	return path;
     } else {
-	fxp_got_status(pktin);
-        sftp_pkt_free(pktin);
+	fxp_got_status(sftp, pktin);
+        sftp_pkt_free(sftp, pktin);
 	return NULL;
     }
 }
@@ -550,20 +550,20 @@ char *fxp_realpath_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sft
  */
 struct sftp_request *fxp_open_send(sftp_handle* sftp, char *path, int type)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_OPEN);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring(pktout, path);
-    sftp_pkt_adduint32(pktout, type);
-    sftp_pkt_adduint32(pktout, 0);     /* (FIXME) empty ATTRS structure */
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_OPEN);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring(sftp, pktout, path);
+    sftp_pkt_adduint32(sftp, pktout, type);
+    sftp_pkt_adduint32(sftp, pktout, 0);     /* (FIXME) empty ATTRS structure */
+    sftp_send(sftp, pktout);
 
     return req;
 }
 
-struct fxp_handle *fxp_open_recv(struct sftp_packet *pktin,
+struct fxp_handle *fxp_open_recv(sftp_handle* sftp, struct sftp_packet *pktin,
 				 struct sftp_request *req)
 {
     sfree(req);
@@ -574,18 +574,18 @@ struct fxp_handle *fxp_open_recv(struct sftp_packet *pktin,
 	int len;
 
 	if (!sftp_pkt_getstring(pktin, &hstring, &len)) {
-	    fxp_internal_error("OPEN returned malformed FXP_HANDLE\n");
-            sftp_pkt_free(pktin);
+	    fxp_internal_error(sftp, "OPEN returned malformed FXP_HANDLE\n");
+            sftp_pkt_free(sftp, pktin);
 	    return NULL;
 	}
 	handle = snew(struct fxp_handle);
-	handle->hstring = mkstr(hstring, len);
+	handle->hstring = mkstr(sftp, hstring, len);
 	handle->hlen = len;
-	sftp_pkt_free(pktin);
+	sftp_pkt_free(sftp, pktin);
 	return handle;
     } else {
-	fxp_got_status(pktin);
-        sftp_pkt_free(pktin);
+	fxp_got_status(sftp, pktin);
+        sftp_pkt_free(sftp, pktin);
 	return NULL;
     }
 }
@@ -595,18 +595,18 @@ struct fxp_handle *fxp_open_recv(struct sftp_packet *pktin,
  */
 struct sftp_request *fxp_opendir_send(sftp_handle* sftp, char *path)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_OPENDIR);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring(pktout, path);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_OPENDIR);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring(sftp, pktout, path);
+    sftp_send(sftp, pktout);
 
     return req;
 }
 
-struct fxp_handle *fxp_opendir_recv(struct sftp_packet *pktin,
+struct fxp_handle *fxp_opendir_recv(sftp_handle* sftp, struct sftp_packet *pktin,
 				    struct sftp_request *req)
 {
     sfree(req);
@@ -616,18 +616,18 @@ struct fxp_handle *fxp_opendir_recv(struct sftp_packet *pktin,
 	int len;
 
 	if (!sftp_pkt_getstring(pktin, &hstring, &len)) {
-	    fxp_internal_error("OPENDIR returned malformed FXP_HANDLE\n");
-            sftp_pkt_free(pktin);
+	    fxp_internal_error(sftp, "OPENDIR returned malformed FXP_HANDLE\n");
+            sftp_pkt_free(sftp, pktin);
 	    return NULL;
 	}
 	handle = snew(struct fxp_handle);
-	handle->hstring = mkstr(hstring, len);
+	handle->hstring = mkstr(sftp, hstring, len);
 	handle->hlen = len;
-	sftp_pkt_free(pktin);
+	sftp_pkt_free(sftp, pktin);
 	return handle;
     } else {
-	fxp_got_status(pktin);
-        sftp_pkt_free(pktin);
+	fxp_got_status(sftp, pktin);
+        sftp_pkt_free(sftp, pktin);
 	return NULL;
     }
 }
@@ -637,14 +637,14 @@ struct fxp_handle *fxp_opendir_recv(struct sftp_packet *pktin,
  */
 struct sftp_request *fxp_close_send(sftp_handle* sftp, struct fxp_handle *handle)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_CLOSE);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring_start(pktout);
-    sftp_pkt_addstring_data(pktout, handle->hstring, handle->hlen);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_CLOSE);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring_start(sftp, pktout);
+    sftp_pkt_addstring_data(sftp, pktout, handle->hstring, handle->hlen);
+    sftp_send(sftp, pktout);
 
     sfree(handle->hstring);
     sfree(handle);
@@ -655,20 +655,20 @@ struct sftp_request *fxp_close_send(sftp_handle* sftp, struct fxp_handle *handle
 void fxp_close_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req)
 {
     sfree(req);
-    fxp_got_status(pktin);
-    sftp_pkt_free(pktin);
+    fxp_got_status(sftp, pktin);
+    sftp_pkt_free(sftp, pktin);
 }
 
 struct sftp_request *fxp_mkdir_send(sftp_handle* sftp, char *path)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_MKDIR);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring(pktout, path);
-    sftp_pkt_adduint32(pktout, 0);     /* (FIXME) empty ATTRS structure */
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_MKDIR);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring(sftp, pktout, path);
+    sftp_pkt_adduint32(sftp, pktout, 0);     /* (FIXME) empty ATTRS structure */
+    sftp_send(sftp, pktout);
 
     return req;
 }
@@ -677,8 +677,8 @@ int fxp_mkdir_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_req
 {
     int id;
     sfree(req);
-    id = fxp_got_status(pktin);
-    sftp_pkt_free(pktin);
+    id = fxp_got_status(sftp, pktin);
+    sftp_pkt_free(sftp, pktin);
     if (id != 1) {
     	return 0;
     }
@@ -687,13 +687,13 @@ int fxp_mkdir_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_req
 
 struct sftp_request *fxp_rmdir_send(sftp_handle* sftp, char *path)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_RMDIR);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring(pktout, path);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_RMDIR);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring(sftp, pktout, path);
+    sftp_send(sftp, pktout);
 
     return req;
 }
@@ -702,8 +702,8 @@ int fxp_rmdir_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_req
 {
     int id;
     sfree(req);
-    id = fxp_got_status(pktin);
-    sftp_pkt_free(pktin);
+    id = fxp_got_status(sftp, pktin);
+    sftp_pkt_free(sftp, pktin);
     if (id != 1) {
     	return 0;
     }
@@ -712,13 +712,13 @@ int fxp_rmdir_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_req
 
 struct sftp_request *fxp_remove_send(sftp_handle* sftp, char *fname)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_REMOVE);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring(pktout, fname);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_REMOVE);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring(sftp, pktout, fname);
+    sftp_send(sftp, pktout);
 
     return req;
 }
@@ -727,8 +727,8 @@ int fxp_remove_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_re
 {
     int id;
     sfree(req);
-    id = fxp_got_status(pktin);
-    sftp_pkt_free(pktin);
+    id = fxp_got_status(sftp, pktin);
+    sftp_pkt_free(sftp, pktin);
     if (id != 1) {
     	return 0;
     }
@@ -737,14 +737,14 @@ int fxp_remove_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_re
 
 struct sftp_request *fxp_rename_send(sftp_handle* sftp, char *srcfname, char *dstfname)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_RENAME);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring(pktout, srcfname);
-    sftp_pkt_addstring(pktout, dstfname);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_RENAME);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring(sftp, pktout, srcfname);
+    sftp_pkt_addstring(sftp, pktout, dstfname);
+    sftp_send(sftp, pktout);
 
     return req;
 }
@@ -753,8 +753,8 @@ int fxp_rename_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_re
 {
     int id;
     sfree(req);
-    id = fxp_got_status(pktin);
-    sftp_pkt_free(pktin);
+    id = fxp_got_status(sftp, pktin);
+    sftp_pkt_free(sftp, pktin);
     if (id != 1) {
     	return 0;
     }
@@ -767,65 +767,65 @@ int fxp_rename_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_re
  */
 struct sftp_request *fxp_stat_send(sftp_handle* sftp, char *fname)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_STAT);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring(pktout, fname);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_STAT);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring(sftp, pktout, fname);
+    sftp_send(sftp, pktout);
 
     return req;
 }
 
-int fxp_stat_recv(struct sftp_packet *pktin, struct sftp_request *req,
+int fxp_stat_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req,
 		  struct fxp_attrs *attrs)
 {
     sfree(req);
     if (pktin->type == SSH_FXP_ATTRS) {
-	if (!sftp_pkt_getattrs(pktin, attrs)) {
-	    fxp_internal_error("malformed SSH_FXP_ATTRS packet");
-	    sftp_pkt_free(pktin);
+	if (!sftp_pkt_getattrs(sftp, pktin, attrs)) {
+	    fxp_internal_error(sftp, "malformed SSH_FXP_ATTRS packet");
+	    sftp_pkt_free(sftp, pktin);
 	    return 0;
 	}
-	sftp_pkt_free(pktin);
+	sftp_pkt_free(sftp, pktin);
 	return 1;
     } else {
-	fxp_got_status(pktin);
-        sftp_pkt_free(pktin);
+	fxp_got_status(sftp, pktin);
+        sftp_pkt_free(sftp, pktin);
 	return 0;
     }
 }
 
 struct sftp_request *fxp_fstat_send(sftp_handle* sftp, struct fxp_handle *handle)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_FSTAT);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring_start(pktout);
-    sftp_pkt_addstring_data(pktout, handle->hstring, handle->hlen);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_FSTAT);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring_start(sftp, pktout);
+    sftp_pkt_addstring_data(sftp, pktout, handle->hstring, handle->hlen);
+    sftp_send(sftp, pktout);
 
     return req;
 }
 
-int fxp_fstat_recv(struct sftp_packet *pktin, struct sftp_request *req,
+int fxp_fstat_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req,
 		   struct fxp_attrs *attrs)
 {
     sfree(req);
     if (pktin->type == SSH_FXP_ATTRS) {
-	if (!sftp_pkt_getattrs(pktin, attrs)) {
-	    fxp_internal_error("malformed SSH_FXP_ATTRS packet");
-	    sftp_pkt_free(pktin);
+	if (!sftp_pkt_getattrs(sftp, pktin, attrs)) {
+	    fxp_internal_error(sftp, "malformed SSH_FXP_ATTRS packet");
+	    sftp_pkt_free(sftp, pktin);
 	    return 0;
 	}
-	sftp_pkt_free(pktin);
+	sftp_pkt_free(sftp, pktin);
 	return 1;
     } else {
-	fxp_got_status(pktin);
-        sftp_pkt_free(pktin);
+	fxp_got_status(sftp, pktin);
+        sftp_pkt_free(sftp, pktin);
 	return 0;
     }
 }
@@ -835,14 +835,14 @@ int fxp_fstat_recv(struct sftp_packet *pktin, struct sftp_request *req,
  */
 struct sftp_request *fxp_setstat_send(sftp_handle* sftp, char *fname, struct fxp_attrs attrs)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_SETSTAT);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring(pktout, fname);
-    sftp_pkt_addattrs(pktout, attrs);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_SETSTAT);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring(sftp, pktout, fname);
+    sftp_pkt_addattrs(sftp, pktout, attrs);
+    sftp_send(sftp, pktout);
 
     return req;
 }
@@ -851,26 +851,26 @@ int fxp_setstat_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_r
 {
     int id;
     sfree(req);
-    id = fxp_got_status(pktin);
-    sftp_pkt_free(pktin);
+    id = fxp_got_status(sftp, pktin);
+    sftp_pkt_free(sftp, pktin);
     if (id != 1) {
     	return 0;
     }
     return 1;
 }
 
-struct sftp_request *fxp_fsetstat_send(struct fxp_handle *handle,
+struct sftp_request *fxp_fsetstat_send(sftp_handle* sftp, struct fxp_handle *handle,
 				       struct fxp_attrs attrs)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_FSETSTAT);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring_start(pktout);
-    sftp_pkt_addstring_data(pktout, handle->hstring, handle->hlen);
-    sftp_pkt_addattrs(pktout, attrs);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_FSETSTAT);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring_start(sftp, pktout);
+    sftp_pkt_addstring_data(sftp, pktout, handle->hstring, handle->hlen);
+    sftp_pkt_addattrs(sftp, pktout, attrs);
+    sftp_send(sftp, pktout);
 
     return req;
 }
@@ -879,8 +879,8 @@ int fxp_fsetstat_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_
 {
     int id;
     sfree(req);
-    id = fxp_got_status(pktin);
-    sftp_pkt_free(pktin);
+    id = fxp_got_status(sftp, pktin);
+    sftp_pkt_free(sftp, pktin);
     if (id != 1) {
     	return 0;
     }
@@ -893,24 +893,24 @@ int fxp_fsetstat_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_
  * will return 0 on EOF, or return -1 and store SSH_FX_EOF in the
  * error indicator. It might even depend on the SFTP server.)
  */
-struct sftp_request *fxp_read_send(struct fxp_handle *handle,
+struct sftp_request *fxp_read_send(sftp_handle* sftp, struct fxp_handle *handle,
 				   uint64 offset, int len)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_READ);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring_start(pktout);
-    sftp_pkt_addstring_data(pktout, handle->hstring, handle->hlen);
-    sftp_pkt_adduint64(pktout, offset);
-    sftp_pkt_adduint32(pktout, len);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_READ);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring_start(sftp, pktout);
+    sftp_pkt_addstring_data(sftp, pktout, handle->hstring, handle->hlen);
+    sftp_pkt_adduint64(sftp, pktout, offset);
+    sftp_pkt_adduint32(sftp, pktout, len);
+    sftp_send(sftp, pktout);
 
     return req;
 }
 
-int fxp_read_recv(struct sftp_packet *pktin, struct sftp_request *req,
+int fxp_read_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req,
 		  char *buffer, int len)
 {
     sfree(req);
@@ -919,23 +919,23 @@ int fxp_read_recv(struct sftp_packet *pktin, struct sftp_request *req,
 	int rlen;
 
 	if (!sftp_pkt_getstring(pktin, &str, &rlen)) {
-	    fxp_internal_error("READ returned malformed SSH_FXP_DATA packet");
-            sftp_pkt_free(pktin);
+	    fxp_internal_error(sftp, "READ returned malformed SSH_FXP_DATA packet");
+            sftp_pkt_free(sftp, pktin);
 	    return -1;
 	}
 
 	if (rlen > len || rlen < 0) {
-	    fxp_internal_error("READ returned more bytes than requested");
-            sftp_pkt_free(pktin);
+	    fxp_internal_error(sftp, "READ returned more bytes than requested");
+            sftp_pkt_free(sftp, pktin);
 	    return -1;
 	}
 
 	memcpy(buffer, str, rlen);
-        sftp_pkt_free(pktin);
+        sftp_pkt_free(sftp, pktin);
 	return rlen;
     } else {
-	fxp_got_status(pktin);
-        sftp_pkt_free(pktin);
+	fxp_got_status(sftp, pktin);
+        sftp_pkt_free(sftp, pktin);
 	return -1;
     }
 }
@@ -945,19 +945,19 @@ int fxp_read_recv(struct sftp_packet *pktin, struct sftp_request *req,
  */
 struct sftp_request *fxp_readdir_send(sftp_handle* sftp, struct fxp_handle *handle)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_READDIR);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring_start(pktout);
-    sftp_pkt_addstring_data(pktout, handle->hstring, handle->hlen);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_READDIR);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring_start(sftp, pktout);
+    sftp_pkt_addstring_data(sftp, pktout, handle->hstring, handle->hlen);
+    sftp_send(sftp, pktout);
 
     return req;
 }
 
-struct fxp_names *fxp_readdir_recv(struct sftp_packet *pktin,
+struct fxp_names *fxp_readdir_recv(sftp_handle* sftp, struct sftp_packet *pktin,
 				   struct sftp_request *req)
 {
     sfree(req);
@@ -973,10 +973,10 @@ struct fxp_names *fxp_readdir_recv(struct sftp_packet *pktin,
 	 * longname, 4 for a set of attribute flags indicating that
 	 * no other attributes are supplied).
 	 */
-	if (!sftp_pkt_getuint32(pktin, &i) ||
+	if (!sftp_pkt_getuint32(sftp, pktin, &i) ||
 	    i > (pktin->length-pktin->savedpos)/12) {
-	    fxp_internal_error("malformed FXP_NAME packet");
-	    sftp_pkt_free(pktin);
+	    fxp_internal_error(sftp, "malformed FXP_NAME packet");
+	    sftp_pkt_free(sftp, pktin);
 	    return NULL;
 	}
 
@@ -986,8 +986,8 @@ struct fxp_names *fxp_readdir_recv(struct sftp_packet *pktin,
 	 * too little space.
 	 */
 	if (i > INT_MAX / sizeof(struct fxp_name)) {
-	    fxp_internal_error("unreasonably large FXP_NAME packet");
-	    sftp_pkt_free(pktin);
+	    fxp_internal_error(sftp, "unreasonably large FXP_NAME packet");
+	    sftp_pkt_free(sftp, pktin);
 	    return NULL;
 	}
 
@@ -999,8 +999,8 @@ struct fxp_names *fxp_readdir_recv(struct sftp_packet *pktin,
 	    int len1, len2;
 	    if (!sftp_pkt_getstring(pktin, &str1, &len1) ||
 		!sftp_pkt_getstring(pktin, &str2, &len2) ||
-		!sftp_pkt_getattrs(pktin, &ret->names[i].attrs)) {
-		fxp_internal_error("malformed FXP_NAME packet");
+		!sftp_pkt_getattrs(sftp, pktin, &ret->names[i].attrs)) {
+		fxp_internal_error(sftp, "malformed FXP_NAME packet");
 		while (i--) {
 		    sfree(ret->names[i].filename);
 		    sfree(ret->names[i].longname);
@@ -1010,14 +1010,14 @@ struct fxp_names *fxp_readdir_recv(struct sftp_packet *pktin,
 		sfree(pktin);
 		return NULL;
 	    }
-	    ret->names[i].filename = mkstr(str1, len1);
-	    ret->names[i].longname = mkstr(str2, len2);
+	    ret->names[i].filename = mkstr(sftp, str1, len1);
+	    ret->names[i].longname = mkstr(sftp, str2, len2);
 	}
-        sftp_pkt_free(pktin);
+        sftp_pkt_free(sftp, pktin);
 	return ret;
     } else {
-	fxp_got_status(pktin);
-        sftp_pkt_free(pktin);
+	fxp_got_status(sftp, pktin);
+        sftp_pkt_free(sftp, pktin);
 	return NULL;
     }
 }
@@ -1025,20 +1025,20 @@ struct fxp_names *fxp_readdir_recv(struct sftp_packet *pktin,
 /*
  * Write to a file. Returns 0 on error, 1 on OK.
  */
-struct sftp_request *fxp_write_send(struct fxp_handle *handle,
+struct sftp_request *fxp_write_send(sftp_handle* sftp, struct fxp_handle *handle,
 				    char *buffer, uint64 offset, int len)
 {
-    struct sftp_request *req = sftp_alloc_request();
+    struct sftp_request *req = sftp_alloc_request(sftp);
     struct sftp_packet *pktout;
 
-    pktout = sftp_pkt_init(SSH_FXP_WRITE);
-    sftp_pkt_adduint32(pktout, req->id);
-    sftp_pkt_addstring_start(pktout);
-    sftp_pkt_addstring_data(pktout, handle->hstring, handle->hlen);
-    sftp_pkt_adduint64(pktout, offset);
-    sftp_pkt_addstring_start(pktout);
-    sftp_pkt_addstring_data(pktout, buffer, len);
-    sftp_send(pktout);
+    pktout = sftp_pkt_init(sftp, SSH_FXP_WRITE);
+    sftp_pkt_adduint32(sftp, pktout, req->id);
+    sftp_pkt_addstring_start(sftp, pktout);
+    sftp_pkt_addstring_data(sftp, pktout, handle->hstring, handle->hlen);
+    sftp_pkt_adduint64(sftp, pktout, offset);
+    sftp_pkt_addstring_start(sftp, pktout);
+    sftp_pkt_addstring_data(sftp, pktout, buffer, len);
+    sftp_send(sftp, pktout);
 
     return req;
 }
@@ -1046,8 +1046,8 @@ struct sftp_request *fxp_write_send(struct fxp_handle *handle,
 int fxp_write_recv(sftp_handle* sftp, struct sftp_packet *pktin, struct sftp_request *req)
 {
     sfree(req);
-    fxp_got_status(pktin);
-    sftp_pkt_free(pktin);
+    fxp_got_status(sftp, pktin);
+    sftp_pkt_free(sftp, pktin);
     return fxp_errtype == SSH_FX_OK;
 }
 
@@ -1171,8 +1171,8 @@ void xfer_download_queue(sftp_handle* sftp, struct fxp_xfer *xfer)
 
 	rr->len = 32768;
 	rr->buffer = snewn(rr->len, char);
-	sftp_register(req = fxp_read_send(xfer->fh, rr->offset, rr->len));
-	fxp_set_userdata(req, rr);
+	sftp_register(sftp, req = fxp_read_send(sftp, xfer->fh, rr->offset, rr->len));
+	fxp_set_userdata(sftp, req, rr);
 
 	xfer->offset = uint64_add32(xfer->offset, rr->len);
 	xfer->req_totalsize += rr->len;
@@ -1185,10 +1185,10 @@ void xfer_download_queue(sftp_handle* sftp, struct fxp_xfer *xfer)
 
 struct fxp_xfer *xfer_download_init(sftp_handle* sftp, struct fxp_handle *fh, uint64 offset)
 {
-    struct fxp_xfer *xfer = xfer_init(fh, offset);
+    struct fxp_xfer *xfer = xfer_init(sftp, fh, offset);
 
     xfer->eof = FALSE;
-    xfer_download_queue(xfer);
+    xfer_download_queue(sftp, xfer);
 
     return xfer;
 }
@@ -1198,16 +1198,16 @@ int xfer_download_gotpkt(sftp_handle* sftp, struct fxp_xfer *xfer, struct sftp_p
     struct sftp_request *rreq;
     struct req *rr;
 
-    rreq = sftp_find_request(pktin);
-    rr = (struct req *)fxp_get_userdata(rreq);
+    rreq = sftp_find_request(sftp, pktin);
+    rr = (struct req *)fxp_get_userdata(sftp, rreq);
     if (!rr)
 	return 0;		       /* this packet isn't ours */
-    rr->retlen = fxp_read_recv(pktin, rreq, rr->buffer, rr->len);
+    rr->retlen = fxp_read_recv(sftp, pktin, rreq, rr->buffer, rr->len);
 #ifdef DEBUG_DOWNLOAD
     printf("read request %p has returned [%d]\n", rr, rr->retlen);
 #endif
 
-    if ((rr->retlen < 0 && fxp_error_type()==SSH_FX_EOF) || rr->retlen == 0) {
+    if ((rr->retlen < 0 && fxp_error_type(sftp)==SSH_FX_EOF) || rr->retlen == 0) {
 	xfer->eof = TRUE;
 	rr->complete = -1;
 #ifdef DEBUG_DOWNLOAD
@@ -1215,7 +1215,7 @@ int xfer_download_gotpkt(sftp_handle* sftp, struct fxp_xfer *xfer, struct sftp_p
 #endif
     } else if (rr->retlen < 0) {
 	/* some error other than EOF; signal it back to caller */
-	xfer_set_error(xfer);
+	xfer_set_error(sftp, xfer);
 	rr->complete = -1;
 	return -1;
     }
@@ -1263,7 +1263,7 @@ int xfer_download_gotpkt(sftp_handle* sftp, struct fxp_xfer *xfer, struct sftp_p
 	fxp_error_message = "received a short buffer from FXP_READ, but not"
 	    " at EOF";
 	fxp_errtype = -1;
-	xfer_set_error(xfer);
+	xfer_set_error(sftp, xfer);
 	return -1;
     }
 
@@ -1318,7 +1318,7 @@ int xfer_download_data(sftp_handle* sftp, struct fxp_xfer *xfer, void **buf, int
 
 struct fxp_xfer *xfer_upload_init(sftp_handle* sftp, struct fxp_handle *fh, uint64 offset)
 {
-    struct fxp_xfer *xfer = xfer_init(fh, offset);
+    struct fxp_xfer *xfer = xfer_init(sftp, fh, offset);
 
     /*
      * We set `eof' to 1 because this will cause xfer_done() to
@@ -1361,8 +1361,8 @@ void xfer_upload_data(sftp_handle* sftp, struct fxp_xfer *xfer, char *buffer, in
 
     rr->len = len;
     rr->buffer = NULL;
-    sftp_register(req = fxp_write_send(xfer->fh, buffer, rr->offset, len));
-    fxp_set_userdata(req, rr);
+    sftp_register(sftp, req = fxp_write_send(sftp, xfer->fh, buffer, rr->offset, len));
+    fxp_set_userdata(sftp, req, rr);
 
     xfer->offset = uint64_add32(xfer->offset, rr->len);
     xfer->req_totalsize += rr->len;
@@ -1378,11 +1378,11 @@ int xfer_upload_gotpkt(sftp_handle* sftp, struct fxp_xfer *xfer, struct sftp_pac
     struct req *rr, *prev, *next;
     int ret;
 
-    rreq = sftp_find_request(pktin);
-    rr = (struct req *)fxp_get_userdata(rreq);
+    rreq = sftp_find_request(sftp, pktin);
+    rr = (struct req *)fxp_get_userdata(sftp, rreq);
     if (!rr)
 	return 0;		       /* this packet isn't ours */
-    ret = fxp_write_recv(pktin, rreq);
+    ret = fxp_write_recv(sftp, pktin, rreq);
 #ifdef DEBUG_UPLOAD
     printf("write request %p has returned [%d]\n", rr, ret);
 #endif
