@@ -1995,6 +1995,8 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
             logevent(tabitem, "----- Session restarted -----");
             term_pwron(tabitem->term, FALSE);
             wintabitem_start_backend(tabitem);
+            wintab* wintab = tabitem->parentTab;
+            PostMessage(wintab->hwndTab, WM_PAINT, 0, 0);
             }
             break;
         }
