@@ -195,6 +195,23 @@ RCFLAGS += $(VER)
 !forceobj pageant.res
 !forceobj puttygen.res
 
+# Hack to force TABSFTP to be rebuilt always.
+!begin cygwin
+tab_sftp.o: 
+	$(CC) $(COMPAT) $(XFLAGS) $(CFLAGS) $(VER) -DTAB -c ../sftp.c -o tab_sftp.o
+tab_psftp.o: 
+	$(CC) $(COMPAT) $(XFLAGS) $(CFLAGS) $(VER) -DTAB -c ../psftp.c -o tab_psftp.o
+tab_int64.o: 
+	$(CC) $(COMPAT) $(XFLAGS) $(CFLAGS) $(VER) -DTAB -c ../int64.c -o tab_int64.o
+tab_winsftp.o: 
+	$(CC) $(COMPAT) $(XFLAGS) $(CFLAGS) $(VER) -DTAB -c winsftp.c -o tab_winsftp.o
+!end
+!specialobj cygwin tab_winsftp 
+!specialobj cygwin tab_int64 
+!specialobj cygwin tab_psftp 
+!specialobj cygwin tab_sftp 
+
+
 # `make install' target for Unix.
 !begin gtk
 install:
@@ -247,9 +264,11 @@ CFLAGS += -DWINVER=0x0500 -D_WIN32_WINDOWS=0x0410 -D_WIN32_WINNT=0x0500
 TERMINAL = terminal wcwidth ldiscucs logging tree234 minibidi
          + config dialog
 
+TABSFTP = tab_sftp tab_psftp tab_int64 tab_winsftp
 # GUI front end and terminal emulator (putty, puttytel).
 GUITERM  = TERMINAL window windlg winctrls sizetip winucs winprint
          + winutils wincfg sercfg winhelp winjump wintab wintabdraw
+         + TABSFTP
 
 # Same thing on Unix.
 UXTERM   = TERMINAL uxcfg sercfg uxucs uxprint timing
