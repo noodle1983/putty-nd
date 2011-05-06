@@ -570,7 +570,17 @@ int  wintab_can_close(wintab *wintab)
 
 void wintab_check_closed_session(wintab *wintab)
 {
-    wintabitem_check_closed_session(wintab->items[wintab->cur]);
+    int a_session_closed = 0;
+    int index = 0;
+    for (; index < wintab->end; index++){
+        wintabitem* tabitem = wintab->items[index];
+        if (tabitem->must_close_session){
+    		wintabitem_close_session(tabitem);
+            a_session_closed = 1;
+        }
+    }
+    if (a_session_closed)
+        PostMessage(wintab->hwndTab, WM_PAINT, 0, 0);
 }
 
 //-----------------------------------------------------------------------
@@ -1787,17 +1797,10 @@ void wintabitem_init_palette(wintabitem *tabitem)
 
 //-----------------------------------------------------------------------
 
-void wintabitem_check_closed_session(wintabitem *tabitem)
-{
-    if (tabitem->must_close_session)
-		wintabitem_close_session(tabitem);
-    
-}
-
-//-----------------------------------------------------------------------
-
 void wintabitem_close_session(wintabitem *tabitem)
 {
+    tabitem->must_close_session = FALSE;
+    
     if (!tabitem->back)  return;
     WaitForSingleObject(tabitem->close_mutex, INFINITE);
 
@@ -1838,8 +1841,6 @@ void wintabitem_close_session(wintabitem *tabitem)
 	//	   IDM_RESTART, "&Restart Session");
     //}
     ReleaseMutex(tabitem->close_mutex);
-    wintab *wintab = tabitem->parentTab;
-    PostMessage(wintab->hwndTab, WM_PAINT, 0, 0);
 }
 
 //-----------------------------------------------------------------------

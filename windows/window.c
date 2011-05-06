@@ -1720,6 +1720,9 @@ void notify_remote_exit(void *frontend)
 	if (tabitem->cfg.close_on_exit == FORCE_ON ||
 	    (tabitem->cfg.close_on_exit == AUTO && exitcode != INT_MAX)) {
 	    wintabitem_close_session(tabitem);
+        
+        wintab *wintab = tabitem->parentTab;
+        PostMessage(wintab->hwndTab, WM_PAINT, 0, 0);
 	    //PostQuitMessage(0);
 	} else {
 	    tabitem->must_close_session = TRUE;
