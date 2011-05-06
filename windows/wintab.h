@@ -233,7 +233,6 @@ int wintabitem_CreateCaret(wintabitem *tabitem);
 int wintabitem_init_mouse(wintabitem *tabitem);
 int wintabitem_start_backend(wintabitem *tabitem);
 void wintabitem_init_palette(wintabitem *tabitem);
-void wintabitem_check_closed_session(wintabitem *tabitem);
 void wintabitem_close_session(wintabitem *tabitem);
 int wintabitem_can_close(wintabitem *tabitem);
 void wintabitem_require_resize(wintabitem *tabitem, int page_width, int page_height);
