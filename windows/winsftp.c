@@ -9,6 +9,7 @@
 #include "ssh.h"
 #include "int64.h"
 
+#ifndef TAB
 char *get_ttymode(void *frontend, const char *mode) { return NULL; }
 
 int get_userpass_input(void *frontend, Config *cfg, prompts_t *p, unsigned char *in, int inlen)
@@ -28,6 +29,7 @@ void platform_get_x11_auth(struct X11Display *display, const Config *cfg)
 }
 const int platform_uses_x11_unix_by_default = TRUE;
 
+#endif /*TAB*/
 /* ----------------------------------------------------------------------
  * File access abstraction.
  */
@@ -452,6 +454,7 @@ char *dir_file_cat(char *dir, char *file)
  */
 static SOCKET sftp_ssh_socket = INVALID_SOCKET;
 static HANDLE netevent = INVALID_HANDLE_VALUE;
+#ifndef TAB
 char *do_select(SOCKET skt, int startup)
 {
     int events;
@@ -479,6 +482,7 @@ char *do_select(SOCKET skt, int startup)
     }
     return NULL;
 }
+#endif /*TAB*/
 extern int select_result(WPARAM, LPARAM);
 
 int do_eventsel_loop(HANDLE other_event)
@@ -710,6 +714,7 @@ char *ssh_sftp_get_cmdline(char *prompt, int no_fds_ok)
     return ctx->line;
 }
 
+#ifndef TAB
 /* ----------------------------------------------------------------------
  * Main program. Parse arguments etc.
  */
@@ -721,3 +726,5 @@ int main(int argc, char *argv[])
 
     return ret;
 }
+#endif /*TAB*/
+

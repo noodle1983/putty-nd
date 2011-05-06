@@ -5395,10 +5395,79 @@ void frontend_keypress(void *handle)
     return;
 }
 
+
+/*
+ * Receive a block of data from the SSH link. Block until all data
+ * is available.
+ *
+ * To do this, we repeatedly call the SSH protocol module, with our
+ * own trap in from_backend() to catch the data that comes sftp->back. We
+ * do this until we have enough data.
+ */
+
+int sftp_from_backend(void *frontend, int is_stderr, const char *data, int datalen)
+{
+    unsigned char *p = (unsigned char *) data;
+    unsigned len = (unsigned) datalen;
+    assert(frontend != NULL);
+    wintabitem *tabitem = (wintabitem*) frontend;
+    sftp_handle* sftp = tabitem->sftp;
+
+    /*
+     * stderr data is just spouted to local stderr and otherwise
+     * ignored.
+     */
+    if (is_stderr) {
+    	if (len > 0)
+            term_data(tabitem->term, is_stderr, data, len);
+    	return 0;
+    }
+
+    /*
+     * If this is before the real session begins, just return.
+     */
+    if (!sftp->outptr)
+	return 0;
+
+    if ((sftp->outlen > 0) && (len > 0)) {
+	unsigned used = sftp->outlen;
+	if (used > len)
+	    used = len;
+	memcpy(sftp->outptr, p, used);
+	sftp->outptr += used;
+	sftp->outlen -= used;
+	p += used;
+	len -= used;
+    }
+
+    if (len > 0) {
+	if (sftp->pendsize < sftp->pendlen + len) {
+	    sftp->pendsize = sftp->pendlen + len + 4096;
+	    sftp->pending = sresize(sftp->pending, sftp->pendsize, unsigned char);
+	}
+	memcpy(sftp->pending + sftp->pendlen, p, len);
+	sftp->pendlen += len;
+    }
+
+    return 0;
+}
+int sftp_from_backend_untrusted(void *frontend_handle, const char *data, int len)
+{
+    /*
+     * No "untrusted" output should get here (the way the code is
+     * currently, it's all diverted by FLAG_STDERR).
+     */
+    assert(!"Unexpected call to from_backend_untrusted()");
+    return 0; /* not reached */
+}
+
 int from_backend(void *frontend, int is_stderr, const char *data, int len)
 {
     assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
+    if (wintab_is_sftp(tabitem)){
+        return sftp_from_backend(tabitem, is_stderr, data, len);
+    }
     return term_data(tabitem->term, is_stderr, data, len);
 }
 
@@ -5406,6 +5475,9 @@ int from_backend_untrusted(void *frontend, const char *data, int len)
 {
     assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
+    if (wintab_is_sftp(tabitem)){
+        return from_backend_untrusted(tabitem, data, len);
+    }
     return term_data_untrusted(tabitem->term, data, len);
 }
 
@@ -5432,3 +5504,5 @@ void agent_schedule_callback(void (*callback)(void *, void *, int),
     c->len = len;
     PostMessage(hwnd, WM_AGENT_CALLBACK, 0, (LPARAM)c);
 }
+
+

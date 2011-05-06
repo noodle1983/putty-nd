@@ -16,7 +16,9 @@
 #include "sftp.h"
 #include "int64.h"
 
+#ifndef TAB
 const char *const appname = "PSFTP";
+#endif /*TAB*/
 
 /*
  * Since SFTP is a request-response oriented protocol, it requires
@@ -2416,6 +2418,7 @@ void do_sftp(sftp_handle* sftp, int mode, int modeflags, char *batchfile)
     }
 }
 
+#ifndef TAB
 
 /*
  *  Print an error message and perform a fatal exit.
@@ -2462,7 +2465,6 @@ void connection_fatal(void *frontend, char *fmt, ...)
 
     cleanup_exit(1);
 }
-
 void ldisc_send(void *handle, char *buf, int len, int interactive)
 {
     /*
@@ -2472,6 +2474,18 @@ void ldisc_send(void *handle, char *buf, int len, int interactive)
      * want to know about it.
      */
     assert(len == 0);
+}
+
+
+void cmdline_error(char *p, ...)
+{
+    va_list ap;
+    fprintf(stderr, "psftp: ");
+    va_start(ap, p);
+    vfprintf(stderr, p, ap);
+    va_end(ap);
+    fprintf(stderr, "\n       try typing \"psftp -h\" for help\n");
+    exit(1);
 }
 
 /*
@@ -2548,6 +2562,8 @@ int from_backend_untrusted(void *frontend_handle, const char *data, int len)
     assert(!"Unexpected call to from_backend_untrusted()");
     return 0; /* not reached */
 }
+
+#endif /*TAB*/
 int sftp_recvdata(sftp_handle* sftp, char *buf, int len)
 {
     sftp->outptr = (unsigned char *) buf;
@@ -2623,6 +2639,7 @@ static void version(void)
   cleanup_exit(1);
 }
 
+#ifndef TAB
 /*
  * Connect to a host.
  */
@@ -2808,17 +2825,6 @@ static int psftp_connect(sftp_handle* sftp, char *userhost, char *user, int port
     return 0;
 }
 
-void cmdline_error(char *p, ...)
-{
-    va_list ap;
-    fprintf(stderr, "psftp: ");
-    va_start(ap, p);
-    vfprintf(stderr, p, ap);
-    va_end(ap);
-    fprintf(stderr, "\n       try typing \"psftp -h\" for help\n");
-    exit(1);
-}
-
 /*
  * Main program. Parse arguments etc.
  */
@@ -2937,3 +2943,6 @@ int psftp_main(int argc, char *argv[])
 
     return 0;
 }
+#endif /*TAB*/
+
+
