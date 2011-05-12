@@ -1828,12 +1828,13 @@ static int sftp_cmd_open(sftp_handle* sftp, struct sftp_command *cmd)
 	}
     } else
 	portnumber = 0;
-
+#ifndef TAB
     if (psftp_connect(sftp, cmd->words[1], NULL, portnumber)) {
 	sftp->back = NULL;		       /* connection is already closed */
 	return -1;		       /* this is fatal */
     }
     do_sftp_init(sftp);
+#endif
     return 1;
 }
 
