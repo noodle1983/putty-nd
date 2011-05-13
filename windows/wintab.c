@@ -2389,8 +2389,7 @@ int wintabsftp_on_char(wintabitem *tabitem, const char *data, int len)
     for (i = 0, j = 0; i < len && j < 128; i++){
         if (data[i] == 8) {
             /* backspace */
-            termline *line = index234(tabitem->term->screen, count234(tabitem->term->screen) - 1);
-            if (line->cols <= 0){
+            if (tabitem->term->curs.x <= 0){
                 continue;
             }
             handled_data[j++] = 8;
@@ -2404,12 +2403,11 @@ int wintabsftp_on_char(wintabitem *tabitem, const char *data, int len)
             handled_data[j++] = data[i];
         }
     }
-    //from_backend(tabitem, 0, data, len);
     term_data(tabitem->term, 0, handled_data, j);
 
-    for (i = 0; i < len; i++)
-        debug(("[%d]", *(data+i)));
-    debug(("\n"));
+    //for (i = 0; i < len; i++)
+    //    debug(("[%d]", *(data+i)));
+    //debug(("\n"));
     return 0;
 }
 
