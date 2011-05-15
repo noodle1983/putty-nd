@@ -2382,9 +2382,33 @@ int wintab_is_sftp(wintabitem *tabitem)
 //-----------------------------------------------------------------------
 
 int wintabsftp_on_char(wintabitem *tabitem, const char *data, int len)
-{
-    from_backend(tabitem, 0, data, len);
-    debug(("[%d,%c]\n", *data, *data));
+{    
+    int i = 0;
+    int j = 0;
+    char handled_data[128] = {0}; 
+    
+    for (i = 0, j = 0; i < len && j < 128; i++){
+        if (data[i] == 8) {
+            /* backspace */
+            if (tabitem->term->curs.x <= 0){
+                continue;
+            }
+            handled_data[j++] = 8;
+            handled_data[j++] = ' ';
+            handled_data[j++] = 8;
+        }else if (data[i] == 13){
+            /* enter */
+            handled_data[j++] = 13;
+            handled_data[j++] = 10;
+        }else{
+            handled_data[j++] = data[i];
+        }
+    }
+    term_data(tabitem->term, 0, handled_data, j);
+
+    //for (i = 0; i < len; i++)
+    //    debug(("[%d]", *(data+i)));
+    //debug(("\n"));
     return 0;
 }
 
