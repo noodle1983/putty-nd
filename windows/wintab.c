@@ -724,6 +724,11 @@ int wintab_drawitems(wintab *wintab)
     int spread = ((float)(curRc.bottom - curRc.top)) * 2/3;
     DrawLinec(hdc, curRc.right + spread-2, curRc.bottom-1,
         wintab->rcPage.right, wintab->rcTabBar.bottom-1, wintab->bd_col);
+
+    RECT rc;
+    GetClientRect(wintab->hwndTab, &rc);
+    DrawRect4c(hdc, 0, 0, rc.right, rc.bottom, wintab->bd_col);
+    
     ReleaseDC(wintab->hwndTab, hdc);
     return 0;
 }
