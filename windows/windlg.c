@@ -1588,6 +1588,7 @@ int do_config(void)
 {
     int ret;
 
+    memset(pre_session, 0, sizeof pre_session);
     showSessionTreeview = 1;
     ctrlbox = ctrl_new_box();
     setup_config_box(ctrlbox, FALSE, 0, 0);
@@ -1612,6 +1613,7 @@ int do_config(void)
     winctrl_cleanup(&ctrls_base);
     dp_cleanup(&dp);
     showSessionTreeview = 0;
+    memset(pre_session, 0, sizeof pre_session);
 
     return ret;
 }
@@ -1623,6 +1625,7 @@ int do_reconfig(HWND hwnd, int protcfginfo)
 
     backup_cfg = cfg;		       /* structure copy */
 
+    memset(pre_session, 0, sizeof pre_session);
     ctrlbox = ctrl_new_box();
     setup_config_box(ctrlbox, TRUE, cfg.protocol, protcfginfo);
     win_setup_config_box(ctrlbox, &dp.hwnd, has_help(), TRUE,
@@ -1649,6 +1652,7 @@ int do_reconfig(HWND hwnd, int protcfginfo)
     if (!ret)
 	cfg = backup_cfg;	       /* structure copy */
 
+    memset(pre_session, 0, sizeof pre_session);
     return ret;
 }
 

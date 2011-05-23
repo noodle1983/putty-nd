@@ -279,6 +279,18 @@ char *save_settings(const char *section, Config * cfg)
     char *errmsg;
 
     if (!strcmp(section, DEFAULT_SESSION_NAME)) return NULL;
+
+    //debug
+    /*
+    {
+        Config tmpCfg;
+        load_settings(section, &tmpCfg);
+        if (*tmpCfg.host){
+            assert (!strcmp(tmpCfg.host, cfg->host)
+                && tmpCfg.port == cfg->port);
+        }
+    }
+    */
     sesskey = open_settings_w(section, &errmsg);
     if (!sesskey)
 	return errmsg;
