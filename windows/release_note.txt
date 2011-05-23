@@ -2,11 +2,18 @@ My comments
 ============
 Any comment is appreciated.
 email: noodle1983@126.com 
-twitter account: putty_nd.
-I have my job myself. Not sure I can reply all the time.
 
 RELEASE NOTE
 ============
+--------------------------------
+putty6.0_nd1.7
+--------------------------------
+1. Bug fixed
+    1. after reconfiguration, current selected session in tab will be saved to the lastest open session.
+
+2. Other changes
+    1. draw the main window's edge
+
 --------------------------------
 putty6.0_nd1.6
 --------------------------------
