@@ -27,6 +27,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
 
 #define BUFFER_MAX (16*1024)
 
@@ -311,7 +312,19 @@ exception_filter(LPEXCEPTION_POINTERS info)
         }
 
         fputs(g_output , stderr);
-
+        
+        struct tm tm;
+        char filename[128] = {0};
+        time_t t;
+        time(&t);
+        if(t != ((time_t)-1)){
+            tm = *localtime(&t);
+            strftime(filename, sizeof(filename), "crash_%Y%m%d_%H%M%S.txt", &tm);
+            FILE* f = fopen(filename, "a+");
+            fputs(g_output , f);
+            fclose(f);   
+        }
+        
         exit(1);
 
         return 0;
