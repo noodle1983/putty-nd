@@ -664,18 +664,26 @@ char const *cfg_dest(const Config *cfg)
  */
 static int autocmd_cmp(const char *recv, const int rlen, const char *expect, const int elen)
 {
+    //debug(("autocmd_cmp(recv[%s], %d, expect[%s], %d", recv, rlen, expect, elen));
 	int cmpelen = elen;
 	int cmprlen = rlen;
 	/* trim recv and expect */
 	while(cmpelen > 0 && expect[cmpelen-1] == ' ')
 		cmpelen--;
-	while(cmprlen > 0 && recv[cmprlen-1] == ' ')
-		cmprlen--;
+	while((cmprlen > 0 && recv[cmprlen-1] == ' ')
+        ||(cmprlen > 3 && recv[cmprlen-3] == '\033')){
+        if (cmprlen > 0 && recv[cmprlen-1] == ' ')
+		    cmprlen--;
+        else if(cmprlen > 3 && recv[cmprlen-3] == '\033')
+            cmprlen -= 3;
+	}
 
     if (!recv || !expect)
         return 1;
     if (cmprlen < cmpelen)
         return 1;
+    //debug(("last 3 bytes: [%c][%c][%c]\n", recv[cmprlen-3], recv[cmprlen-2], recv[cmprlen-1]));
+    //debug(("cmp last %d byte in [%s] with [%s]", cmpelen, recv + cmprlen - cmpelen, expect));
     return memcmp(recv + cmprlen - cmpelen, expect, cmpelen);
 }
 
@@ -687,6 +695,8 @@ void autocmd_init(Config *cfg)
 {
     cfg->autocmd_index = 0;
     cfg->autocmd_try = 0;
+    memset(cfg->autocmd_lastprint, 0, sizeof cfg->autocmd_lastprint);
+    cfg->autocmd_lastprint_index = 0;
 }
 
 /*
@@ -698,7 +708,7 @@ void exec_autocmd(void *handle, Config *cfg,
     char *recv_buf, int len, 
     int (*send) (void *handle, char *buf, int len))
 {
-    const char* autocmd = get_autocmd(cfg, recv_buf, len);
+    char* autocmd = get_autocmd(cfg, recv_buf, len);
     if (autocmd == NULL)
         return;
     if (strlen(autocmd) > 0)
@@ -714,16 +724,13 @@ const char* get_autocmd(Config *cfg,
     char *recv_buf, int len)
 {
     /* in case the packet is coming partially */
-    static char last_print[32] = {0};
-    static int  llen = 0;
-    const int  LSIZE = sizeof(last_print);
+    const int  LSIZE = sizeof(cfg->autocmd_lastprint) - 1;
     int  lempty;
 
-    /*
-    from_backend(NULL, 1, "recv[", 5);
-    from_backend(NULL, 1,  recv_buf, len);
-    from_backend(NULL, 1, "]", 1);
-    */
+    const int cmd_debug = 0;
+    if (cmd_debug){
+        debug(("\nrecv[%s]\n", recv_buf));
+    }
 
     /* autocmd is completed or it reach retry times */
     if (cfg->autocmd_try < 0 || cfg->autocmd_try >= AUTOCMD_COUNT*3
@@ -731,37 +738,35 @@ const char* get_autocmd(Config *cfg,
         return NULL;
 
     /* recombine the package */
-    lempty = LSIZE - llen;
+    lempty = LSIZE - cfg->autocmd_lastprint_index;
     if (len >= LSIZE){
-        memcpy(last_print, recv_buf + len - LSIZE, LSIZE);
-        llen = LSIZE;
+        memcpy(cfg->autocmd_lastprint, recv_buf + len - LSIZE, LSIZE);
+        cfg->autocmd_lastprint_index = LSIZE;
     } else if (len > lempty){
-        memcpy(last_print, last_print + len - lempty, LSIZE - len);
-        memcpy(last_print + LSIZE - len, recv_buf, len);
-        llen = LSIZE;
+        memcpy(cfg->autocmd_lastprint, cfg->autocmd_lastprint + len - lempty, LSIZE - len);
+        memcpy(cfg->autocmd_lastprint + LSIZE - len, recv_buf, len);
+        cfg->autocmd_lastprint_index = LSIZE;
     } else {
-        memcpy(last_print + llen, recv_buf, len);
-        llen += len;
+        memcpy(cfg->autocmd_lastprint + cfg->autocmd_lastprint_index, recv_buf, len);
+        cfg->autocmd_lastprint_index += len;
+    }
+    cfg->autocmd_lastprint[cfg->autocmd_lastprint_index] = '\0';
+    if (cmd_debug){
+        debug(("\nbuff[index:%d][%s]\n", cfg->autocmd_lastprint_index, cfg->autocmd_lastprint));
     }
     
     for (; cfg->autocmd_index < AUTOCMD_COUNT; cfg->autocmd_index++){
         if (!cfg->autocmd_enable[cfg->autocmd_index]) continue;
         if (!*(cfg->expect[cfg->autocmd_index])) continue;
-        /*
-        from_backend(NULL, 1, "expect[", 7);
-        from_backend(NULL, 1,  cfg->expect[cfg->autocmd_index], 
-            strlen(cfg->expect[cfg->autocmd_index]));
-        from_backend(NULL, 1, "]", 1);
-        */
+        if (cmd_debug){
+            debug(( "\nexpect[%s]\n", cfg->expect[cfg->autocmd_index]));
+        }
         
-        if (!autocmd_cmp(last_print, llen, cfg->expect[cfg->autocmd_index], 
+        if (!autocmd_cmp(cfg->autocmd_lastprint, cfg->autocmd_lastprint_index, cfg->expect[cfg->autocmd_index], 
                 strlen(cfg->expect[cfg->autocmd_index]))){
-            /*     
-            from_backend(NULL, 1, "send[", 5);
-            from_backend(NULL, 1,  cfg->autocmd[cfg->autocmd_index], 
-                strlen(cfg->autocmd[cfg->autocmd_index]));
-            from_backend(NULL, 1, "]", 1);
-            */
+            if (cmd_debug){  
+                debug(("\nsend[%s]\n", cfg->autocmd[cfg->autocmd_index]));
+            }
             
             return cfg->autocmd[cfg->autocmd_index++];
         }else{
