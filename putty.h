@@ -512,6 +512,8 @@ struct config_tag {
     int autocmd_enable[AUTOCMD_COUNT];
     int autocmd_index;
     int autocmd_try;
+    char autocmd_lastprint[32];
+    int autocmd_lastprint_index;
     /* Keyboard options */
     int bksp_is_delete;
     int rxvt_homeend;
