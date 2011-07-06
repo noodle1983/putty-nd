@@ -72,7 +72,6 @@ static void sys_cursor_update(wintabitem *tabitem);
 static int get_fullscreen_rect(RECT * ss);
 
 static int kbd_codepage;
-static int reconfiguring = FALSE;
 //static HMENU specials_menu = NULL;
 
 static wchar_t *clipboard_contents;
@@ -87,6 +86,8 @@ static int need_backend_resize = FALSE;
 int ignore_clip = FALSE;
 static int fullscr_on_max = FALSE;
 static int processed_resize = FALSE;
+
+HANDLE config_dialog_mutex;
 
 static struct {
     HMENU menu;
@@ -468,6 +469,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     hwnd = NULL;
     flags = FLAG_VERBOSE | FLAG_INTERACTIVE;
     initialized = 0;
+    config_dialog_mutex = CreateMutex(NULL, FALSE, NULL);
 
     sk_init();
 
@@ -645,6 +647,7 @@ void cleanup_exit(int code)
 
     /* Clean up COM. */
     CoUninitialize();
+    CloseHandle(config_dialog_mutex);
 
     exit(code);
 }
@@ -1794,6 +1797,24 @@ int on_init_menu_popup(HWND hwnd, UINT message,
     return 0;
 }
 
+static DWORD WINAPI config_dialog_threadfunc(void *param)
+{
+    DWORD wait_result = WaitForSingleObject(config_dialog_mutex, 0);
+    if (WAIT_OBJECT_0 != wait_result)
+        return -1;
+    
+    WPARAM wParam = (WPARAM)param;
+    if (wParam == IDM_NEWSESS) {
+        if (!do_config()){
+            ReleaseMutex(config_dialog_mutex);
+            return -1;
+        }
+        SendMessage(hwnd, WM_CREATE_TAB, (WPARAM)0, (LPARAM)0);   
+    }
+    ReleaseMutex(config_dialog_mutex);
+    return 0;
+}
+
 int on_session_menu(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
@@ -1807,9 +1828,9 @@ int on_session_menu(HWND hwnd, UINT message,
         //noodle: please try reconfigure
     	return 0;
     } else /* IDM_NEWSESS */ {
-        if (!do_config())
-            return -1;
-        wintab_create_tab(&tab, &cfg);
+        DWORD in_threadid; /* required for Win9x */
+        CreateThread(NULL, 0, config_dialog_threadfunc,
+   		   wParam, 0, &in_threadid);
         return 0;
     }
     return 0;
@@ -1822,19 +1843,18 @@ int on_reconfig(wintabitem* tabitem, UINT message,
 	int init_lvl = 1;
 	int reconfig_result;
 
-	if (reconfiguring)
-	    return 0;
-	else
-	    reconfiguring = TRUE;
-
+   DWORD wait_result = WaitForSingleObject(config_dialog_mutex, 0);
+   if (WAIT_OBJECT_0 != wait_result)
+        return 0;
+   
 	//GetWindowText(hwnd, cfg.wintitle, sizeof(cfg.wintitle));
 	prev_cfg = tabitem->cfg;
-    cfg = tabitem->cfg;
+   cfg = tabitem->cfg;
 
 	reconfig_result =
 	    do_reconfig(hwnd, tabitem->back ? tabitem->back->cfg_info(tabitem->backhandle) : 0);
-	reconfiguring = FALSE;
-	if (!reconfig_result)
+   ReleaseMutex(config_dialog_mutex);
+   if (!reconfig_result)
 	    return 0;
     
     tabitem->cfg = cfg;
@@ -2926,6 +2946,9 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
         			break;
             }
             break; 
+        case WM_CREATE_TAB:
+            wintab_create_tab(&tab, &cfg);
+            break;
         default:
         	on_default(tabitem, hwnd, message,wParam, lParam);
             break;

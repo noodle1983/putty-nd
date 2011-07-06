@@ -63,6 +63,7 @@
 #define WM_FULLSCR_ON_MAX (WM_APP + 3)
 #define WM_AGENT_CALLBACK (WM_APP + 4)
 #define WM_GOT_CLIPDATA (WM_APP + 6)
+#define WM_CREATE_TAB (WM_APP + 7)
 //-----------------------------------------------------------------------
 // struct
 //-----------------------------------------------------------------------

@@ -1801,7 +1801,10 @@ void wintabitem_close_session(wintabitem *tabitem)
     tabitem->must_close_session = FALSE;
     
     if (!tabitem->back)  return;
-    WaitForSingleObject(tabitem->close_mutex, INFINITE);
+    
+    DWORD wait_result = WaitForSingleObject(tabitem->close_mutex, INFINITE);
+    if (WAIT_OBJECT_0 != wait_result)
+        return;
 
     if (!tabitem->back)  {
         ReleaseMutex(tabitem->close_mutex);
