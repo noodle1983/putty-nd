@@ -444,12 +444,20 @@ static void okcancelbutton_handler(union control *ctrl, void *dlg,
     Config *cfg = (Config *)data;
     struct sessionsaver_data *ssd =
 		(struct sessionsaver_data *)ctrl->generic.context.p;
-    char *savedsession = cfg->session_name;
 
 	if (event != EVENT_ACTION) 
 		 return;
 	if (ctrl == ssd->okbutton) {
-		save_settings(savedsession, cfg);
+      if (!strcmp(cfg->session_name, DEFAULT_SESSION_NAME)){
+         if (cfg->protocol == PROT_SERIAL)
+            snprintf(cfg->session_name, sizeof(cfg->session_name),  
+               "tmp#%s:%d", cfg->serline, cfg->serspeed);
+         else
+            snprintf(cfg->session_name, sizeof(cfg->session_name),  
+               "tmp#%s:%d", cfg->host, cfg->port);
+      }
+		save_settings(cfg->session_name, cfg);
+      
 		if (ssd->midsession) {
 			/* In a mid-session Change Settings, Apply is always OK. */
 			dlg_end(dlg, 1);
