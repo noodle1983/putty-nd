@@ -368,6 +368,15 @@ void process_cmdline(LPSTR cmdline)
 	}
 
 	adjust_host(&cfg);
+
+   if (!strcmp(cfg.session_name, DEFAULT_SESSION_NAME)){
+      if (cfg.protocol == PROT_SERIAL)
+         snprintf(cfg.session_name, sizeof(cfg.session_name),  
+            "tmp#%s:%d", cfg.serline, cfg.serspeed);
+      else
+         snprintf(cfg.session_name, sizeof(cfg.session_name),  
+            "tmp#%s:%d", cfg.host, cfg.port);
+   }
 }
 
 

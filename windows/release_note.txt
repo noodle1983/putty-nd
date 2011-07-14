@@ -6,6 +6,15 @@ email: noodle1983@126.com
 RELEASE NOTE
 ============
 --------------------------------
+putty6.0_nd1.8
+--------------------------------
+1. Bug fixed
+    1. when using Vim in a session for a long time and then creating another session, it may crash. It happened in my work env from time to time. Root cause is unknown. I changed something by guessing. And the issue didn't happen for 2 weeks.
+
+2. Other changes
+    1. When openning a session via Default Setting, the session will be saved with name "tmp/host:port". And the title will show as "host:port" instead of "Default Setting".
+
+--------------------------------
 putty6.0_nd1.7
 --------------------------------
 1. Bug fixed
