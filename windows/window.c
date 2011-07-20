@@ -1831,7 +1831,7 @@ int on_session_menu(HWND hwnd, UINT message,
         wintabitem* tabitem = wintab_get_active_item(&tab);
         assert (tabitem != NULL);
         cfg = tabitem->cfg;
-        wintab_create_tab(&tab, &cfg);
+        wintab_dup_tab(&tab, &cfg);
         return 0;
     } else if (wParam == IDM_SAVEDSESS) {
         //noodle: please try reconfigure

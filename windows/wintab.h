@@ -190,6 +190,7 @@ void reset_window(wintabitem* tabitem, int);
 int wintab_init(wintab *wintab, HWND hwndParent);
 int wintab_fini(wintab *wintab);
 int wintab_create_tab(wintab *wintab, Config *cfg);
+int wintab_dup_tab(wintab *wintab, Config *cfg);
 int wintab_create_sysbtn(wintab *wintab);
 int wintab_create_toolbar(wintab *wintab);
 int wintab_create_searchbar(wintab *wintab);
@@ -222,7 +223,7 @@ LRESULT CALLBACK WintabWndProc(HWND hwnd, UINT message,
 //-----------------------------------------------------------------------
 // tabbar item related
 //-----------------------------------------------------------------------
-int wintabitem_creat(wintab *wintab, Config *cfg);
+int wintabitem_creat(wintab *wintab, Config *cfg, int afterIndex);
 int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg);
 void wintabitem_fini(wintabitem *tabitem);
 void wintabitem_cfgtopalette(wintabitem *tabitem);

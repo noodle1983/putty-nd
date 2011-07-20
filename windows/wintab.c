@@ -89,7 +89,7 @@ int wintab_init(wintab *wintab, HWND hwndParent)
     wintab_create_sysbtn(wintab);
     wintab_create_searchbar(wintab);
  
-    if (wintabitem_creat(wintab, &cfg) != 0){
+    if (wintabitem_creat(wintab, &cfg, -1) != 0){
         ErrorExit("wintabitem_creat(...)"); 
     }
     
@@ -118,7 +118,14 @@ int wintab_fini(wintab *wintab)
 
 int wintab_create_tab(wintab *wintab, Config *cfg)
 { 
-    return wintabitem_creat(wintab, cfg); 
+    return wintabitem_creat(wintab, cfg, -1); 
+}
+
+//-----------------------------------------------------------------------
+
+int wintab_dup_tab(wintab *wintab, Config *cfg)
+{ 
+    return wintabitem_creat(wintab, cfg, wintab->cur); 
 }
 
 //-----------------------------------------------------------------------
@@ -1360,7 +1367,7 @@ void wintabitem_fini(wintabitem *tabitem)
 }
 //-----------------------------------------------------------------------
 
-int wintabitem_creat(wintab *wintab, Config *cfg)
+int wintabitem_creat(wintab *wintab, Config *cfg, int afterIndex)
 {
     int index = wintab->end;
     if (index >= sizeof(wintab->items)/sizeof(wintabitem*)){
@@ -1368,11 +1375,21 @@ int wintabitem_creat(wintab *wintab, Config *cfg)
         return -1;
     }
 
-    wintab->items[index] = snew(wintabitem);
-    if (wintabitem_init(wintab, wintab->items[index], cfg) != 0){
-        wintabitem_fini(wintab->items[index]);
-        sfree(wintab->items[index]);
+    wintabitem* tabitem = snew(wintabitem);
+    if (wintabitem_init(wintab, tabitem, cfg) != 0){
+        wintabitem_fini(tabitem);
+        sfree(tabitem);
         return -1;
+    }
+
+    if (afterIndex < 0 || afterIndex >= index-1){
+        wintab->items[index] = tabitem;
+    }else{
+        for (; index > (afterIndex+1); index--){
+            wintab->items[index] = wintab->items[index-1];
+        }
+        wintab->items[index] = tabitem;
+        if (wintab->cur > index) wintab->cur += 1;
     }
     UpdateWindow(wintab->items[index]->page.hwndCtrl);
     
