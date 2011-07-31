@@ -5,6 +5,8 @@
 #ifndef WINTAB_H
 #define WINTAB_H
 
+#include "zmodem.h"
+
 /* From MSDN: In the WM_SYSCOMMAND message, the four low-order bits of
  * wParam are used by Windows, and should be masked off, so we shouldn't
  * attempt to store information in them. Hence all these identifiers have
@@ -146,6 +148,8 @@ typedef struct {
     HWND logbox;
     int nevents, negsize;
     char **events;
+
+    zmodem zm;
 }wintabitem;
 
 typedef struct {

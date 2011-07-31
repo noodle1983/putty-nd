@@ -23,8 +23,17 @@
 #define ZCOMMAND   18
 #define ZSTDERR    19
 
+//state
+#define STATE_IDLE 0
 
+struct zmodem_t{
+   int state;
+   void *handle;
+   int (*send) (void *handle, char *buf, int len);
+};
+typedef struct zmodem_t zmodem;
 
-
+void initZmodem(zmodem *zm, void* handle, int (*send) (void *handle, char *buf, int len));
+int processZmodem(zmodem *zm, const char* const str, const int len);
 #endif /* ZMODEM_H */
 

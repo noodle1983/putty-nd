@@ -5424,7 +5424,13 @@ int from_backend(void *frontend, int is_stderr, const char *data, int len)
 {
     assert (frontend != NULL);
     wintabitem *tabitem = (wintabitem*) frontend;
-    return term_data(tabitem->term, is_stderr, data, len);
+    if (!is_stderr){
+        if (-1 == processZmodem(&tabitem->zm, data, len))
+            return term_data(tabitem->term, is_stderr, data, len);
+        //else it will be processed in processZmodem
+    }else {
+        return term_data(tabitem->term, is_stderr, data, len);
+    }
 }
 
 int from_backend_untrusted(void *frontend, const char *data, int len)
