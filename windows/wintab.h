@@ -149,7 +149,7 @@ typedef struct {
     int nevents, negsize;
     char **events;
 
-    zmodem zm;
+    zmodem_t zm;
 }wintabitem;
 
 typedef struct {

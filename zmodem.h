@@ -24,16 +24,29 @@
 #define ZSTDERR    19
 
 //state
-#define STATE_IDLE 0
+typedef enum{
+    STATE_IDLE = 0,
+    STATE_ZRQINIT = 1,
 
-struct zmodem_t{
-   int state;
+    STATE_EXIT,
+    STATE_DUMP
+} ZmodemState;
+
+typedef enum{
+    ZR_ERROR  = -1,
+    ZR_DONE   = 0,
+    ZR_PARTLY = 1
+
+} ZmodemResult;
+
+struct zmodem_tag{
+   ZmodemState state;
    void *handle;
    int (*send) (void *handle, char *buf, int len);
 };
-typedef struct zmodem_t zmodem;
+typedef struct zmodem_tag zmodem_t;
 
-void initZmodem(zmodem *zm, void* handle, int (*send) (void *handle, char *buf, int len));
-int processZmodem(zmodem *zm, const char* const str, const int len);
+void initZmodem(zmodem_t *zm, void* handle, int (*send) (void *handle, char *buf, int len));
+int processZmodem(zmodem_t *zm, const char* const str, const int len);
 #endif /* ZMODEM_H */
 
