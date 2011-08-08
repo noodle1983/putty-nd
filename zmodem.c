@@ -19,6 +19,17 @@ ZmodemResult stateIdle(zmodem_t *zm, const char* const str, const int len, uint6
     return ZR_ERROR;
 }
 
+
+ZmodemResult stateZrqinit(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
+{
+    if (len >= 3 && 0 == memcmp(str, "rz\r", 3)){
+        zm->state = STATE_DUMP;
+        *decodeIndex += 3;
+        return ZR_DONE;
+    }
+    return ZR_ERROR;
+}
+
 ZmodemResult stateDump(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
 {
     debug(("\nrecv%d[", len));
@@ -41,6 +52,10 @@ ZmodemResult processZmodem(zmodem_t *zm, const char* const str, const int len)
         {
         case STATE_IDLE:
             result = stateIdle(zm, str, len, &decodeIndex);
+            break;
+
+        case STATE_ZRQINIT:
+            result = stateZrqinit(zm, str, len, &decodeIndex);
             break;
             
         case STATE_DUMP:
