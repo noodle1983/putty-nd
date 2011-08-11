@@ -1,6 +1,17 @@
 #ifndef ZMODEM_H
 #define ZMODEM_H
 
+/******************************
+ *macro
+ *****************************/
+
+#define ZPAD '*' 
+#define ZDLE 030
+#define ZDLEE (ZDLE^0100)
+#define ZBIN 'A'
+#define ZHEX 'B'
+#define ZBIN32 'C'
+
 // Frame types
 #define ZRQINIT    0
 #define ZRINIT     1
@@ -23,10 +34,15 @@
 #define ZCOMMAND   18
 #define ZSTDERR    19
 
-//state
+/******************************
+ *enum
+ *****************************/
 typedef enum{
     STATE_IDLE = 0,
-    STATE_ZRQINIT = 1,
+    STATE_CHK_ENC,
+    STATE_PARSE_HEX,
+    
+    STATE_ZRQINIT,
 
     STATE_EXIT,
     STATE_DUMP
@@ -36,8 +52,28 @@ typedef enum{
     ZR_ERROR  = -1,
     ZR_DONE   = 0,
     ZR_PARTLY = 1
-
 } ZmodemResult;
+
+/******************************
+ *struct
+ *****************************/
+
+#pragma   pack(1)
+
+struct hex_str_tag{
+    char hex[2];
+};
+typedef struct hex_str_tag hex_str_t;
+
+struct hex_tag{
+    char      hex_pre[4];
+    hex_str_t type;
+    hex_str_t flag[4];
+    hex_str_t crc[2];         
+};
+typedef struct hex_tag hex_t;
+
+#pragma   pack()
 
 struct zmodem_tag{
    ZmodemState state;
