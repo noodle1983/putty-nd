@@ -41,6 +41,7 @@ typedef enum{
     STATE_IDLE = 0,
     STATE_CHK_ENC,
     STATE_PARSE_HEX,
+    STATE_PARSE_LINESEEDXON,
     
     STATE_ZRQINIT,
 
@@ -60,18 +61,32 @@ typedef enum{
 
 #pragma   pack(1)
 
+
+struct enc_header_tag{
+    char      hex_pre[4];
+};
+typedef struct enc_header_tag enc_header_t;
+
 struct hex_str_tag{
     char hex[2];
 };
-typedef struct hex_str_tag hex_str_t;
-
+typedef struct hex_str_tag hex_str_t;    
 struct hex_tag{
-    char      hex_pre[4];
     hex_str_t type;
     hex_str_t flag[4];
     hex_str_t crc[2];         
 };
 typedef struct hex_tag hex_t;
+
+struct lineseed_tag{
+    char lineseed[2];         
+};
+typedef struct lineseed_tag lineseed_t;
+struct lineseedxon_tag{
+    char lineseed[2]; 
+    char xon;
+};
+typedef struct lineseedxon_tag lineseedxon_t;
 
 #pragma   pack()
 
@@ -79,6 +94,9 @@ struct zmodem_tag{
    ZmodemState state;
    void *handle;
    int (*send) (void *handle, char *buf, int len);
+
+   char buffer[512];
+   int buf_len;
 };
 typedef struct zmodem_tag zmodem_t;
 
