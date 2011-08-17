@@ -34,6 +34,25 @@
 #define ZCOMMAND   18
 #define ZSTDERR    19
 
+#define ZF0	3
+#define ZF1	2
+#define ZF2	1
+#define ZF3	0
+#define ZP0	0
+#define ZP1	1
+#define ZP2	2
+#define ZP3	3
+
+#define CANFDX	0x01
+#define CANOVIO	0x02
+#define CANBRK	0x04
+#define CANCRY	0x08
+#define CANLZW	0x10
+#define CANFC32	0x20
+#define ESCCTL  0x40
+#define ESC8    0x80
+
+
 /******************************
  *enum
  *****************************/
@@ -77,6 +96,13 @@ struct hex_tag{
     hex_str_t crc[2];         
 };
 typedef struct hex_tag hex_t;
+
+struct frame_tag{
+    unsigned char type;
+    unsigned char flag[4];
+    unsigned short crc;
+};
+typedef struct frame_tag frame_t;
 
 struct lineseed_tag{
     char lineseed[2];         
