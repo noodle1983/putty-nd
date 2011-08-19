@@ -60,6 +60,8 @@ typedef enum{
     STATE_IDLE = 0,
     STATE_CHK_ENC,
     STATE_PARSE_HEX,
+    STATE_PARSE_BIN,
+    STATE_PARSE_BIN32,
     STATE_PARSE_LINESEEDXON,
     
     STATE_ZRQINIT,
@@ -103,6 +105,13 @@ struct frame_tag{
     unsigned short crc;
 };
 typedef struct frame_tag frame_t;
+
+struct frame32_tag{
+    unsigned char type;
+    unsigned char flag[4];
+    unsigned long crc;
+};
+typedef struct frame32_tag frame32_t;
 
 struct lineseed_tag{
     char lineseed[2];         
