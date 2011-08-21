@@ -104,7 +104,7 @@ unsigned long calcFrameCrc32(const frame32_t *frame)
     unsigned long crc = 0xFFFFFFFFL;
     crc = UPDC32((frame->type & 0x7f), crc);
     for (i = 0; i < 4; i++){
-        crc = UPDC32(frame->flag[i]&, crc);
+        crc = UPDC32(frame->flag[i], crc);
     }
     crc = ~crc;;
     return crc;
@@ -133,10 +133,10 @@ int handleZrqinit(zmodem_t *zm, const frame_t *frame)
     return 0;
 }
 
-int handleZfile(zmodem_t *zm, const frame_t *frame)
+int handleZfile32(zmodem_t *zm, const frame32_t *frame32)
 {
     zm_log(zm, "recv file header\r\n");
-    zm->state = STATE_EXIT;
+    zm->state = STATE_PARSE_FILE_NAME;
     return 0;
 }
 
@@ -146,9 +146,7 @@ int handleFrame(zmodem_t *zm, const frame_t *frame)
     case ZRQINIT:
         return handleZrqinit(zm, frame);
 
-    case ZFILE:
-        return handleZfile(zm, frame);
-        
+    case ZFILE:        
     case ZRINIT:
     case ZSINIT:
     case ZACK:
@@ -169,6 +167,43 @@ int handleFrame(zmodem_t *zm, const frame_t *frame)
     case ZSTDERR: 
 
     default:
+        zm_log(zm, "[handleFrame]frame type %d is not implemented!\r\n", frame->type);
+        return -1;
+
+
+    }
+    return 0;
+
+}
+
+int handleFrame32(zmodem_t *zm, const frame32_t *frame32)
+{
+    switch (frame32->type){
+
+    case ZFILE:
+        return handleZfile32(zm, frame32);
+        
+    case ZRQINIT:
+    case ZRINIT:
+    case ZSINIT:
+    case ZACK:
+    case ZSKIP:
+    case ZNAK:
+    case ZABORT:
+    case ZFIN:
+    case ZRPOS:
+    case ZDATA:
+    case ZEOF:
+    case ZFERR:
+    case ZCRC:
+    case ZCHALLENGE:
+    case ZCOMPL:
+    case ZCAN:
+    case ZFREECNT:
+    case ZCOMMAND:
+    case ZSTDERR: 
+    default:
+        zm_log(zm, "[handleFrame32]frame type %d is not implemented!\r\n", frame32->type);
         return -1;
 
 
@@ -250,7 +285,7 @@ ZmodemResult stateParseBin32(zmodem_t *zm, const char* const str, const int len,
             str, decodeIndex, len);
     if (ZR_DONE == result){
         unsigned long crc = calcFrameCrc32(&frame32);
-        if ( crc != frame32.crc || 0 != handleFrame(zm, (frame_t*)&frame32)){
+        if ( crc != frame32.crc || 0 != handleFrame32(zm, &frame32)){
             zm_log(zm, "crc32 error!\r\n");
             zm->state = STATE_EXIT;
             return ZR_ERROR;
@@ -272,6 +307,32 @@ ZmodemResult stateParseLineseedXon(zmodem_t *zm, const char* const str, const in
     }
     
     return result;
+}
+
+ZmodemResult stateParseFileName(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
+{
+    uint64_t i = *decodeIndex;
+    for (; (i < len) && (str[i] != 0); i++){
+        zm->buffer[zm->buf_len++] = str[i];
+        if (zm->buf_len > sizeof(zm->buffer)){
+            *decodeIndex = i;
+            zm_log(zm, "file name is too long!\r\n");
+            zm->state = STATE_IDLE;
+            return ZR_ERROR;
+        }
+    }
+    *decodeIndex = i;
+    if (str[i] == 0){
+        zm->buffer[zm->buf_len] = 0;
+        strcpy(zm->filename, zm->buffer);
+        memset(zm->buffer, 0, sizeof(zm->buffer));
+        zm->buf_len = 0;
+        zm_log(zm, "start to handle file:%s.\r\n", zm->filename);
+        zm->state = STATE_IDLE;
+        return ZR_DONE;
+    }
+    
+    return ZR_PARTLY;
 }
 
 ZmodemResult stateDump(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
@@ -298,6 +359,13 @@ void initZmodem(zmodem_t *zm,
 
     memset(zm->buffer, 0, sizeof(zm->buffer));
     zm->buf_len = 0;
+
+    memset(zm->filename, 0, sizeof(zm->filename));
+    zm->filesize = 0;
+    zm->mtime = 0;
+    zm->mode = 0;
+    zm->nfilesleft = 0;
+    zm->ntotalfilesize = 0;
 }
 
 ZmodemResult processZmodem(zmodem_t *zm, const char* const str, const int len)
@@ -330,6 +398,10 @@ ZmodemResult processZmodem(zmodem_t *zm, const char* const str, const int len)
 
         case STATE_PARSE_LINESEEDXON:
             result = stateParseLineseedXon(zm, str, len, &decodeIndex);
+            break;  
+
+        case STATE_PARSE_FILE_NAME:
+            result = stateParseFileName(zm, str, len, &decodeIndex);
             break;  
             
         case STATE_DUMP:
