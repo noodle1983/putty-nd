@@ -1,6 +1,7 @@
 #include "zmodem.h"
 #include "misc.h"
 #include <stdint.h>
+#include <stdarg.h>
 #include <assert.h>
 #include "crctab.c"
 #include <string.h>
@@ -10,6 +11,18 @@ const char HEX_ARRAY[] = "0123456789abcdef";
 
 const char BIN_PREFIX[] = {ZPAD, ZDLE, ZBIN};
 const char BIN32_PREFIX[] = {ZPAD, ZDLE, ZBIN32};
+
+void zm_log(zmodem_t *zm, char *fmt, ...)
+{
+    char *buf;
+    va_list ap;
+
+    va_start(ap, fmt);
+    buf = dupvprintf(fmt, ap);
+    zm->log(zm->log_handle, 1, buf, strlen(buf));
+    sfree(buf);
+    va_end(ap);
+}
 
 ZmodemResult decodeStruct(
     void* to_struct, const int struct_len, 
@@ -89,9 +102,9 @@ unsigned long calcFrameCrc32(const frame32_t *frame)
 {
     int i = 0;
     unsigned long crc = 0xFFFFFFFFL;
-    crc = UPDC32(frame->type, crc);
+    crc = UPDC32((frame->type & 0x7f), crc);
     for (i = 0; i < 4; i++){
-        crc = UPDC32(frame->flag[i], crc);
+        crc = UPDC32(frame->flag[i]&, crc);
     }
     crc = ~crc;;
     return crc;
@@ -99,7 +112,7 @@ unsigned long calcFrameCrc32(const frame32_t *frame)
 
 int handleZrqinit(zmodem_t *zm, const frame_t *frame)
 {
-    debug(("recv ZRQINIT\n"));
+    zm_log(zm, "init zmodem session\r\n");
     frame_t zrinit;
     memset(&zrinit, 0, sizeof(frame_t));
     zrinit.type = ZRINIT;
@@ -116,13 +129,14 @@ int handleZrqinit(zmodem_t *zm, const frame_t *frame)
     memcpy(buf+len,"\r\n\021", 3);
     len += 3;
     zm->send(zm->handle,buf, len);
-    debug(("sent ZRINIT\n"));
+    zm_log(zm, "ack init message\r\n");
     return 0;
 }
 
 int handleZfile(zmodem_t *zm, const frame_t *frame)
 {
-    debug(("recv ZFILE\n"));
+    zm_log(zm, "recv file header\r\n");
+    zm->state = STATE_EXIT;
     return 0;
 }
 
@@ -166,7 +180,7 @@ int handleFrame(zmodem_t *zm, const frame_t *frame)
 ZmodemResult stateIdle(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
 {
     if (len >= 3 && 0 == memcmp(str, "rz\r", 3)){
-        debug(("zmodem\n"));
+        zm_log(zm, "see zmodem trigger\r\n");
         zm->state = STATE_CHK_ENC;
         *decodeIndex += 3;
         return ZR_DONE;
@@ -182,20 +196,20 @@ ZmodemResult stateCheckEncoding(zmodem_t *zm, const char* const str, const int l
             str, decodeIndex, len);
     if (ZR_DONE == result){
         if (0 == memcmp(enc_header.hex_pre, HEX_PREFIX, sizeof(HEX_PREFIX))){
-            debug(("hex frame\n"));
+            zm_log(zm, "hex frame: ");
             zm->state = STATE_PARSE_HEX;
         }else if (0 == memcmp(enc_header.hex_pre, BIN_PREFIX, sizeof(BIN_PREFIX))){
-            debug(("bin frame\n"));
+            zm_log(zm, "bin frame: ");
             zm->state = STATE_PARSE_BIN;
             zm->buffer[zm->buf_len] = enc_header.hex_pre[3];
             zm->buf_len++;
         }else if (0 == memcmp(enc_header.hex_pre, BIN32_PREFIX, sizeof(BIN32_PREFIX))){
-            debug(("bin32 frame\n"));
+            zm_log(zm, "bin32 frame: ");
             zm->state = STATE_PARSE_BIN32;
             zm->buffer[zm->buf_len] = enc_header.hex_pre[3];
             zm->buf_len++;
         }else{
-            debug(("unknow frame\n"));
+            zm_log(zm, "unknow frame type!\r\n");
             zm->state = STATE_EXIT;
         }
     }
@@ -215,7 +229,7 @@ ZmodemResult stateParseHex(zmodem_t *zm, const char* const str, const int len, u
         frame_t frame;
         convHex2Plain(&hexframe, &frame);
         if (frame.crc != calcFrameCrc(&frame) || 0 != handleFrame(zm, &frame)){
-            debug(("crc failed or frame error\n"));
+            zm_log(zm, "crc error!\r\n");
             zm->state = STATE_EXIT;
             return ZR_ERROR;
         }
@@ -237,7 +251,7 @@ ZmodemResult stateParseBin32(zmodem_t *zm, const char* const str, const int len,
     if (ZR_DONE == result){
         unsigned long crc = calcFrameCrc32(&frame32);
         if ( crc != frame32.crc || 0 != handleFrame(zm, (frame_t*)&frame32)){
-            debug(("crc failed or frame error\n"));;
+            zm_log(zm, "crc32 error!\r\n");
             zm->state = STATE_EXIT;
             return ZR_ERROR;
         }
@@ -262,21 +276,25 @@ ZmodemResult stateParseLineseedXon(zmodem_t *zm, const char* const str, const in
 
 ZmodemResult stateDump(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
 {
-    debug(("\nrecv%d[", len));
+    zm_log(zm, "\nrecv%d[", len);
     int i = *decodeIndex;
     for (; i < len; i++)
-        debug(("0x%x ", (unsigned)str[i]));
-    debug(("]\n"));
+        zm_log(zm, "0x%x ", (unsigned)str[i]);
+    zm_log(zm, "]\r\n");
     zm->state = STATE_IDLE;
     *decodeIndex = len;
     return ZR_DONE;
 }
 
-void initZmodem(zmodem_t *zm, void* handle, int (*send) (void *handle, char *buf, int len))
+void initZmodem(zmodem_t *zm, 
+    void* handle, int (*send) (void *handle, char *buf, int len),
+    void* log_handle, int (*log)(void *log_handle, int is_stderr, const char *data, int len))
 {
     zm->state = STATE_IDLE;
     zm->handle = handle;
     zm->send = send;
+    zm->log_handle = log_handle;
+    zm->log = log;
 
     memset(zm->buffer, 0, sizeof(zm->buffer));
     zm->buf_len = 0;

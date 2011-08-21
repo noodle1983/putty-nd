@@ -130,12 +130,17 @@ struct zmodem_tag{
    void *handle;
    int (*send) (void *handle, char *buf, int len);
 
+   void* log_handle;
+   int (*log)(void *log_handle, int is_stderr, const char *data, int len);
+
    char buffer[512];
    int buf_len;
 };
 typedef struct zmodem_tag zmodem_t;
 
-void initZmodem(zmodem_t *zm, void* handle, int (*send) (void *handle, char *buf, int len));
+void initZmodem(zmodem_t *zm, 
+void* handle, int (*send) (void *handle, char *buf, int len),
+void* log_handle, int (*log)(void *log_handle, int is_stderr, const char *data, int len));
 int processZmodem(zmodem_t *zm, const char* const str, const int len);
 #endif /* ZMODEM_H */
 

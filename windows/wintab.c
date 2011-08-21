@@ -1748,7 +1748,9 @@ int wintabitem_start_backend(wintabitem *tabitem)
     	sfree(str);
 	    return -1;
     }
-    initZmodem(&tabitem->zm, tabitem->backhandle, tabitem->back->send);
+    initZmodem(&tabitem->zm, 
+        tabitem->backhandle, tabitem->back->send,
+        tabitem->term, term_data);
 
     sfree(realhost);
 
