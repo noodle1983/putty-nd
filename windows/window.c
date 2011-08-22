@@ -5431,6 +5431,7 @@ int from_backend(void *frontend, int is_stderr, const char *data, int len)
     }else {
         return term_data(tabitem->term, is_stderr, data, len);
     }
+    return 0;
 }
 
 int from_backend_untrusted(void *frontend, const char *data, int len)

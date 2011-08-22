@@ -5,6 +5,8 @@
 #include <assert.h>
 #include "crctab.c"
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 const char HEX_PREFIX[] = {ZPAD, ZPAD, ZDLE, ZHEX};
 const char HEX_ARRAY[] = "0123456789abcdef";
@@ -321,20 +323,156 @@ ZmodemResult stateParseFileName(zmodem_t *zm, const char* const str, const int l
             return ZR_ERROR;
         }
     }
-    *decodeIndex = i;
+    *decodeIndex = i + 1;
     if (str[i] == 0){
         zm->buffer[zm->buf_len] = 0;
         strcpy(zm->filename, zm->buffer);
         memset(zm->buffer, 0, sizeof(zm->buffer));
         zm->buf_len = 0;
         zm_log(zm, "start to handle file:%s.\r\n", zm->filename);
-        zm->state = STATE_IDLE;
+        zm->state = STATE_PARSE_FILE_SIZE;
         return ZR_DONE;
     }
     
     return ZR_PARTLY;
 }
 
+ZmodemResult stateParseFileSize(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
+{
+    uint64_t i = *decodeIndex;
+    for (; (i < len) && (str[i] != ' '); i++){
+        zm->buffer[zm->buf_len++] = str[i];
+        if (zm->buf_len > sizeof(zm->buffer)){
+            *decodeIndex = i;
+            zm_log(zm, "file size is too long!\r\n");
+            zm->state = STATE_IDLE;
+            return ZR_ERROR;
+        }
+    }
+    *decodeIndex = i + 1;
+    if (str[i] == ' '){
+        zm->buffer[zm->buf_len] = 0;
+        zm->filesize = atoi(zm->buffer);
+        
+        memset(zm->buffer, 0, sizeof(zm->buffer));
+        zm->buf_len = 0;
+        zm_log(zm, "file size:%d.\r\n", zm->filesize);
+        zm->state = STATE_PARSE_FILE_MTIME;
+        return ZR_DONE;
+    }
+    
+    return ZR_PARTLY;
+}
+
+
+ZmodemResult stateParseFileMtime(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
+{
+    uint64_t i = *decodeIndex;
+    for (; (i < len) && (str[i] != ' '); i++){
+        zm->buffer[zm->buf_len++] = str[i];
+        if (zm->buf_len > sizeof(zm->buffer)){
+            *decodeIndex = i;
+            zm_log(zm, "file mtime is too long!\r\n");
+            zm->state = STATE_IDLE;
+            return ZR_ERROR;
+        }
+    }
+    *decodeIndex = i + 1;
+    if (str[i] == ' '){
+        zm->buffer[zm->buf_len] = 0;
+        sscanf(zm->buffer, "%lo", &zm->mtime);;
+        
+        memset(zm->buffer, 0, sizeof(zm->buffer));
+        zm->buf_len = 0;
+        zm_log(zm, "file mtime:%d.\r\n", zm->mtime);
+        zm->state = STATE_PARSE_FILE_MODE;
+        return ZR_DONE;
+    }
+    
+    return ZR_PARTLY;
+}
+
+ZmodemResult stateParseFileMode(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
+{
+    uint64_t i = *decodeIndex;
+    for (; (i < len) && (str[i] != ' '); i++){
+        zm->buffer[zm->buf_len++] = str[i];
+        if (zm->buf_len > sizeof(zm->buffer)){
+            *decodeIndex = i;
+            zm_log(zm, "file mode is too long!\r\n");
+            zm->state = STATE_IDLE;
+            return ZR_ERROR;
+        }
+    }
+    *decodeIndex = i + 3;
+    if (str[i] == ' '){
+        zm->buffer[zm->buf_len] = 0;
+        sscanf(zm->buffer, "%o", &zm->mode);;
+        
+        memset(zm->buffer, 0, sizeof(zm->buffer));
+        zm->buf_len = 0;
+        zm_log(zm, "file mode:%o.\r\n", zm->mode);
+        zm->state = STATE_PARSE_FILE_NFILELEFT;
+        return ZR_DONE;
+    }
+    
+    return ZR_PARTLY;
+}
+
+
+ZmodemResult stateParseFileNFileLeft(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
+{
+    uint64_t i = *decodeIndex;
+    for (; (i < len) && (str[i] != ' '); i++){
+        zm->buffer[zm->buf_len++] = str[i];
+        if (zm->buf_len > sizeof(zm->buffer)){
+            *decodeIndex = i;
+            zm_log(zm, "file count is too long!\r\n");
+            zm->state = STATE_IDLE;
+            return ZR_ERROR;
+        }
+    }
+    *decodeIndex = i + 1;
+    if (str[i] == ' '){
+        zm->buffer[zm->buf_len] = 0;
+        sscanf(zm->buffer, "%d", &zm->nfilesleft);;
+        
+        memset(zm->buffer, 0, sizeof(zm->buffer));
+        zm->buf_len = 0;
+        zm_log(zm, "file count:%d.\r\n", zm->nfilesleft);
+        zm->state = STATE_PARSE_FILE_TOTALSIZELEFT;
+        return ZR_DONE;
+    }
+    
+    return ZR_PARTLY;
+}
+
+ZmodemResult stateParseFileTotalSizeLeft(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
+{
+    uint64_t i = *decodeIndex;
+    for (; (i < len) && (str[i] != 0); i++){
+        zm->buffer[zm->buf_len++] = str[i];
+        if (zm->buf_len > sizeof(zm->buffer)){
+            *decodeIndex = i;
+            zm_log(zm, "total size is too long!\r\n");
+            zm->state = STATE_IDLE;
+            return ZR_ERROR;
+        }
+    }
+    *decodeIndex = i + 1;
+    if (str[i] == 0){
+        zm->buffer[zm->buf_len] = 0;
+        sscanf(zm->buffer, "%d", &zm->totalfilesize);;
+        
+        memset(zm->buffer, 0, sizeof(zm->buffer));
+        zm->buf_len = 0;
+        zm_log(zm, "total size:%d.\r\n", zm->totalfilesize);
+        zm->state = STATE_IDLE;
+        return ZR_DONE;
+    }
+    
+    return ZR_PARTLY;
+}
 ZmodemResult stateDump(zmodem_t *zm, const char* const str, const int len, uint64_t *decodeIndex)
 {
     zm_log(zm, "\nrecv%d[", len);
@@ -365,7 +503,7 @@ void initZmodem(zmodem_t *zm,
     zm->mtime = 0;
     zm->mode = 0;
     zm->nfilesleft = 0;
-    zm->ntotalfilesize = 0;
+    zm->totalfilesize = 0;
 }
 
 ZmodemResult processZmodem(zmodem_t *zm, const char* const str, const int len)
@@ -403,7 +541,27 @@ ZmodemResult processZmodem(zmodem_t *zm, const char* const str, const int len)
         case STATE_PARSE_FILE_NAME:
             result = stateParseFileName(zm, str, len, &decodeIndex);
             break;  
-            
+
+        case STATE_PARSE_FILE_SIZE:
+            result = stateParseFileSize(zm, str, len, &decodeIndex);
+            break;              
+
+        case STATE_PARSE_FILE_MTIME:
+            result = stateParseFileMtime(zm, str, len, &decodeIndex);
+            break;  
+
+        case STATE_PARSE_FILE_MODE:
+            result = stateParseFileMode(zm, str, len, &decodeIndex);
+            break;  
+
+        case STATE_PARSE_FILE_NFILELEFT:
+            result = stateParseFileNFileLeft(zm, str, len, &decodeIndex);
+            break;  
+
+        case STATE_PARSE_FILE_TOTALSIZELEFT:
+            result = stateParseFileTotalSizeLeft(zm, str, len, &decodeIndex);
+            break;    
+
         case STATE_DUMP:
             result = stateDump(zm, str, len, &decodeIndex);
             break;

@@ -65,6 +65,11 @@ typedef enum{
     STATE_PARSE_LINESEEDXON,
     
     STATE_PARSE_FILE_NAME,
+    STATE_PARSE_FILE_SIZE,
+    STATE_PARSE_FILE_MTIME,
+    STATE_PARSE_FILE_MODE,
+    STATE_PARSE_FILE_NFILELEFT,
+    STATE_PARSE_FILE_TOTALSIZELEFT,
     
     STATE_ZRQINIT,
 
@@ -143,7 +148,7 @@ struct zmodem_tag{
    unsigned long mtime;
    unsigned int  mode;
    int nfilesleft;
-   int ntotalfilesize;
+   int totalfilesize;
 };
 typedef struct zmodem_tag zmodem_t;
 

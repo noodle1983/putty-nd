@@ -1750,7 +1750,7 @@ int wintabitem_start_backend(wintabitem *tabitem)
     }
     initZmodem(&tabitem->zm, 
         tabitem->backhandle, tabitem->back->send,
-        tabitem->term, term_data);
+        tabitem->term, (int (*)(void *log_handle, int is_stderr, const char *data, int len))term_data);
 
     sfree(realhost);
 
