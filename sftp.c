@@ -37,6 +37,8 @@ void sftp_handle_init(sftp_handle* sftp){
     sftp->fxp_errtype= 0;
     sftp->fxp_error_message = NULL;
     sftp->sftp_requests = NULL;
+
+    sftp->log_handle = NULL;
 }
 
 /* for tab usage only*/

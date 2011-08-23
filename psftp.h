@@ -175,4 +175,6 @@ int create_directory(char *name);
  */
 char *dir_file_cat(char *dir, char *file);
 
+
+
 #endif /* PUTTY_PSFTP_H */

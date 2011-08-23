@@ -153,6 +153,8 @@ typedef struct {
     //sftp
     sftp_handle _sftp;
     sftp_handle* sftp;
+    char sftpcommand[256];
+    int  sftpcomlen;
 }wintabitem;
 
 typedef struct {

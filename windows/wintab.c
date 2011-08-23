@@ -1286,6 +1286,8 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->logpal = NULL;
     tabitem->sftp = &tabitem->_sftp;
     sftp_handle_init(tabitem->sftp);
+    tabitem->sftpcomlen = 0;
+    memset(tabitem->sftpcommand, 0, sizeof(tabitem->sftpcommand));
     set_title(tabitem, cfg->session_name);
     set_icon(tabitem, cfg->session_name);
     tabitem->close_mutex= CreateMutex(NULL, FALSE, NULL);
@@ -1307,6 +1309,7 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     term_size(tabitem->term, tabitem->cfg.height, 
         tabitem->cfg.width, tabitem->cfg.savelines);   
     wintabitem_init_fonts(tabitem, 0, 0);
+    tabitem->_sftp.log_handle = tabitem->term;
 
     wintabitem_CreateCaret(tabitem);
     wintabpage_init_scrollbar(&tabitem->page, tabitem->term);
@@ -2380,6 +2383,28 @@ int wintab_is_sftp(wintabitem *tabitem)
 }
 
 //-----------------------------------------------------------------------
+extern struct sftp_command *sftp_findcmd(sftp_handle* sftp, char* const cmdline);
+int wintabsftp_handle_cmd(wintabitem *tabitem)
+{
+    struct sftp_command *cmd;
+    int ret;
+
+    cmd = sftp_findcmd(tabitem->sftp, tabitem->sftpcommand);
+    if (!cmd)
+        return 0;
+        
+    ret = cmd->obey(tabitem->sftp, cmd);
+    if (cmd->words) {
+        int i;
+        for(i = 0; i < cmd->nwords; i++)
+            sfree(cmd->words[i]);
+        sfree(cmd->words);
+    }
+    sfree(cmd);
+    return ret;
+}
+
+//-----------------------------------------------------------------------
 
 int wintabsftp_on_char(wintabitem *tabitem, const char *data, int len)
 {    
@@ -2396,12 +2421,22 @@ int wintabsftp_on_char(wintabitem *tabitem, const char *data, int len)
             handled_data[j++] = 8;
             handled_data[j++] = ' ';
             handled_data[j++] = 8;
+
+            tabitem->sftpcomlen  = (tabitem->sftpcomlen>0) ? (tabitem->sftpcomlen-1) : 0;
+            tabitem->sftpcommand[tabitem->sftpcomlen] = 0;
         }else if (data[i] == 13){
             /* enter */
             handled_data[j++] = 13;
             handled_data[j++] = 10;
+
+            tabitem->sftpcommand[tabitem->sftpcomlen++] = 0;
+            wintabsftp_handle_cmd(tabitem);
+
+            tabitem->sftpcomlen = 0;
+            memset(tabitem->sftpcommand, 0, sizeof(tabitem->sftpcommand));
         }else{
             handled_data[j++] = data[i];
+            tabitem->sftpcommand[tabitem->sftpcomlen++] = data[i];
         }
     }
     term_data(tabitem->term, 0, handled_data, j);
@@ -2411,6 +2446,8 @@ int wintabsftp_on_char(wintabitem *tabitem, const char *data, int len)
     //debug(("\n"));
     return 0;
 }
+
+
 
 //-----------------------------------------------------------------------
 //Config post handling

@@ -74,7 +74,15 @@ typedef struct {
     int fxp_errtype;
     const char *fxp_error_message;
     tree234 *sftp_requests;
+
+    void* log_handle;
 } sftp_handle;
+
+struct sftp_command {
+    char **words;
+    int nwords, wordssize;
+    int (*obey) (sftp_handle* sftp, struct sftp_command *);	/* returns <0 to quit */
+};
 
 void sftp_handle_init(sftp_handle* sftp);
 void sftp_handle_fini(sftp_handle* sftp);
