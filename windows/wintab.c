@@ -1751,6 +1751,9 @@ int wintabitem_start_backend(wintabitem *tabitem)
 
     tabitem->must_close_session = FALSE;
     tabitem->session_closed = FALSE;
+
+    if (wintab_is_sftp(tabitem))
+        term_data(tabitem->term, 0, "sftp> ", 6);
     return 0;
 }
 
@@ -2370,7 +2373,6 @@ int wintabsftp_create(wintab *wintab, Config *cfg)
 
     if (-1 == wintabitem_creat(wintab, &sftp_cfg))
         return -1;
-
     return 0;
 }
 
@@ -2415,7 +2417,7 @@ int wintabsftp_on_char(wintabitem *tabitem, const char *data, int len)
     for (i = 0, j = 0; i < len && j < 128; i++){
         if (data[i] == 8) {
             /* backspace */
-            if (tabitem->term->curs.x <= 0){
+            if (tabitem->sftpcomlen <= 0){
                 continue;
             }
             handled_data[j++] = 8;
@@ -2429,8 +2431,14 @@ int wintabsftp_on_char(wintabitem *tabitem, const char *data, int len)
             handled_data[j++] = 13;
             handled_data[j++] = 10;
 
+            term_data(tabitem->term, 0, handled_data, j);
+            memset(handled_data, 0, j);
+            j = 0;
+            
             tabitem->sftpcommand[tabitem->sftpcomlen++] = 0;
             wintabsftp_handle_cmd(tabitem);
+
+            term_data(tabitem->term, 0, "sftp> ", 6);
 
             tabitem->sftpcomlen = 0;
             memset(tabitem->sftpcommand, 0, sizeof(tabitem->sftpcommand));
@@ -2439,7 +2447,8 @@ int wintabsftp_on_char(wintabitem *tabitem, const char *data, int len)
             tabitem->sftpcommand[tabitem->sftpcomlen++] = data[i];
         }
     }
-    term_data(tabitem->term, 0, handled_data, j);
+    if (j > 0)
+        term_data(tabitem->term, 0, handled_data, j);
 
     //for (i = 0; i < len; i++)
     //    debug(("[%d]", *(data+i)));
