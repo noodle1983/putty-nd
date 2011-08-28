@@ -601,8 +601,8 @@ void dlg_pwdcheckbox_handler(union control *ctrl, void *dlg,
 {
     dlg_stdcheckbox_handler(ctrl, dlg, data, event);
     if (ctrl->checkbox.relctrl){
-        dlg_editbox_set_hide(ctrl->checkbox.relctrl, dlg, 
-            dlg_checkbox_get(ctrl, dlg));
+        //dlg_editbox_set_hide(ctrl->checkbox.relctrl, dlg, 
+        //    dlg_checkbox_get(ctrl, dlg));
         dlg_set_focus(ctrl->checkbox.relctrl, dlg);
     }
 }
