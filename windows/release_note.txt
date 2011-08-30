@@ -1,3 +1,14 @@
+My announcement
+============
+I have reviewed the putty6.1's code and merge to the master branch.
+It has been changed a lot on the config structure, on which I did lots of extentions.
+So it is not easy to merge.
+Since there are not too many new features(putty-nd's code bases on the commit early this year) and big bugs fixing, I'd like not to merge it to the putty-nd's code at the moment.
+
+I am changing my job. It would take some time to make everything fine.
+So the new feature, such as sftp and zmodem, will not be coming soon.
+And I just release the last change in the queue, as putty6.0_nd1.9.
+
 My comments
 ============
 Any comment is appreciated.
@@ -5,6 +16,12 @@ email: noodle1983@126.com
 
 RELEASE NOTE
 ============
+--------------------------------
+putty6.0_nd1.9
+--------------------------------
+1. Other changes
+    1. when duplicating a tab, the new tab will be placed next to the current tab.
+
 --------------------------------
 putty6.0_nd1.8
 --------------------------------
