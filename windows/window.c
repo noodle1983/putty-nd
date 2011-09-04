@@ -2904,6 +2904,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
         case WM_SYSKEYDOWN:
         case WM_KEYUP:
         case WM_SYSKEYUP:
+            if (wintabitem_swallow_shortcut_key(tabitem, message, wParam, lParam))
+                break;
 	        if (on_key(tabitem, hwnd, message,wParam, lParam))
                 break;
         	return 0;

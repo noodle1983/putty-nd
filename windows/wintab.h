@@ -247,6 +247,7 @@ int wintabitem_on_scroll(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
 int wintabitem_on_paint(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
+int wintabitem_swallow_shortcut_key(wintabitem* tabitem, UINT message, WPARAM wParam, LPARAM lParam);
 //-----------------------------------------------------------------------
 //page related
 //-----------------------------------------------------------------------

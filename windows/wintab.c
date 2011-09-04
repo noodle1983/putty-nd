@@ -408,7 +408,7 @@ int wintab_del_tab(wintab *wintab, const int index)
 int wintab_swith_tab(wintab *wintab)
 {
     int index = wintab->next;
-    if (index == -1)
+    if (index < 0 || index >= wintab->end || index == wintab->cur)
         return -1;
 
     ShowWindow(wintab->items[wintab->cur]->page.hwndCtrl, SW_HIDE);
@@ -1382,6 +1382,7 @@ int wintabitem_creat(wintab *wintab, Config *cfg, int afterIndex)
         return -1;
     }
 
+    wintab->end++;
     if (afterIndex < 0 || afterIndex >= index-1){
         wintab->items[index] = tabitem;
     }else{
@@ -1395,7 +1396,6 @@ int wintabitem_creat(wintab *wintab, Config *cfg, int afterIndex)
     
     wintab->next = index;
     wintab_swith_tab(wintab);
-    wintab->end++;
     InvalidateRect(wintab->hwndTab, NULL, TRUE);
     return 0;
 }
@@ -2103,6 +2103,50 @@ int wintabitem_on_paint(wintabitem* tabitem, HWND hwnd, UINT message,
 }
 
 //-----------------------------------------------------------------------
+int wintabitem_swallow_shortcut_key(wintabitem* tabitem, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    if (message != WM_KEYDOWN && message != WM_SYSKEYDOWN)
+        return 0;
+        
+    BYTE keystate[256];
+    if (GetKeyboardState(keystate) == 0)
+        return 0;
+
+    int ctrl_pressed = (keystate[VK_CONTROL] & 0x80);
+    int shift_pressed = (keystate[VK_SHIFT] & 0x80);
+    int alt_pressed = (keystate[VK_MENU] & 0x80);
+    int next_tab = -1;
+    wintab* tab = (wintab*)tabitem->parentTab;
+
+    if (alt_pressed && !ctrl_pressed && !shift_pressed){
+        if (wParam == '0'){
+            next_tab = 9;
+        }else if (wParam >= '1' && wParam <= '9'){
+            next_tab = wParam - '1';
+        }else if (wParam == VK_OEM_3 || wParam == VK_RIGHT){
+            // '`'
+            next_tab = (tab->cur + 1) % tab->end;
+        }else if (wParam == VK_LEFT){
+            next_tab = (tab->cur + tab->end - 1) % tab->end;
+        }
+
+        if (next_tab >= 0 && next_tab < tab->end){
+            tab->next = next_tab;
+            wintab_swith_tab(tab);
+            return 1;
+        }
+    }
+
+    if (!alt_pressed && ctrl_pressed && shift_pressed){
+        if (wParam == 'T'){
+            wintab_dup_tab(tab, &tabitem->cfg);
+            return 1;
+        }
+    }
+    return 0;
+
+}
+//-----------------------------------------------------------------------
 //page related
 //-----------------------------------------------------------------------
 int wintabpage_init(wintabpage *page, const Config *cfg, HWND hwndParent)
@@ -2314,6 +2358,8 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
         case WM_SYSKEYDOWN:
         case WM_KEYUP:
         case WM_SYSKEYUP:
+            if (wintabitem_swallow_shortcut_key(tabitem, message, wParam, lParam))
+                break;
 	        if (on_key(tabitem, hwnd, message,wParam, lParam))
                 break;
         default:
