@@ -20,6 +20,7 @@
 #define IDI_SEARCH_PRE   212
 #define IDI_SEARCH_NEXT  213
 #define IDI_SEARCH_RESET 214
+#define IDI_TAB_SHORTCUT 215
 
 #define IDD_MAINBOX      102
 #define IDD_LOGBOX       110

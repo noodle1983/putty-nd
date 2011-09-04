@@ -193,6 +193,8 @@ int wintab_create_toolbar(wintab *wintab)
     ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_FULL_SCREEN )); 
     ImageList_AddIcon(hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_TAB_SHORTCUT)); 
+    ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_ABOUT       )); 
     ImageList_AddIcon(hImageList, hicon);
     
@@ -219,8 +221,9 @@ int wintab_create_toolbar(wintab *wintab)
         { 7, IDM_PASTE, TBSTATE_ENABLED,  buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 8, IDM_CLRSB, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 9, IDM_FULLSCREEN, 0, buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 10, IDM_TAB_SHORTCUT, TBSTATE_CHECKED|TBSTATE_ENABLED, TBSTYLE_CHECK, {0}, 0, (INT_PTR)NULL},
         { 5, 0, TBSTATE_ENABLED, TBSTYLE_SEP, {0}, 0, (INT_PTR)NULL},
-        { 10, IDM_ABOUT, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL}
+        { 11, IDM_ABOUT, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL}
     };
 
     const int numButtons = sizeof(tbButtons)/sizeof(TBBUTTON);
@@ -334,6 +337,9 @@ int wintab_set_tooltips(LPTOOLTIPTEXT lpttt)
             break;
         case IDM_HELP:	    
             wcsncpy((wchar_t *)lpttt->szText, L"help", 80); 
+            break;
+        case IDM_TAB_SHORTCUT:	    
+            wcsncpy((wchar_t *)lpttt->szText, L"tab shortcuts enabler.\nAlt+Num: switch to tab\nCtrl+Shift+t: dup the tab", 80);    
             break;
         case IDM_ABOUT:	    
             wcsncpy((wchar_t *)lpttt->szText, L"about", 80);    
@@ -2107,6 +2113,12 @@ int wintabitem_swallow_shortcut_key(wintabitem* tabitem, UINT message, WPARAM wP
 {
     if (message != WM_KEYDOWN && message != WM_SYSKEYDOWN)
         return 0;
+
+    wintab* tab = (wintab*)tabitem->parentTab;
+    int btn_state = SendMessage(tab->hToolBar, 
+            TB_GETSTATE , (WPARAM)IDM_TAB_SHORTCUT, (LPARAM)0);
+    if (btn_state == -1 || !(btn_state & TBSTATE_CHECKED))
+        return 0;
         
     BYTE keystate[256];
     if (GetKeyboardState(keystate) == 0)
@@ -2116,7 +2128,6 @@ int wintabitem_swallow_shortcut_key(wintabitem* tabitem, UINT message, WPARAM wP
     int shift_pressed = (keystate[VK_SHIFT] & 0x80);
     int alt_pressed = (keystate[VK_MENU] & 0x80);
     int next_tab = -1;
-    wintab* tab = (wintab*)tabitem->parentTab;
 
     if (alt_pressed && !ctrl_pressed && !shift_pressed){
         if (wParam == '0'){

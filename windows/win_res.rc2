@@ -25,6 +25,7 @@ IDI_ABOUT        ICON "about.ico"
 IDI_SEARCH_PRE   ICON "up.ico"
 IDI_SEARCH_NEXT  ICON "down.ico"
 IDI_SEARCH_RESET ICON "reset.ico"
+IDI_TAB_SHORTCUT ICON "shortcut.ico"
 
 IDI_MAINICON ICON "putty.ico"
 
