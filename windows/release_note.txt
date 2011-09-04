@@ -17,6 +17,12 @@ email: noodle1983@126.com
 RELEASE NOTE
 ============
 --------------------------------
+putty6.0_nd1.10
+--------------------------------
+1. Other changes
+    1. keyboard shortcuts for tabs: Alt+Num: switch to tab; Alt+`/Right: iterate the tab forward; Alt+Left; iterate the tab backword; Ctrl+Shift+t: duplicate the tab.
+
+--------------------------------
 putty6.0_nd1.9
 --------------------------------
 1. Other changes
