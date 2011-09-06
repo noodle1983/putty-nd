@@ -402,6 +402,7 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_i(sesskey, "NoRemoteResize", cfg->no_remote_resize);
     write_setting_i(sesskey, "NoAltScreen", cfg->no_alt_screen);
     write_setting_i(sesskey, "NoRemoteWinTitle", cfg->no_remote_wintitle);
+    write_setting_i(sesskey, "NoRemoteTabName", cfg->no_remote_tabname);
     write_setting_i(sesskey, "RemoteQTitleAction", cfg->remote_qtitle_action);
     write_setting_i(sesskey, "NoDBackspace", cfg->no_dbackspace);
     write_setting_i(sesskey, "NoRemoteCharset", cfg->no_remote_charset);
@@ -729,6 +730,7 @@ void load_open_settings(void *sesskey, Config *cfg)
     gppi(sesskey, "NoRemoteResize", 0, &cfg->no_remote_resize);
     gppi(sesskey, "NoAltScreen", 0, &cfg->no_alt_screen);
     gppi(sesskey, "NoRemoteWinTitle", 0, &cfg->no_remote_wintitle);
+    gppi(sesskey, "NoRemoteTabName", 1, &cfg->no_remote_tabname);
     {
 	/* Backward compatibility */
 	int no_remote_qtitle;

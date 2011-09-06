@@ -524,6 +524,7 @@ struct config_tag {
     int no_remote_resize;	       /* disable remote resizing */
     int no_alt_screen;		       /* disable alternate screen */
     int no_remote_wintitle;	       /* disable remote retitling */
+    int no_remote_tabname; 
     int no_dbackspace;		       /* disable destructive backspace */
     int no_remote_charset;	       /* disable remote charset config */
     int remote_qtitle_action;	       /* remote win title query action */

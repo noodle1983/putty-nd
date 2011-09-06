@@ -1587,6 +1587,10 @@ void setup_config_box(struct controlbox *b, int midsession,
 		  HELPCTX(features_retitle),
 		  dlg_stdcheckbox_handler,
 		  I(offsetof(Config,no_remote_wintitle)));
+	ctrl_checkbox(s, "Disable remote-controlled tab title changing", NULL,
+		  HELPCTX(features_retitle),
+		  dlg_stdcheckbox_handler,
+		  I(offsetof(Config,no_remote_tabname)));	  
     ctrl_radiobuttons(s, "Response to remote title query (SECURITY):", 'q', 3,
 		      HELPCTX(features_qtitle),
 		      dlg_stdradiobutton_handler,
@@ -1696,10 +1700,12 @@ void setup_config_box(struct controlbox *b, int midsession,
 
     s = ctrl_getset(b, "Window/Behaviour", "title",
 		    "Adjust the behaviour of the window title");
+    /*
     ctrl_editbox(s, "Window title:", 't', 100,
 		 HELPCTX(appearance_title),
 		 dlg_stdeditbox_handler, I(offsetof(Config,wintitle)),
 		 I(sizeof(((Config *)0)->wintitle)));
+	*/
     ctrl_checkbox(s, "Separate window and icon titles", 'i',
 		  HELPCTX(appearance_title),
 		  dlg_stdcheckbox_handler,

@@ -704,9 +704,7 @@ void wintab_calc_item_size(wintab *wintab, HDC hdc)
         rc.left = left;
         rc.right = average_size * (index + 1);
 
-        char *disname = strrchr(tabitem->cfg.session_name, '#');
-        disname = (disname == NULL)? tabitem->cfg.session_name : (disname + 1);
-        snprintf(tabitem->disName, 256,  "%d. %s", index+1, disname);
+        snprintf(tabitem->disName, 256,  "%d. %s", index+1, tabitem->disRawName);
         wintabitem_adjust_text_rect(tabitem, hdc, &rc);
         left = tabitem->rcDis.right;
     }
@@ -1302,6 +1300,9 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->logpal = NULL;
     set_title(tabitem, cfg->session_name);
     set_icon(tabitem, cfg->session_name);
+    char *disrawname = strrchr(tabitem->cfg.session_name, '#');
+    disrawname = (disrawname == NULL)? cfg->session_name : (disrawname + 1);
+    strncpy(tabitem->disRawName, disrawname, 256);
     tabitem->close_mutex= CreateMutex(NULL, FALSE, NULL);
     
     tabitem->parentTab = wintab;

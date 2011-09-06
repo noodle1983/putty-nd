@@ -1881,6 +1881,11 @@ int on_reconfig(wintabitem* tabitem, UINT message,
 		ShowWindow(hwnd, SW_RESTORE);
 	    }
 	}
+	if (!prev_cfg.no_remote_tabname && cfg.no_remote_tabname){
+        char *disrawname = strrchr(tabitem->cfg.session_name, '#');
+        disrawname = (disrawname == NULL)? tabitem->cfg.session_name : (disrawname + 1);
+        strncpy(tabitem->disRawName, disrawname, 256);
+	}
 
 	/* Pass new config data to the logging module */
 	log_reconfig(tabitem->logctx, &cfg);
@@ -4362,12 +4367,19 @@ void set_title(void *frontend, char *title)
 {
     assert (frontend != NULL);
     if (!title || !*title) return;
+    int titlelen = strlen(title);
+    if (titlelen <= 0 || titlelen >= 256) return;
     wintabitem *tabitem = (wintabitem*) frontend;
     sfree(tabitem->window_name);
     tabitem->window_name = snewn(1 + strlen(title), char);
     strcpy(tabitem->window_name, title);
     if (tabitem->cfg.win_name_always || !IsIconic(hwnd))
 	SetWindowText(hwnd, title);
+	if (!tabitem->cfg.no_remote_tabname){
+    	strncpy(tabitem->disRawName, title, 256);
+    	InvalidateRect(hwnd, NULL, TRUE);
+	}
+	
 }
 
 void set_icon(void *frontend, char *title)

@@ -139,6 +139,7 @@ typedef struct {
     HRGN hRgn, hCloserRgn;
 
     RECT rcDis;
+    char disRawName[256];
     char disName[256];
     char *window_name, *icon_name;
 
