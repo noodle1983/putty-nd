@@ -1300,7 +1300,7 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->logpal = NULL;
     set_title(tabitem, cfg->session_name);
     set_icon(tabitem, cfg->session_name);
-    char *disrawname = strrchr(tabitem->cfg.session_name, '#');
+    char *disrawname = strrchr(cfg->session_name, '#');
     disrawname = (disrawname == NULL)? cfg->session_name : (disrawname + 1);
     strncpy(tabitem->disRawName, disrawname, 256);
     tabitem->close_mutex= CreateMutex(NULL, FALSE, NULL);
