@@ -60,6 +60,9 @@ static void make_full_screen(wintabitem* tabitem);
 static void clear_full_screen(wintabitem* tabitem);
 static void flip_full_screen(void);
 int process_clipdata(HGLOBAL clipdata, int unicode);
+extern int is_session_log_enabled(void *handle);
+extern void log_restart(void *handle, Config *cfg);
+extern void log_stop(void *handle, Config *cfg);
 
 static int was_zoomed = 0;
   
@@ -545,6 +548,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 	for (j = 0; j < lenof(popup_menus); j++) {
 	    m = popup_menus[j].menu;
 
+        AppendMenu(m, MF_SEPARATOR, 0, 0);
+        AppendMenu(m, MF_ENABLED | MF_UNCHECKED, IDM_START_STOP_LOG, "&Start Logging");
 	    AppendMenu(m, MF_SEPARATOR, 0, 0);
 	    AppendMenu(m, MF_ENABLED, IDM_SHOWLOG, "&Event Log");
 	    AppendMenu(m, MF_SEPARATOR, 0, 0);
@@ -1998,6 +2003,24 @@ int on_reconfig(wintabitem* tabitem, UINT message,
     return 0;
 }
 
+void process_log_status(wintabitem* tabitem)
+{
+	wintab *tab = (wintab *)tabitem->parentTab;
+    if (!is_session_log_enabled(tabitem->logctx))
+    {
+        CheckMenuItem(popup_menus[CTXMENU].menu, IDM_START_STOP_LOG, MF_UNCHECKED);
+		CheckMenuItem(popup_menus[SYSMENU].menu, IDM_START_STOP_LOG, MF_UNCHECKED);
+        SendMessage(tab->hToolBar, TB_SETSTATE,
+        			(WPARAM)IDM_START_STOP_LOG, (LPARAM)TBSTATE_ENABLED);
+    }
+    else
+    {
+        CheckMenuItem(popup_menus[CTXMENU].menu, IDM_START_STOP_LOG, MF_CHECKED);
+		CheckMenuItem(popup_menus[SYSMENU].menu, IDM_START_STOP_LOG, MF_CHECKED);
+        SendMessage(tab->hToolBar, TB_SETSTATE,
+        			(WPARAM)IDM_START_STOP_LOG, (LPARAM)TBSTATE_CHECKED | TBSTATE_ENABLED);
+    }
+}
 
 int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
@@ -2005,6 +2028,30 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
     switch (wParam & ~0xF) {       /* low 4 bits reserved to Windows */
         case IDM_SHOWLOG:
             showeventlog(tabitem, hwnd);
+            break;
+        case IDM_START_STOP_LOG:
+        {
+            wintab *tab = (wintab *)tabitem->parentTab;
+            if (!is_session_log_enabled(tabitem->logctx))
+            {
+                CheckMenuItem(popup_menus[CTXMENU].menu, IDM_START_STOP_LOG, MF_CHECKED);
+    			CheckMenuItem(popup_menus[SYSMENU].menu, IDM_START_STOP_LOG, MF_CHECKED);
+                SendMessage(tab->hToolBar, TB_SETSTATE,
+        			(WPARAM)IDM_START_STOP_LOG, (LPARAM)TBSTATE_CHECKED | TBSTATE_ENABLED);
+                log_restart(tabitem->logctx, &tabitem->cfg);
+            }
+            else
+            {
+                CheckMenuItem(popup_menus[CTXMENU].menu, IDM_START_STOP_LOG, MF_UNCHECKED);
+    			CheckMenuItem(popup_menus[SYSMENU].menu, IDM_START_STOP_LOG, MF_UNCHECKED);
+
+                SendMessage(tab->hToolBar, TB_SETSTATE,
+        			(WPARAM)IDM_START_STOP_LOG, (LPARAM)TBSTATE_ENABLED);
+
+    			/* Pass new config data to the logging module */
+    		    log_stop(tabitem->logctx, &tabitem->cfg);
+            }
+        }
             break;
         case IDM_NEWSESS:
         case IDM_DUPSESS:

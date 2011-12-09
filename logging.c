@@ -366,6 +366,30 @@ void log_reconfig(void *handle, Config *cfg)
 	logfopen(ctx);
 }
 
+void log_stop(void *handle, Config *cfg)
+{
+    struct LogContext *ctx = (struct LogContext *)handle;
+
+	ctx->cfg.logtype = LGTYP_NONE;
+	logfclose(ctx);
+}
+
+int is_session_log_enabled(void *handle)
+{
+	struct LogContext *ctx = (struct LogContext *)handle;
+	return ctx->cfg.logtype;
+}
+
+void log_restart(void *handle, Config *cfg)
+{
+    struct LogContext *ctx = (struct LogContext *)handle;
+
+	logfclose(ctx);
+    ctx->cfg = *cfg;		       /* STRUCTURE COPY */
+	ctx->cfg.logtype = LGTYP_ASCII;
+	logfopen(ctx);
+}
+
 /*
  * translate format codes into time/date strings
  * and insert them into log file name

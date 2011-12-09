@@ -37,6 +37,7 @@ extern int on_key(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
 extern int on_button(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
+extern void process_log_status(wintabitem* tabitem);
 
 const char* const WINTAB_PAGE_CLASS = "WintabPage";
 int wintabpage_registed = 0;
@@ -118,6 +119,7 @@ int wintab_fini(wintab *wintab)
 
 int wintab_create_tab(wintab *wintab, Config *cfg)
 { 
+	process_log_status(wintab->items[wintab->cur]);
     return wintabitem_creat(wintab, cfg, -1); 
 }
 
@@ -125,6 +127,7 @@ int wintab_create_tab(wintab *wintab, Config *cfg)
 
 int wintab_dup_tab(wintab *wintab, Config *cfg)
 { 
+	process_log_status(wintab->items[wintab->cur]);
     return wintabitem_creat(wintab, cfg, wintab->cur); 
 }
 
@@ -191,6 +194,8 @@ int wintab_create_toolbar(wintab *wintab)
     ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_CLEAR_SB    )); 
     ImageList_AddIcon(hImageList, hicon);
+    hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_START_LOG   )); 
+    ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_FULL_SCREEN )); 
     ImageList_AddIcon(hImageList, hicon);
     hicon = LoadIcon(hinst, MAKEINTRESOURCE(IDI_TAB_SHORTCUT)); 
@@ -220,10 +225,11 @@ int wintab_create_toolbar(wintab *wintab)
         { 6, IDM_COPYALL, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 7, IDM_PASTE, TBSTATE_ENABLED,  buttonStyles, {0}, 0, (INT_PTR)NULL},
         { 8, IDM_CLRSB, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL},
-        { 9, IDM_FULLSCREEN, 0, buttonStyles, {0}, 0, (INT_PTR)NULL},
-        { 10, IDM_TAB_SHORTCUT, TBSTATE_CHECKED|TBSTATE_ENABLED, TBSTYLE_CHECK, {0}, 0, (INT_PTR)NULL},
+        { 9, IDM_START_STOP_LOG, TBSTATE_ENABLED, TBSTYLE_CHECK, {0}, 0, (INT_PTR)NULL},
+        { 10, IDM_FULLSCREEN, 0, buttonStyles, {0}, 0, (INT_PTR)NULL},
+        { 11, IDM_TAB_SHORTCUT, TBSTATE_CHECKED|TBSTATE_ENABLED, TBSTYLE_CHECK, {0}, 0, (INT_PTR)NULL},
         { 5, 0, TBSTATE_ENABLED, TBSTYLE_SEP, {0}, 0, (INT_PTR)NULL},
-        { 11, IDM_ABOUT, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL}
+        { 12, IDM_ABOUT, TBSTATE_ENABLED, buttonStyles, {0}, 0, (INT_PTR)NULL}
     };
 
     const int numButtons = sizeof(tbButtons)/sizeof(TBBUTTON);
@@ -341,6 +347,9 @@ int wintab_set_tooltips(LPTOOLTIPTEXT lpttt)
         case IDM_TAB_SHORTCUT:	    
             wcsncpy((wchar_t *)lpttt->szText, L"tab shortcuts enabler.\nAlt+Num: switch to tab\nCtrl+Shift+t: dup the tab", 80);    
             break;
+        case IDM_START_STOP_LOG:
+            wcsncpy((wchar_t *)lpttt->szText, L"start or stop logging", 80);
+            break;
         case IDM_ABOUT:	    
             wcsncpy((wchar_t *)lpttt->szText, L"about", 80);    
             break;
@@ -436,6 +445,7 @@ int wintab_swith_tab(wintab *wintab)
         term_size(tabitem->term, win_height/tabitem->font_height, win_width/tabitem->font_width,
                 	  tabitem->cfg.savelines);
     }
+	process_log_status(wintab->items[wintab->cur]);
     return 0;
 }
 //-----------------------------------------------------------------------
@@ -2343,6 +2353,7 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
         case WM_LBUTTONUP:
         case WM_MBUTTONUP:
         case WM_RBUTTONUP:
+            process_log_status(tabitem);
 	        on_button(tabitem, hwnd, message, wParam, lParam);
             return 0;
         case WM_MOUSEMOVE:
