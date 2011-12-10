@@ -1417,7 +1417,7 @@ void setup_config_box(struct controlbox *b, int midsession,
 		 HELPCTX(logging_filename),
 		 dlg_stdfilesel_handler, I(offsetof(Config, logfilename)));
     ctrl_text(s, "(Log file name can contain &Y, &M, &D for date,"
-	      " &T for time, and &H for host name)",
+	      " &T for time, &S for session name, and &H for host name)",
 	      HELPCTX(logging_filename));
     ctrl_radiobuttons(s, "What to do if the log file already exists:", 'e', 1,
 		      HELPCTX(logging_exists),

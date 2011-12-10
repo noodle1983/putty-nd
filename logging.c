@@ -21,7 +21,7 @@ struct LogContext {
     Config cfg;
 };
 
-static void xlatlognam(Filename *d, Filename s, char *hostname, struct tm *tm);
+static void xlatlognam(Filename *d, Filename s, Config* cfg, struct tm *tm);
 
 /*
  * Internal wrapper function which must be called for _all_ output
@@ -154,7 +154,7 @@ void logfopen(void *handle)
     tm = ltime();
 
     /* substitute special codes in file name */
-    xlatlognam(&ctx->currlogfilename, ctx->cfg.logfilename,ctx->cfg.host, &tm);
+    xlatlognam(&ctx->currlogfilename, ctx->cfg.logfilename,&ctx->cfg, &tm);
 
     ctx->lgfp = f_open(ctx->currlogfilename, "r", FALSE);  /* file already present? */
     if (ctx->lgfp) {
@@ -397,7 +397,7 @@ void log_restart(void *handle, Config *cfg)
  * "&Y":YYYY   "&m":MM   "&d":DD   "&T":hhmmss   "&h":<hostname>   "&&":&
  */
 static void xlatlognam(Filename *dest, Filename src,
-		       char *hostname, struct tm *tm) {
+		       Config* cfg, struct tm *tm) {
     char buf[10], *bufp;
     int size;
     char buffer[FILENAME_MAX];
@@ -429,7 +429,11 @@ static void xlatlognam(Filename *dest, Filename src,
 		size = strftime(buf, sizeof(buf), "%H%M%S", tm);
 		break;
 	      case 'h':
-		bufp = hostname;
+		bufp = cfg->host;
+		size = strlen(bufp);
+		break;
+		  case 's':
+		bufp = cfg->session_name;
 		size = strlen(bufp);
 		break;
 	      default:
