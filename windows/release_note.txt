@@ -5,9 +5,6 @@ It has been changed a lot on the config structure, on which I did lots of extent
 So it is not easy to merge.
 Since there are not too many new features(putty-nd's code bases on the commit early this year) and big bugs fixing, I'd like not to merge it to the putty-nd's code at the moment.
 
-I am changing my job. It would take some time to make everything fine.
-So the new feature, such as sftp and zmodem, will not be coming soon.
-And I just release the last change in the queue, as putty6.0_nd1.9.
 
 My comments
 ============
@@ -16,6 +13,20 @@ email: noodle1983@126.com
 
 RELEASE NOTE
 ============
+--------------------------------
+putty6.0_nd1.11
+--------------------------------
+1. Other changes
+    1. make it possible to change the tab title dynamically. How to do:
+       a. un-tick setting Terminal->Featrues->Disable remote-controlled tab title...
+       b. run cmd:PROMPT_COMMAND='echo -ne "\033]0;the_tab_title\007"'. The tab title can contain the system env, for example:
+           PROMPT_COMMAND='echo -ne "\033]0;${USER}@${HOST}: ${PWD}\007"'
+    2. a very good idea from Lokesh: One click logging feature to capture terminal prints. This modified code will have an option for capturing the onscreen prints to a log file. Even though this is already a feature of Putty in "logging" section but there is no straight forward mechanism to Start & Stop whenever required. So two options have been provided:
+       a. A menu entry "Start Logging" when we right click anywhere inside terminal (for this to work "Selection" behaviour has to be "windows").
+       b. A toolbar button ">" for Start & Stop Logging.
+    3. more options for log file's name(&S for session name, and &P for the desktop path).
+
+
 --------------------------------
 putty6.0_nd1.10
 --------------------------------
