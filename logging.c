@@ -436,6 +436,10 @@ static void xlatlognam(Filename *dest, Filename src,
 		bufp = cfg->session_name;
 		size = strlen(bufp);
 		break;
+		  case 'p':
+		bufp = cfg->default_log_path;
+		size = strlen(bufp);
+		break;
 	      default:
 		buf[0] = '&';
 		size = 1;

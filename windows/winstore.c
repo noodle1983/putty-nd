@@ -166,6 +166,31 @@ char *read_setting_s(void *handle, const char *key, char *buffer, int buflen)
 	return buffer;
 }
 
+int open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen)
+{
+    HKEY hkey;
+    char *p;
+
+    if (RegOpenKey(HKEY_CURRENT_USER, key, &hkey) != ERROR_SUCCESS) {
+		return -1;
+    } 
+
+	DWORD type, size;
+    size = buflen;
+
+    if (RegQueryValueEx(hkey, subkey, 0,
+				&type, buffer, &size) != ERROR_SUCCESS ||
+		type != REG_SZ) {
+		RegCloseKey(hkey);
+		*buffer = 0;
+		return -1;
+    }
+	
+	RegCloseKey(hkey);
+
+    return 0;
+}
+
 int read_setting_i(void *handle, const char *key, int defvalue)
 {
     DWORD type, val, size;

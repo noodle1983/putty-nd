@@ -24,7 +24,7 @@ Filename platform_default_filename(const char *name)
 {
     Filename ret;
     if (!strcmp(name, "LogFileName"))
-	strcpy(ret.path, "putty-&S-&Y&M&D-&T.log");
+	strcpy(ret.path, "&P\\putty-&S-&Y&M&D-&T.log");
     else
 	*ret.path = '\0';
     return ret;

@@ -551,6 +551,12 @@ void load_settings(const char *section, Config * cfg)
     sesskey = open_settings_r(section);
     load_open_settings(sesskey, cfg);
     close_settings_r(sesskey);
+
+	open_read_settings_s(
+		"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders", 
+		"Desktop",
+		cfg->default_log_path, 
+		sizeof(cfg->default_log_path));
 	
     if (!section || !*section)
 		strncpy(cfg->session_name, DEFAULT_SESSION_NAME, sizeof cfg->session_name);

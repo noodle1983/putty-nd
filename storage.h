@@ -54,6 +54,7 @@ void close_settings_w(void *handle);
  */
 void *open_settings_r(const char *sessionname);
 char *read_setting_s(void *handle, const char *key, char *buffer, int buflen);
+int open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen);
 int read_setting_i(void *handle, const char *key, int defvalue);
 int read_setting_filename(void *handle, const char *key, Filename *value);
 int read_setting_fontspec(void *handle, const char *key, FontSpec *font);
