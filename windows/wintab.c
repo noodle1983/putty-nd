@@ -1777,7 +1777,7 @@ int wintabitem_start_backend(wintabitem *tabitem)
      * Set up a line discipline.
      */
     tabitem->ldisc = ldisc_create(&tabitem->cfg, tabitem->term
-                    , tabitem->back, tabitem->backhandle, NULL);
+                    , tabitem->back, tabitem->backhandle, tabitem);
 
     tabitem->must_close_session = FALSE;
     tabitem->session_closed = FALSE;
