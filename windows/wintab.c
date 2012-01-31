@@ -445,9 +445,66 @@ int wintab_swith_tab(wintab *wintab)
         term_size(tabitem->term, win_height/tabitem->font_height, win_width/tabitem->font_width,
                 	  tabitem->cfg.savelines);
     }
+	InvalidateRect(wintab->hwndTab, NULL, TRUE);
 	process_log_status(wintab->items[wintab->cur]);
     return 0;
 }
+
+//-----------------------------------------------------------------------
+
+int wintab_move_tab(wintab *wintab, const int back)
+{
+	int i = 0;
+	if (wintab->end == 1)
+		return 0;	
+
+	if (back)
+	{
+		if (wintab->cur != wintab->end - 1)
+		{
+			wintab->next = wintab->cur + 1;
+			wintabitem* tmpItem = wintab->items[wintab->cur];
+			wintab->items[wintab->cur] = wintab->items[wintab->next];
+			wintab->items[wintab->next] = tmpItem;
+			return wintab_swith_tab(wintab);
+		}else
+		{
+			wintab->next = 0;
+			wintabitem* tmpItem = wintab->items[wintab->cur];
+			for(i = wintab->cur -1; i >= 0; i--)
+			{
+				wintab->items[i+1] = wintab->items[i];
+			}
+			wintab->items[wintab->next] = tmpItem;
+			return wintab_swith_tab(wintab);
+		}
+	}
+	else
+	{
+		if (wintab->cur != 0)
+		{
+			wintab->next = wintab->cur - 1;
+			wintabitem* tmpItem = wintab->items[wintab->cur];
+			wintab->items[wintab->cur] = wintab->items[wintab->next];
+			wintab->items[wintab->next] = tmpItem;
+			return wintab_swith_tab(wintab);
+		}else
+		{
+			wintab->next = wintab->end -1;
+			wintabitem* tmpItem = wintab->items[wintab->cur];
+			for(i = 0; i < wintab->next; i++)
+			{
+				wintab->items[i] = wintab->items[i+1];
+			}
+			wintab->items[wintab->next] = tmpItem;
+			return wintab_swith_tab(wintab);
+		}
+	}
+
+	return 0;
+	
+}
+
 //-----------------------------------------------------------------------
 
 int wintab_resize(wintab *wintab, const RECT *rc)
@@ -2159,9 +2216,32 @@ int wintabitem_swallow_shortcut_key(wintabitem* tabitem, UINT message, WPARAM wP
         }
     }
 
+	if (!alt_pressed && ctrl_pressed && !shift_pressed){
+		if (wParam == VK_TAB){
+			tab->next = (tab->cur + 1) % tab->end;
+			wintab_swith_tab(tab);
+            return 1;
+		}
+		else if (wParam == VK_OEM_3){
+			tab->next = (tab->cur + tab->end - 1) % tab->end;
+			wintab_swith_tab(tab);
+            return 1;
+		}
+		else if (wParam == VK_RIGHT){
+            wintab_move_tab(tab, 1);
+			return 1;
+        }else if (wParam == VK_LEFT){
+            wintab_move_tab(tab, 0);
+			return 1;
+        }
+	}
     if (!alt_pressed && ctrl_pressed && shift_pressed){
         if (wParam == 'T'){
             wintab_dup_tab(tab, &tabitem->cfg);
+            return 1;
+        }
+		if (wParam == 'N'){
+            on_session_menu(hwnd, 0,IDM_NEWSESS, 0);
             return 1;
         }
     }

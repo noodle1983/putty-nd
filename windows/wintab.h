@@ -198,6 +198,7 @@ int wintab_create_sysbtn(wintab *wintab);
 int wintab_create_toolbar(wintab *wintab);
 int wintab_create_searchbar(wintab *wintab);
 int wintab_swith_tab(wintab *wintab);
+int wintab_move_tab(wintab *wintab, const int back);
 int wintab_resize(wintab *wintab, const RECT *rc);
 void wintab_onsize(wintab *wintab, HWND hwndParent, LPARAM lParam);
 int  wintab_is_logboxmsg(wintab *wintab, MSG *msg);
