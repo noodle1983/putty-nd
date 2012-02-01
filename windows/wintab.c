@@ -2223,8 +2223,7 @@ int wintabitem_swallow_shortcut_key(wintabitem* tabitem, UINT message, WPARAM wP
             return 1;
 		}
 		else if (wParam == VK_OEM_3){
-			tab->next = (tab->cur + tab->end - 1) % tab->end;
-			wintab_swith_tab(tab);
+			wintab_move_tab(tab, 1);;
             return 1;
 		}
 		else if (wParam == VK_RIGHT){
@@ -2234,6 +2233,17 @@ int wintabitem_swallow_shortcut_key(wintabitem* tabitem, UINT message, WPARAM wP
             wintab_move_tab(tab, 0);
 			return 1;
         }
+	}
+	if (!alt_pressed && ctrl_pressed && shift_pressed){
+		if (wParam == VK_TAB){
+			tab->next = (tab->cur + tab->end - 1) % tab->end;
+			wintab_swith_tab(tab);
+            return 1;
+		}
+		else if (wParam == VK_OEM_3){
+			wintab_move_tab(tab, 0);
+            return 1;
+		}
 	}
     if (!alt_pressed && ctrl_pressed && shift_pressed){
         if (wParam == 'T'){
