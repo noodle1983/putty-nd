@@ -324,10 +324,10 @@ int wintab_set_tooltips(LPTOOLTIPTEXT lpttt)
             wcsncpy((wchar_t *)lpttt->szText, L"show logs", 80);    
             break;
         case IDM_NEWSESS:	
-            wcsncpy((wchar_t *)lpttt->szText, L"new a session", 80);    
+            wcsncpy((wchar_t *)lpttt->szText, L"Ctrl+Shift+n: new a session", 80);    
             break;
         case IDM_DUPSESS:	
-            wcsncpy((wchar_t *)lpttt->szText, L"duplicate current session", 80);    
+            wcsncpy((wchar_t *)lpttt->szText, L"Ctrl+Shift+t: duplicate current session.", 80);    
             break;
         case IDM_RESTART:	
             wcsncpy((wchar_t *)lpttt->szText, L"restart current session", 80);  
@@ -345,7 +345,10 @@ int wintab_set_tooltips(LPTOOLTIPTEXT lpttt)
             wcsncpy((wchar_t *)lpttt->szText, L"help", 80); 
             break;
         case IDM_TAB_SHORTCUT:	    
-            wcsncpy((wchar_t *)lpttt->szText, L"tab shortcuts enabler.\nAlt+Num: switch to tab\nCtrl+Shift+t: dup the tab", 80);    
+            wcsncpy((wchar_t *)lpttt->szText, 
+				L"shortcuts enabler.\n"
+				L"Alt+Num/Ctrl[+Shift]+Tab:switch tab\n"
+				L"Ctrl[+Shift]+`:move tab\n", 80);	   
             break;
         case IDM_START_STOP_LOG:
             wcsncpy((wchar_t *)lpttt->szText, L"start or stop logging", 80);
