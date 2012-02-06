@@ -9,10 +9,21 @@ Since there are not too many new features(putty-nd's code bases on the commit ea
 My comments
 ============
 Any comment is appreciated.
-email: noodle1983@126.com 
+Email: noodle1983@126.com 
+PalPay: noodle1983@126.com
 
 RELEASE NOTE
 ============
+--------------------------------
+putty6.0_nd1.12
+--------------------------------
+1. Bugs
+    1. crash bug: ldisc's frontend should be set as tabitem. it happens when connecting to a raw telnet server.
+    2. one Makefile issue while cross-compiling putty-nd on linux for Windows in Recipe file.
+
+2. Other changes
+    1. keyboard shortcuts: Ctrl+[Shift]+Tab to shift tab; Ctrl+[Shift]+` to move tab; Ctrl+Shift+n to new a session.
+
 --------------------------------
 putty6.0_nd1.11
 --------------------------------
