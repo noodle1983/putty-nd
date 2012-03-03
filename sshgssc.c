@@ -172,7 +172,7 @@ static Ssh_gss_stat ssh_gssapi_get_mic(struct ssh_gss_library *lib,
     struct gssapi_functions *gss = &lib->u.gssapi;
     gssapi_ssh_gss_ctx *gssctx = (gssapi_ssh_gss_ctx *) ctx;
     if (gssctx == NULL) return SSH_GSS_FAILURE;
-    return gss->get_mic(&(gssctx->min_stat), gssctx->ctx, 0, buf, hash);
+    return (Ssh_gss_stat)gss->get_mic(&(gssctx->min_stat), gssctx->ctx, 0, buf, hash);
 }
 
 static Ssh_gss_stat ssh_gssapi_free_mic(struct ssh_gss_library *lib,

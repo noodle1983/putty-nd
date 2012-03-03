@@ -308,7 +308,7 @@ static struct sftp_request *sftp_alloc_request(void)
     high = tsize;
     while (high - low > 1) {
 	mid = (high + low) / 2;
-	r = index234(sftp_requests, mid);
+	r = (sftp_request*)index234(sftp_requests, mid);
 	if (r->id == mid + REQUEST_ID_OFFSET)
 	    low = mid;		       /* this one is fine */
 	else
@@ -362,7 +362,7 @@ struct sftp_request *sftp_find_request(struct sftp_packet *pktin)
 	fxp_internal_error("did not receive a valid SFTP packet\n");
 	return NULL;
     }
-    req = find234(sftp_requests, &id, sftp_reqfind);
+    req = (sftp_request*)find234(sftp_requests, &id, sftp_reqfind);
 
     if (!req || !req->registered) {
 	fxp_internal_error("request ID mismatch\n");

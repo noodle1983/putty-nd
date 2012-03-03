@@ -31,9 +31,55 @@ extern void sshfwd_unthrottle(struct ssh_channel *c, int bufsize);
 #define APIEXTRA 0
 #endif
 
-#ifndef BIGNUM_INTERNAL
-typedef void *Bignum;
+#if defined __GNUC__ && defined __i386__
+typedef unsigned long BignumInt;
+typedef unsigned long long BignumDblInt;
+#define BIGNUM_INT_MASK  0xFFFFFFFFUL
+#define BIGNUM_TOP_BIT   0x80000000UL
+#define BIGNUM_INT_BITS  32
+#define MUL_WORD(w1, w2) ((BignumDblInt)w1 * w2)
+#define DIVMOD_WORD(q, r, hi, lo, w) \
+    __asm__("div %2" : \
+	    "=d" (r), "=a" (q) : \
+	    "r" (w), "d" (hi), "a" (lo))
+#elif defined _MSC_VER && defined _M_IX86
+typedef unsigned __int32 BignumInt;
+typedef unsigned __int64 BignumDblInt;
+#define BIGNUM_INT_MASK  0xFFFFFFFFUL
+#define BIGNUM_TOP_BIT   0x80000000UL
+#define BIGNUM_INT_BITS  32
+#define MUL_WORD(w1, w2) ((BignumDblInt)w1 * w2)
+/* Note: MASM interprets array subscripts in the macro arguments as
+ * assembler syntax, which gives the wrong answer. Don't supply them.
+ * <http://msdn2.microsoft.com/en-us/library/bf1dw62z.aspx> */
+#define DIVMOD_WORD(q, r, hi, lo, w) do { \
+    __asm mov edx, hi \
+    __asm mov eax, lo \
+    __asm div w \
+    __asm mov r, edx \
+    __asm mov q, eax \
+} while(0)
+#else
+typedef unsigned short BignumInt;
+typedef unsigned long BignumDblInt;
+#define BIGNUM_INT_MASK  0xFFFFU
+#define BIGNUM_TOP_BIT   0x8000U
+#define BIGNUM_INT_BITS  16
+#define MUL_WORD(w1, w2) ((BignumDblInt)w1 * w2)
+#define DIVMOD_WORD(q, r, hi, lo, w) do { \
+    BignumDblInt n = (((BignumDblInt)hi) << BIGNUM_INT_BITS) | lo; \
+    q = n / w; \
+    r = n % w; \
+} while (0)
 #endif
+
+#define BIGNUM_INT_BYTES (BIGNUM_INT_BITS / 8)
+
+#define BIGNUM_INTERNAL
+typedef BignumInt *Bignum;
+//#ifndef BIGNUM_INTERNAL
+//typedef void *Bignum;
+//#endif
 
 struct RSAKey {
     int bits;
@@ -132,7 +178,7 @@ typedef struct {
     uint32 lenhi, lenlo;
 } SHA_State;
 void SHA_Init(SHA_State * s);
-void SHA_Bytes(SHA_State * s, void *p, int len);
+void SHA_Bytes(SHA_State * s, const void *p, int len);
 void SHA_Final(SHA_State * s, unsigned char *output);
 void SHA_Simple(void *p, int len, unsigned char *output);
 
@@ -215,9 +261,10 @@ struct ssh_hash {
     char *text_name;
 };   
 
+enum ssh_key_type{ KEXTYPE_DH, KEXTYPE_RSA };
 struct ssh_kex {
     char *name, *groupname;
-    enum { KEXTYPE_DH, KEXTYPE_RSA } main_type;
+    enum ssh_key_type main_type;
     /* For DH */
     const unsigned char *pdata, *gdata; /* NULL means group exchange */
     int plen, glen;

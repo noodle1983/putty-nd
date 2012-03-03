@@ -1029,10 +1029,10 @@ static termline *lineptr(Terminal *term, int y, int lineno, int screen)
 	}
     }
     if (whichtree == term->scrollback) {
-	unsigned char *cline = index234(whichtree, treeindex);
+	unsigned char *cline = (unsigned char*)index234(whichtree, treeindex);
 	line = decompressline(cline, NULL);
     } else {
-	line = index234(whichtree, treeindex);
+	line = (termline*)index234(whichtree, treeindex);
     }
 
     /* We assume that we don't screw up and retrieve something out of range. */
@@ -1413,7 +1413,7 @@ void term_clrsb(Terminal *term)
 {
     unsigned char *line;
     term->disptop = 0;
-    while ((line = delpos234(term->scrollback, 0)) != NULL) {
+    while ((line = (unsigned char*)delpos234(term->scrollback, 0)) != NULL) {
 	sfree(line);            /* this is compressed data, not a termline */
     }
     term->tempsblines = 0;
@@ -1510,13 +1510,13 @@ void term_free(Terminal *term)
     struct beeptime *beep;
     int i;
 
-    while ((line = delpos234(term->scrollback, 0)) != NULL)
+    while ((line = (termline *)delpos234(term->scrollback, 0)) != NULL)
 	sfree(line);		       /* compressed data, not a termline */
     freetree234(term->scrollback);
-    while ((line = delpos234(term->screen, 0)) != NULL)
+    while ((line = (termline *)delpos234(term->screen, 0)) != NULL)
 	freeline(line);
     freetree234(term->screen);
-    while ((line = delpos234(term->alt_screen, 0)) != NULL)
+    while ((line = (termline *)delpos234(term->alt_screen, 0)) != NULL)
 	freeline(line);
     freetree234(term->alt_screen);
     if (term->disptext) {
@@ -1611,7 +1611,7 @@ void term_size(Terminal *term, int newrows, int newcols, int newsavelines)
 	    unsigned char *cline;
 	    /* Insert a line from the scrollback at the top of the screen. */
 	    assert(sblen >= term->tempsblines);
-	    cline = delpos234(term->scrollback, --sblen);
+	    cline = (unsigned char*)delpos234(term->scrollback, --sblen);
 	    line = decompressline(cline, NULL);
 	    sfree(cline);
 	    line->temporary = FALSE;   /* reconstituted line is now real */
@@ -1635,7 +1635,7 @@ void term_size(Terminal *term, int newrows, int newcols, int newsavelines)
 	    sfree(delpos234(term->screen, term->rows - 1));
 	} else {
 	    /* push top row to scrollback */
-	    line = delpos234(term->screen, 0);
+	    line = (termline*)delpos234(term->screen, 0);
 	    addpos234(term->scrollback, compressline(line), sblen++);
 	    freeline(line);
 	    term->tempsblines += 1;
@@ -1651,7 +1651,7 @@ void term_size(Terminal *term, int newrows, int newcols, int newsavelines)
 
     /* Delete any excess lines from the scrollback. */
     while (sblen > newsavelines) {
-	line = delpos234(term->scrollback, 0);
+	line = (termline*)delpos234(term->scrollback, 0);
 	sfree(line);
 	sblen--;
     }
@@ -1683,7 +1683,7 @@ void term_size(Terminal *term, int newrows, int newcols, int newsavelines)
 	addpos234(newalt, line, i);
     }
     if (term->alt_screen) {
-	while (NULL != (line = delpos234(term->alt_screen, 0)))
+	while (NULL != (line = (termline*)delpos234(term->alt_screen, 0)))
 	    freeline(line);
 	freetree234(term->alt_screen);
     }
@@ -1759,7 +1759,7 @@ static int find_last_nonempty_line(Terminal * term, tree234 * screen)
 {
     int i;
     for (i = count234(screen) - 1; i >= 0; i--) {
-	termline *line = index234(screen, i);
+	termline *line = (termline*)index234(screen, i);
 	int j;
 	for (j = 0; j < line->cols; j++)
 	    if (!termchars_equal(&line->chars[j], &term->erase_char))
@@ -1903,7 +1903,7 @@ static void scroll(Terminal *term, int topline, int botline, int lines, int sb)
     shift = lines;
     if (lines < 0) {
 	while (lines < 0) {
-	    line = delpos234(term->screen, botline);
+	    line = (termline*)delpos234(term->screen, botline);
             resizeline(term, line, term->cols);
 	    for (i = 0; i < term->cols; i++)
 		copy_termchar(line, i, &term->erase_char);
@@ -1929,7 +1929,7 @@ static void scroll(Terminal *term, int topline, int botline, int lines, int sb)
 	}
     } else {
 	while (lines > 0) {
-	    line = delpos234(term->screen, topline);
+	    line = (termline*)delpos234(term->screen, topline);
 #ifdef TERM_CC_DIAGS
 	    cc_check(line);
 #endif
@@ -1944,7 +1944,7 @@ static void scroll(Terminal *term, int topline, int botline, int lines, int sb)
 		    unsigned char *cline;
 
 		    sblen--;
-		    cline = delpos234(term->scrollback, 0);
+		    cline = (unsigned char*)delpos234(term->scrollback, 0);
 		    sfree(cline);
 		} else
 		    term->tempsblines += 1;
@@ -5388,7 +5388,7 @@ void term_free_hits(Terminal *term)
     hit_pos *pos = term->hits_head;
     while (pos){
         hit_pos *to_free = pos;
-        pos = pos->next;
+        pos = (hit_pos *)pos->next;
         sfree(to_free);
     }
     term->hits_head = NULL;
@@ -5557,10 +5557,10 @@ void term_find(Terminal *term, const wchar_t* const str, int direct)
         term_find_all(term);
     }
 
-    hit_pos *hit = (direct && term->last_hit) ? term->last_hit->rnext
+    hit_pos *hit = (hit_pos*)( (direct && term->last_hit) ? term->last_hit->rnext
                     : (!direct && term->last_hit) ? term->last_hit->next
                     : direct ? term->hits_tail
-                    :          term->hits_head;
+                    :          term->hits_head);
     if (hit == NULL)
         return;
     term->last_hit = hit;
@@ -6117,7 +6117,7 @@ int format_arrow_key(char *buf, Terminal *term, int xkey, int ctrl)
     return p - buf;
 }
 
-void term_key(Terminal *term, Key_Sym keysym, wchar_t *text, size_t tlen,
+void term_key(Terminal *term, int keysym, wchar_t *text, size_t tlen,
 	      unsigned int modifiers, unsigned int flags)
 {
     char output[10];
@@ -6689,7 +6689,7 @@ void term_set_focus(Terminal *term, int has_focus)
  */
 char *term_get_ttymode(Terminal *term, const char *mode)
 {
-    char *val = NULL;
+    const char *val = NULL;
     if (strcmp(mode, "ERASE") == 0) {
 	val = term->cfg.bksp_is_delete ? "^?" : "^H";
     }

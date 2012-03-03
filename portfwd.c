@@ -67,7 +67,7 @@ static int pfd_closing(Plug plug, const char *error_msg, int error_code,
      * and treat it like a proper close.
      */
     if (pr->c)
-	sshfwd_close(pr->c);
+	sshfwd_close((struct ssh_channel*)pr->c);
     pfd_close(pr->s);
     return 1;
 }
@@ -305,7 +305,7 @@ static int pfd_receive(Plug plug, int urgent, char *data, int len)
 	}
     }
     if (pr->ready) {
-	if (sshfwd_write(pr->c, data, len) > 0) {
+	if (sshfwd_write((struct ssh_channel*)pr->c, data, len) > 0) {
 	    pr->throttled = 1;
 	    sk_set_frozen(pr->s, 1);
 	}
@@ -318,7 +318,7 @@ static void pfd_sent(Plug plug, int bufsize)
     struct PFwdPrivate *pr = (struct PFwdPrivate *) plug;
 
     if (pr->c)
-	sshfwd_unthrottle(pr->c, bufsize);
+	sshfwd_unthrottle((struct ssh_channel*)pr->c, bufsize);
 }
 
 /*
@@ -549,7 +549,7 @@ void pfd_confirm(Socket s)
     sk_set_frozen(s, 0);
     sk_write(s, NULL, 0);
     if (pr->buffer) {
-	sshfwd_write(pr->c, pr->buffer, pr->buflen);
+	sshfwd_write((struct ssh_channel*)pr->c, (char*)pr->buffer, pr->buflen);
 	sfree(pr->buffer);
 	pr->buffer = NULL;
     }

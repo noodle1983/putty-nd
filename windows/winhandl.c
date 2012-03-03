@@ -316,7 +316,7 @@ static void handle_try_output(struct handle_output *ctx)
 
     if (!ctx->busy && bufchain_size(&ctx->queued_data)) {
 	bufchain_prefix(&ctx->queued_data, &senddata, &sendlen);
-	ctx->buffer = senddata;
+	ctx->buffer = (char*)senddata;
 	ctx->len = sendlen;
 	SetEvent(ctx->ev_from_main);
 	ctx->busy = TRUE;
@@ -442,7 +442,7 @@ HANDLE *handle_get_events(int *nevents)
     ret = NULL;
     n = size = 0;
     if (handles_by_evtomain) {
-	for (i = 0; (h = index234(handles_by_evtomain, i)) != NULL; i++) {
+	for (i = 0; (h = (handle*)index234(handles_by_evtomain, i)) != NULL; i++) {
 	    if (h->u.g.busy) {
 		if (n >= size) {
 		    size += 32;
@@ -506,7 +506,7 @@ void handle_got_event(HANDLE event)
     struct handle *h;
 
     assert(handles_by_evtomain);
-    h = find234(handles_by_evtomain, &event, handle_find_evtomain);
+    h = (handle*)find234(handles_by_evtomain, &event, handle_find_evtomain);
     if (!h) {
 	/*
 	 * This isn't an error condition. If two or more event

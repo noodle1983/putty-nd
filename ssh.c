@@ -1,7 +1,7 @@
 /*
  * SSH backend.
  */
-
+#undef _NO_OLDNAMES
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -203,10 +203,11 @@ static const char *const ssh2_disconnect_reasons[] = {
  * This list is derived from RFC 4254 and
  * SSH-1 RFC-1.2.31.
  */
+typedef enum { TTY_OP_CHAR, TTY_OP_BOOL } TtyType;
 static const struct {
     const char* const mode;
     int opcode;
-    enum { TTY_OP_CHAR, TTY_OP_BOOL } type;
+    TtyType type;
 } ssh_ttymodes[] = {
     /* "V" prefix discarded for special characters relative to SSH specs */
     { "INTR",	      1, TTY_OP_CHAR },
@@ -433,7 +434,7 @@ enum {
 #define crState(t) \
     struct t *s; \
     if (!ssh->t) ssh->t = snew(struct t); \
-    s = ssh->t;
+    s = (struct t *)ssh->t;
 #define crFinish(z)	} *crLine = 0; return (z); }
 #define crFinishV	} *crLine = 0; return; }
 #define crReturn(z)	\
@@ -549,7 +550,27 @@ const static struct ssh_compress ssh_comp_none = {
     ssh_comp_none_init, ssh_comp_none_cleanup, ssh_comp_none_block,
     ssh_comp_none_disable, NULL
 };
-extern const struct ssh_compress ssh_zlib;
+//extern const struct ssh_compress ssh_zlib;
+void *zlib_compress_init(void);
+void zlib_compress_cleanup(void *handle);
+int zlib_compress_block(void *handle, unsigned char *block, int len,
+			unsigned char **outblock, int *outlen);
+void *zlib_decompress_init(void);
+void zlib_decompress_cleanup(void *handle);
+int zlib_decompress_block(void *handle, unsigned char *block, int len,
+			  unsigned char **outblock, int *outlen);
+int zlib_disable_compression(void *handle);
+const struct ssh_compress ssh_zlib = {
+    "zlib",
+    zlib_compress_init,
+    zlib_compress_cleanup,
+    zlib_compress_block,
+    zlib_decompress_init,
+    zlib_decompress_cleanup,
+    zlib_decompress_block,
+    zlib_disable_compression,
+    "zlib (RFC1950)"
+};
 const static struct ssh_compress *compressions[] = {
     &ssh_zlib, &ssh_comp_none
 };
@@ -573,6 +594,7 @@ struct winadj {
 /*
  * 2-3-4 tree storing channels.
  */
+typedef enum { THROTTLED, UNTHROTTLING, UNTHROTTLED } ThrottleState;
 struct ssh_channel {
     Ssh ssh;			       /* pointer back to main context */
     unsigned remoteid, localid;
@@ -623,7 +645,7 @@ struct ssh_channel {
 	     * been acked.
 	     */
 	    struct winadj *winadj_head, *winadj_tail;
-	    enum { THROTTLED, UNTHROTTLING, UNTHROTTLED } throttle_state;
+	    ThrottleState throttle_state;
 	} v2;
     } v;
     union {
@@ -686,8 +708,9 @@ struct ssh_rportfwd {
  * so that we can reconfigure in mid-session if the user requests
  * it.
  */
+typedef enum { DESTROY, KEEP, CREATE } PortfwdStatus;
 struct ssh_portfwd {
-    enum { DESTROY, KEEP, CREATE } status;
+    PortfwdStatus status;
     int type;
     unsigned sport, dport;
     char *saddr, *daddr;
@@ -768,6 +791,13 @@ struct queued_handler {
     struct queued_handler *next;
 };
 
+typedef enum {
+	SSH_STATE_PREPACKET,
+	SSH_STATE_BEFORE_SIZE,
+	SSH_STATE_INTERMED,
+	SSH_STATE_SESSION,
+	SSH_STATE_CLOSED
+    } SshState;
 struct ssh_tag {
     const struct plug_function_table *fn;
     /* the above field _must_ be first in the structure */
@@ -821,13 +851,7 @@ struct ssh_tag {
 
     tree234 *rportfwds, *portfwds;
 
-    enum {
-	SSH_STATE_PREPACKET,
-	SSH_STATE_BEFORE_SIZE,
-	SSH_STATE_INTERMED,
-	SSH_STATE_SESSION,
-	SSH_STATE_CLOSED
-    } state;
+    SshState state;
 
     int size_needed, eof_needed;
 
@@ -1125,11 +1149,11 @@ static int alloc_channel_id(Ssh ssh)
      */
     tsize = count234(ssh->channels);
 
-    low = -1;
+    low = (unsigned)-1;
     high = tsize;
     while (high - low > 1) {
 	mid = (high + low) / 2;
-	c = index234(ssh->channels, mid);
+	c = (struct ssh_channel*)index234(ssh->channels, mid);
 	if (c->localid == mid + CHANNEL_NUMBER_OFFSET)
 	    low = mid;		       /* this one is fine */
 	else
@@ -1160,7 +1184,7 @@ static void c_write(Ssh ssh, const char *buf, int len)
 	c_write_stderr(1, buf, len);
     else{
 	from_backend(ssh->frontend, 1, buf, len);
-    exec_autocmd(ssh, &ssh->cfg, buf, len, ssh_backend.send);
+    exec_autocmd(ssh, &ssh->cfg, (char*)buf, len, ssh_backend.send);
     }
 }
 
@@ -1170,7 +1194,7 @@ static void c_write_untrusted(Ssh ssh, const char *buf, int len)
 	c_write_stderr(0, buf, len);
     else{
 	from_backend_untrusted(ssh->frontend, buf, len);
-    exec_autocmd(ssh, &ssh->cfg, buf, len, ssh_backend.send);
+    exec_autocmd(ssh, &ssh->cfg, (char*)buf, len, ssh_backend.send);
     }
 }
 
@@ -2023,7 +2047,10 @@ static void ssh2_pkt_send_noqueue(Ssh ssh, struct Packet *pkt)
     if (!ssh->kex_in_progress &&
 	ssh->max_data_size != 0 &&
 	ssh->outgoing_data_size > ssh->max_data_size)
-	do_ssh2_transport(ssh, "too much data sent", -1, NULL);
+    {
+    	char tmpdata[] = "too much data sent";
+    	do_ssh2_transport(ssh, tmpdata, -1, NULL);
+    }
 
     ssh_free_packet(pkt);
 }
@@ -2124,7 +2151,10 @@ static void ssh_pkt_defersend(Ssh ssh)
     if (!ssh->kex_in_progress &&
 	ssh->max_data_size != 0 &&
 	ssh->outgoing_data_size > ssh->max_data_size)
-	do_ssh2_transport(ssh, "too much data sent", -1, NULL);
+    {
+    	char tmpdata[] = "too much data sent";
+    	do_ssh2_transport(ssh, tmpdata, -1, NULL);
+    }
     ssh->deferred_data_size = 0;
 }
 
@@ -2762,7 +2792,7 @@ static void ssh_process_queued_incoming_data(Ssh ssh)
 
     while (!ssh->frozen && bufchain_size(&ssh->queued_incoming_data)) {
 	bufchain_prefix(&ssh->queued_incoming_data, &vdata, &len);
-	data = vdata;
+	data = (unsigned char*)vdata;
 	origlen = len;
 
 	while (!ssh->frozen && len > 0)
@@ -2860,7 +2890,7 @@ static int ssh_do_close(Ssh ssh, int notify_exit)
      * through this connection.
      */
     if (ssh->channels) {
-	while (NULL != (c = index234(ssh->channels, 0))) {
+	while (NULL != (c = (struct ssh_channel*)index234(ssh->channels, 0))) {
 	    switch (c->type) {
 	      case CHAN_X11:
 		x11_close(c->u.x11.s);
@@ -2882,7 +2912,7 @@ static int ssh_do_close(Ssh ssh, int notify_exit)
      */
     if (ssh->portfwds) {
 	struct ssh_portfwd *pf;
-	while (NULL != (pf = index234(ssh->portfwds, 0))) {
+	while (NULL != (pf = (struct ssh_portfwd *)index234(ssh->portfwds, 0))) {
 	    /* Dispose of any listening socket. */
 	    if (pf->local)
 		pfd_terminate(pf->local);
@@ -3084,7 +3114,7 @@ static void ssh_throttle_all(Ssh ssh, int enable, int bufsize)
     ssh->overall_bufsize = bufsize;
     if (!ssh->channels)
 	return;
-    for (i = 0; NULL != (c = index234(ssh->channels, i)); i++) {
+    for (i = 0; NULL != (c = (struct ssh_channel*)index234(ssh->channels, i)); i++) {
 	switch (c->type) {
 	  case CHAN_MAINSESSION:
 	    /*
@@ -3137,17 +3167,18 @@ static void ssh_dialog_callback(void *sshv, int ret)
 
 static void ssh_agentf_callback(void *cv, void *reply, int replylen)
 {
+	char tmpdata[] = "\0\0\0\1\5";
     struct ssh_channel *c = (struct ssh_channel *)cv;
     Ssh ssh = c->ssh;
     void *sentreply = reply;
 
     if (!sentreply) {
 	/* Fake SSH_AGENT_FAILURE. */
-	sentreply = "\0\0\0\1\5";
+	sentreply = tmpdata;
 	replylen = 5;
     }
     if (ssh->version == 2) {
-	ssh2_add_channel_data(c, sentreply, replylen);
+	ssh2_add_channel_data(c, (char*)sentreply, replylen);
 	ssh2_try_send(c);
     } else {
 	send_packet(ssh, SSH1_MSG_CHANNEL_DATA,
@@ -3201,6 +3232,9 @@ static void ssh_disconnect(Ssh ssh, char *client_reason, char *wire_reason,
 static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
 			 struct Packet *pktin)
 {
+	int cipher_chosen = 0, warn = 0;
+	char *cipher_string = NULL;
+	char *passphrase = NULL;    /* only written after crReturn */
     int i, j, ret;
     unsigned char cookie[8], *ptr;
     struct RSAKey servkey, hostkey;
@@ -3245,7 +3279,7 @@ static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
 
     logevent("Received public keys");
 
-    ptr = ssh_pkt_getdata(pktin, 8);
+    ptr = (unsigned char*)ssh_pkt_getdata(pktin, 8);
     if (!ptr) {
 	bombout(("SSH-1 public key packet stopped before random cookie"));
 	crStop(0);
@@ -3365,8 +3399,8 @@ static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
     logevent("Encrypted session key");
 
     {
-	int cipher_chosen = 0, warn = 0;
-	char *cipher_string = NULL;
+	cipher_chosen = 0, warn = 0;
+	cipher_string = NULL;
 	int i;
 	for (i = 0; !cipher_chosen && i < CIPHER_MAX; i++) {
 	    int next_cipher = ssh->cfg.ssh_cipherlist[i];
@@ -3707,7 +3741,7 @@ static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
 			    retlen = ssh->agent_response_len;
 			} else
 			    sfree(agentreq);
-			ret = vret;
+			ret = (char*)vret;
 			if (ret) {
 			    if (ret[4] == SSH1_AGENT_RSA_RESPONSE) {
 				logevent("Sending Pageant's response");
@@ -3768,7 +3802,7 @@ static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
 		/*
 		 * Get a passphrase, if necessary.
 		 */
-		char *passphrase = NULL;    /* only written after crReturn */
+		passphrase = NULL;    /* only written after crReturn */
 		const char *error;
 		if (!s->publickey_encrypted) {
 		    if (flags & FLAG_VERBOSE)
@@ -4360,7 +4394,7 @@ static void ssh_rportfwd_succfail(Ssh ssh, struct Packet *pktin, void *ctx)
 	logeventf(ssh, "Remote port forwarding from %s refused",
 		  pf->sportdesc);
 
-	rpf = del234(ssh->rportfwds, pf);
+	rpf = (struct ssh_rportfwd*)del234(ssh->rportfwds, pf);
 	assert(rpf == pf);
 	pf->pfrec->remote = NULL;
 	free_rportfwd(pf);
@@ -4385,7 +4419,7 @@ static void ssh_setup_portfwd(Ssh ssh, const Config *cfg)
 	 */
 	struct ssh_portfwd *epf;
 	int i;
-	for (i = 0; (epf = index234(ssh->portfwds, i)) != NULL; i++)
+	for (i = 0; (epf = (struct ssh_portfwd *)index234(ssh->portfwds, i)) != NULL; i++)
 	    epf->status = DESTROY;
     }
 
@@ -4492,7 +4526,7 @@ static void ssh_setup_portfwd(Ssh ssh, const Config *cfg)
 				    address_family == '6' ? ADDRTYPE_IPV6 :
 				    ADDRTYPE_UNSPEC);
 
-	    epfrec = add234(ssh->portfwds, pfrec);
+	    epfrec = (struct ssh_portfwd *)add234(ssh->portfwds, pfrec);
 	    if (epfrec != pfrec) {
 		if (epfrec->status == DESTROY) {
 		    /*
@@ -4518,7 +4552,7 @@ static void ssh_setup_portfwd(Ssh ssh, const Config *cfg)
      * Now go through and destroy any port forwardings which were
      * not re-enabled.
      */
-    for (i = 0; (epf = index234(ssh->portfwds, i)) != NULL; i++)
+    for (i = 0; (epf = (struct ssh_portfwd *)index234(ssh->portfwds, i)) != NULL; i++)
 	if (epf->status == DESTROY) {
 	    char *message;
 
@@ -4590,7 +4624,7 @@ static void ssh_setup_portfwd(Ssh ssh, const Config *cfg)
     /*
      * And finally, set up any new port forwardings (status==CREATE).
      */
-    for (i = 0; (epf = index234(ssh->portfwds, i)) != NULL; i++)
+    for (i = 0; (epf = (struct ssh_portfwd*)index234(ssh->portfwds, i)) != NULL; i++)
 	if (epf->status == CREATE) {
 	    char *sportdesc, *dportdesc;
 	    sportdesc = dupprintf("%s%s%s%s%d%s",
@@ -4813,7 +4847,7 @@ static void ssh1_msg_port_open(Ssh ssh, struct Packet *pktin)
     memcpy(pf.dhost, host, hostsize);
     pf.dhost[hostsize] = '\0';
     pf.dport = port;
-    pfp = find234(ssh->rportfwds, &pf, NULL);
+    pfp = (struct ssh_rportfwd*)find234(ssh->rportfwds, &pf, NULL);
 
     if (pfp == NULL) {
 	logeventf(ssh, "Rejected remote port open request for %s:%d",
@@ -4853,7 +4887,7 @@ static void ssh1_msg_channel_open_confirmation(Ssh ssh, struct Packet *pktin)
     unsigned int localid = ssh_pkt_getuint32(pktin);
     struct ssh_channel *c;
 
-    c = find234(ssh->channels, &remoteid, ssh_channelfind);
+    c = (struct ssh_channel *)find234(ssh->channels, &remoteid, ssh_channelfind);
     if (c && c->type == CHAN_SOCKDATA_DORMANT) {
 	c->remoteid = localid;
 	c->halfopen = FALSE;
@@ -4879,7 +4913,7 @@ static void ssh1_msg_channel_open_failure(Ssh ssh, struct Packet *pktin)
     unsigned int remoteid = ssh_pkt_getuint32(pktin);
     struct ssh_channel *c;
 
-    c = find234(ssh->channels, &remoteid, ssh_channelfind);
+    c = (struct ssh_channel *)find234(ssh->channels, &remoteid, ssh_channelfind);
     if (c && c->type == CHAN_SOCKDATA_DORMANT) {
 	logevent("Forwarded connection refused by server");
 	pfd_close(c->u.pfd.s);
@@ -4893,7 +4927,7 @@ static void ssh1_msg_channel_close(Ssh ssh, struct Packet *pktin)
     /* Remote side closes a channel. */
     unsigned i = ssh_pkt_getuint32(pktin);
     struct ssh_channel *c;
-    c = find234(ssh->channels, &i, ssh_channelfind);
+    c = (struct ssh_channel *)find234(ssh->channels, &i, ssh_channelfind);
     if (c && !c->halfopen) {
 	int closetype;
 	closetype =
@@ -4941,7 +4975,7 @@ static void ssh1_msg_channel_data(Ssh ssh, struct Packet *pktin)
 
     ssh_pkt_getstring(pktin, &p, &len);
 
-    c = find234(ssh->channels, &i, ssh_channelfind);
+    c = (struct ssh_channel *)find234(ssh->channels, &i, ssh_channelfind);
     if (c) {
 	int bufsize = 0;
 	switch (c->type) {
@@ -6388,7 +6422,7 @@ static int ssh2_try_send(struct ssh_channel *c)
 	ssh2_pkt_adduint32(pktout, c->remoteid);
 	ssh2_pkt_addstring_start(pktout);
 	dont_log_data(ssh, pktout, PKTLOG_OMIT);
-	ssh2_pkt_addstring_data(pktout, data, len);
+	ssh2_pkt_addstring_data(pktout, (char*)data, len);
 	end_log_omission(ssh, pktout);
 	ssh2_pkt_send(ssh, pktout);
 	bufchain_consume(&c->v.v2.outbuffer, len);
@@ -6553,7 +6587,7 @@ static struct ssh_channel *ssh2_channel_msg(Ssh ssh, struct Packet *pktin)
     unsigned localid = ssh_pkt_getuint32(pktin);
     struct ssh_channel *c;
 
-    c = find234(ssh->channels, &localid, ssh_channelfind);
+    c = (struct ssh_channel *)find234(ssh->channels, &localid, ssh_channelfind);
     if (!c ||
 	(c->halfopen && pktin->type != SSH2_MSG_CHANNEL_OPEN_CONFIRMATION &&
 	 pktin->type != SSH2_MSG_CHANNEL_OPEN_FAILURE)) {
@@ -7072,6 +7106,7 @@ static void ssh2_msg_global_request(Ssh ssh, struct Packet *pktin)
     int typelen, want_reply;
     struct Packet *pktout;
 
+
     ssh_pkt_getstring(pktin, &type, &typelen);
     want_reply = ssh2_pkt_getbool(pktin);
 
@@ -7141,7 +7176,7 @@ static void ssh2_msg_channel_open(Ssh ssh, struct Packet *pktin)
 	pf.sport = ssh_pkt_getuint32(pktin);
 	ssh_pkt_getstring(pktin, &peeraddr, &peeraddrlen);
 	peerport = ssh_pkt_getuint32(pktin);
-	realpf = find234(ssh->rportfwds, &pf, NULL);
+	realpf = (struct ssh_rportfwd*)find234(ssh->rportfwds, &pf, NULL);
 	logeventf(ssh, "Received remote port %d open request "
 		  "from %s:%d", pf.sport, peeraddr, peerport);
 	if (realpf == NULL) {
@@ -7239,11 +7274,8 @@ static void ssh2_send_ttymode(void *data, char *mode, char *val)
 /*
  * Handle the SSH-2 userauth and connection layers.
  */
-static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
-			     struct Packet *pktin)
-{
-    struct do_ssh2_authconn_state {
-	enum {
+
+typedef enum {
 	    AUTH_TYPE_NONE,
 		AUTH_TYPE_PUBLICKEY,
 		AUTH_TYPE_PUBLICKEY_OFFER_LOUD,
@@ -7252,7 +7284,15 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 	        AUTH_TYPE_GSSAPI,
 		AUTH_TYPE_KEYBOARD_INTERACTIVE,
 		AUTH_TYPE_KEYBOARD_INTERACTIVE_QUIET
-	} type;
+	} AuthType;
+static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
+			     struct Packet *pktin)
+{
+    char *methods = NULL;
+    int methlen = 0;
+	int got_new = FALSE; /* not live over crReturn */
+    struct do_ssh2_authconn_state {
+	AuthType type;
 	int done_service_req;
 	int gotit, need_pw, can_pubkey, can_passwd, can_keyb_inter;
 	int tried_pubkey_config, done_agent;
@@ -7475,6 +7515,7 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
      */
     s->username[0] = '\0';
     s->got_username = FALSE;
+
     while (!s->we_are_in) {
 	/*
 	 * Get a username.
@@ -7553,9 +7594,8 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 	}
 
 	while (1) {
-	    char *methods = NULL;
-	    int methlen = 0;
-
+		methods = NULL;
+	    methlen = 0;
 	    /*
 	     * Wait for the result of the last authentication request.
 	     */
@@ -7789,7 +7829,7 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 			vret = ssh->agent_response;
 			s->retlen = ssh->agent_response_len;
 		    }
-		    s->ret = vret;
+		    s->ret = (char*)vret;
 		    sfree(s->agentreq);
 		    if (s->ret) {
 			if (s->ret[4] == SSH2_AGENT_SIGN_RESPONSE) {
@@ -8120,7 +8160,7 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 
 			if (s->gsslib->display_status(s->gsslib, s->gss_ctx,
 						      &s->gss_buf) == SSH_GSS_OK) {
-			    logevent(s->gss_buf.value);
+			    logevent((char*)s->gss_buf.value);
 			    sfree(s->gss_buf.value);
 			}
 
@@ -8134,7 +8174,7 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 		    if (s->gss_sndtok.length != 0) {
 			s->pktout = ssh2_pkt_init(SSH2_MSG_USERAUTH_GSSAPI_TOKEN);
 			ssh_pkt_addstring_start(s->pktout);
-			ssh_pkt_addstring_data(s->pktout,s->gss_sndtok.value,s->gss_sndtok.length);
+			ssh_pkt_addstring_data(s->pktout,(char*)s->gss_sndtok.value,s->gss_sndtok.length);
 			ssh2_pkt_send(ssh, s->pktout);
 			s->gsslib->free_tok(s->gsslib, &s->gss_sndtok);
 		    }
@@ -8176,7 +8216,7 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 		s->gsslib->get_mic(s->gsslib, s->gss_ctx, &s->gss_buf, &mic);
 		s->pktout = ssh2_pkt_init(SSH2_MSG_USERAUTH_GSSAPI_MIC);
 		ssh_pkt_addstring_start(s->pktout);
-		ssh_pkt_addstring_data(s->pktout, mic.value, mic.length);
+		ssh_pkt_addstring_data(s->pktout, (char*)mic.value, mic.length);
 		ssh2_pkt_send(ssh, s->pktout);
 		s->gsslib->free_mic(s->gsslib, &mic);
 
@@ -8420,7 +8460,7 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 		     * Loop until the server accepts it.
 		     */
 
-		    int got_new = FALSE; /* not live over crReturn */
+		    got_new = FALSE; /* not live over crReturn */
 		    char *prompt;   /* not live over crReturn */
 		    int prompt_len; /* not live over crReturn */
 		    
@@ -8986,6 +9026,7 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
     /*
      * Transfer data!
      */
+
     if (ssh->ldisc)
 	ldisc_send(ssh->ldisc, NULL, 0, 0);/* cause ldisc to notice changes */
     if (ssh->mainchan)
@@ -9016,7 +9057,7 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 	    /*
 	     * Try to send data on all channels if we can.
 	     */
-	    for (i = 0; NULL != (c = index234(ssh->channels, i)); i++)
+	    for (i = 0; NULL != (c = (struct ssh_channel*)index234(ssh->channels, i)); i++)
 		ssh2_try_send_and_unthrottle(ssh, c);
 	}
     }
@@ -9150,7 +9191,8 @@ static void ssh2_timer(void *ctx, long now)
 
     if (!ssh->kex_in_progress && ssh->cfg.ssh_rekey_time != 0 &&
 	now - ssh->next_rekey >= 0) {
-	do_ssh2_transport(ssh, "timeout", -1, NULL);
+	char tmpdata[] = "timeout";
+	do_ssh2_transport(ssh, tmpdata, -1, NULL);
     }
 }
 
@@ -9166,7 +9208,10 @@ static void ssh2_protocol(Ssh ssh, void *vin, int inlen,
 	if (!ssh->kex_in_progress &&
 	    ssh->max_data_size != 0 &&
 	    ssh->incoming_data_size > ssh->max_data_size)
-	    do_ssh2_transport(ssh, "too much data received", -1, NULL);
+	{
+	    char tmpdata[] = "too much data received";
+	    do_ssh2_transport(ssh, tmpdata, -1, NULL);
+	}
     }
 
     if (pktin && ssh->packet_dispatch[pktin->type]) {
@@ -9362,7 +9407,7 @@ static void ssh_free(void *handle)
     ssh->qhead = ssh->qtail = NULL;
 
     if (ssh->channels) {
-	while ((c = delpos234(ssh->channels, 0)) != NULL) {
+	while ((c = (struct ssh_channel*)delpos234(ssh->channels, 0)) != NULL) {
 	    switch (c->type) {
 	      case CHAN_X11:
 		if (c->u.x11.s != NULL)
@@ -9381,7 +9426,7 @@ static void ssh_free(void *handle)
     }
 
     if (ssh->rportfwds) {
-	while ((pf = delpos234(ssh->rportfwds, 0)) != NULL)
+	while ((pf = (struct ssh_rportfwd*)delpos234(ssh->rportfwds, 0)) != NULL)
 	    free_rportfwd(pf);
 	freetree234(ssh->rportfwds);
 	ssh->rportfwds = NULL;
@@ -9475,7 +9520,7 @@ static void ssh_reconfig(void *handle, Config *cfg)
 /*
  * Called to send data down the SSH connection.
  */
-static int ssh_send(void *handle, char *buf, int len)
+static int ssh_send(void *handle, const char *buf, int len)
 {
     Ssh ssh = (Ssh) handle;
 
@@ -9679,7 +9724,8 @@ static void ssh_special(void *handle, Telnet_Special code)
 	}
     } else if (code == TS_REKEY) {
 	if (!ssh->kex_in_progress && ssh->version == 2) {
-	    do_ssh2_transport(ssh, "at user request", -1, NULL);
+		char tmpdata[] = "at user request";
+	    do_ssh2_transport(ssh, tmpdata, -1, NULL);
 	}
     } else if (code == TS_BRK) {
 	if (ssh->state == SSH_STATE_CLOSED

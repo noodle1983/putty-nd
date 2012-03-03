@@ -49,11 +49,11 @@ enum {
  * included with DEFINE_INTORPTR_FNS defined. This is a total pain,
  * but such is life.
  */
-typedef union { void *p; int i; } intorptr;
+typedef union { void *p; int i; const void*cp;} intorptr;
 
 #ifndef INLINE
 intorptr I(int i);
-intorptr P(void *p);
+intorptr P(const void *p);
 #endif
 
 #if defined DEFINE_INTORPTR_FNS || defined INLINE
@@ -64,6 +64,7 @@ intorptr P(void *p);
 #endif
 PREFIX intorptr I(int i) { intorptr ret; ret.i = i; return ret; }
 PREFIX intorptr P(void *p) { intorptr ret; ret.p = p; return ret; }
+PREFIX intorptr P(const void *p) { intorptr ret; ret.cp = p; return ret; }
 #undef PREFIX
 #endif
 
@@ -480,7 +481,7 @@ void *ctrl_alloc(struct controlbox *b, size_t size);
 
 /* `ncolumns' is followed by that many percentages, as integers. */
 union control *ctrl_columns(struct controlset *, int ncolumns, ...);
-union control *ctrl_editbox(struct controlset *, char *label, char shortcut,
+union control *ctrl_editbox(struct controlset *, const char *label, char shortcut,
 			    int percentage, intorptr helpctx,
 			    handler_fn handler,
 			    intorptr context, intorptr context2);
@@ -498,7 +499,7 @@ union control *ctrl_radiobuttons(struct controlset *, char *label,
 				 char shortcut, int ncolumns,
 				 intorptr helpctx,
 				 handler_fn handler, intorptr context, ...);
-union control *ctrl_pushbutton(struct controlset *,char *label,char shortcut,
+union control *ctrl_pushbutton(struct controlset *,const char *label,char shortcut,
 			       intorptr helpctx,
 			       handler_fn handler, intorptr context);
 union control *ctrl_listbox(struct controlset *,char *label,char shortcut,

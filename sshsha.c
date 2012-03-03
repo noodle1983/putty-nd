@@ -98,9 +98,9 @@ void SHA_Init(SHA_State * s)
     s->lenhi = s->lenlo = 0;
 }
 
-void SHA_Bytes(SHA_State * s, void *p, int len)
+void SHA_Bytes(SHA_State * s, const void *p, int len)
 {
-    unsigned char *q = (unsigned char *) p;
+    const unsigned char *q = (const unsigned char *) p;
     uint32 wordblock[16];
     uint32 lenw = len;
     int i;
@@ -203,14 +203,14 @@ static void *sha1_init(void)
 
 static void sha1_bytes(void *handle, void *p, int len)
 {
-    SHA_State *s = handle;
+    SHA_State *s = (SHA_State *)handle;
 
     SHA_Bytes(s, p, len);
 }
 
 static void sha1_final(void *handle, unsigned char *output)
 {
-    SHA_State *s = handle;
+    SHA_State *s = (SHA_State *)handle;
 
     SHA_Final(s, output);
     sfree(s);
@@ -364,7 +364,7 @@ void hmac_sha1_simple(void *key, int keylen, void *data, int datalen,
     SHA_State states[2];
     unsigned char intermediate[20];
 
-    sha1_key_internal(states, key, keylen);
+    sha1_key_internal(states, (unsigned char*)key, keylen);
     SHA_Bytes(&states[0], data, datalen);
     SHA_Final(&states[0], intermediate);
 

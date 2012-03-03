@@ -147,7 +147,7 @@ static int CALLBACK LogProc(HWND hwnd, UINT msg,
 			    WPARAM wParam, LPARAM lParam)
 {
     int i;
-    wintabitem* tabitem = win_get_data(hwnd);
+    wintabitem* tabitem = (wintabitem* )win_get_data(hwnd);
     if (tabitem == NULL){
         return DefWindowProc(hwnd, msg, wParam, lParam);
     }
@@ -762,7 +762,7 @@ static LPARAM change_selected_session(HWND hwndSess)
     isdef = !strcmp(pre_session, DEFAULT_SESSION_NAME);
 	if (pre_session[0] != 0 && !isdef)
 	{
-        char *errmsg = save_settings(pre_session, dp.data);
+        char *errmsg = save_settings(pre_session, (Config*)dp.data);
         if (errmsg) {
             dlg_error_msg(&dp, errmsg);
             sfree(errmsg);
@@ -1050,14 +1050,14 @@ static void show_st_popup_menu(HWND  hwndSess)
             to_sess_flag = SESSION_GROUP;
             break;
         case IDM_ST_DUPSESS:
-            save_settings(pre_session, dp.data);
+            save_settings(pre_session, (Config*)dp.data);
             strncpy(base_session, pre_session, sizeof base_session);
             strncpy(to_session, pre_session, sizeof to_session);
             strncat(to_session, " Session", sizeof(to_session) - strlen(pre_session));
             to_sess_flag = SESSION_ITEM;
             break;
         case IDM_ST_DUPGRP:
-            save_settings(pre_session, dp.data);
+            save_settings(pre_session, (Config*)dp.data);
             strncpy(base_session, pre_session, sizeof base_session);
             strncpy(to_session, pre_session, sizeof to_session);
             to_session[strlen(to_session)-1] = '\0';
@@ -1065,7 +1065,7 @@ static void show_st_popup_menu(HWND  hwndSess)
             to_sess_flag = SESSION_GROUP;
             break;
         case IDM_ST_NEWSESSONGRP:
-            save_settings(pre_session, dp.data);
+            save_settings(pre_session, (Config*)dp.data);
             strncpy(base_session, pre_session, sizeof base_session);
             strncpy(to_session, pre_session, sizeof to_session);
             strncat(to_session, "Session", sizeof(to_session)-strlen(pre_session));
@@ -1122,7 +1122,7 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 		RECT rcItem;
 		LPNMTREEVIEW lpnmtv = (LPNMTREEVIEW) lParam;
 
-        save_settings(pre_session, dp.data); 
+        save_settings(pre_session, (Config*)dp.data);
 	    /* select the session. End dragging if it is not item.*/
         TreeView_SelectItem(hwndSess, lpnmtv->itemNew.hItem);
         if (lpnmtv->itemNew.lParam != SESSION_ITEM) 

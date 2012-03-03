@@ -172,7 +172,7 @@ int agent_query(void *in, int inlen, void **out, int *outlen,
 				0, AGENT_MAX_MSGLEN, mapname);
     if (filemap == NULL || filemap == INVALID_HANDLE_VALUE)
 	return 1;		       /* *out == NULL, so failure */
-    p = MapViewOfFile(filemap, FILE_MAP_WRITE, 0, 0, 0);
+    p = (unsigned char*)MapViewOfFile(filemap, FILE_MAP_WRITE, 0, 0, 0);
     memcpy(p, in, inlen);
     cds.dwData = AGENT_COPYDATA_ID;
     cds.cbData = 1 + strlen(mapname);

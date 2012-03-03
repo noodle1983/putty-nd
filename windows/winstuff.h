@@ -325,7 +325,7 @@ struct dlgparam {
 void ctlposinit(struct ctlpos *cp, HWND hwnd,
 		int leftborder, int rightborder, int topborder);
 HWND doctl(struct ctlpos *cp, RECT r,
-	   char *wclass, int wstyle, int exstyle, char *wtext, int wid);
+	   char *wclass, int wstyle, int exstyle, const char *wtext, int wid);
 void bartitle(struct ctlpos *cp, char *name, int id);
 void beginbox(struct ctlpos *cp, char *name, int idbox);
 void endbox(struct ctlpos *cp);

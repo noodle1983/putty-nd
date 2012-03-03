@@ -331,7 +331,7 @@ HRGN DrawCloseButton(HDC hdc, const int x, const int y,
     hOldPen = SelectObject(hdc, hPen); 
 
     hBrush = CreateSolidBrush (clrBack);
-    hOldBrush = SelectObject(hdc, hBrush);
+    hOldBrush = (HBRUSH__*)SelectObject(hdc, hBrush);
 
     BeginPath(hdc);
     AngleArc(hdc, x , y, 6, 0, 360);
@@ -402,7 +402,7 @@ void DrawFrame(HDC hdc, POINT const *pPoints, int iCount, COLORREF clrBorder, CO
     hOldPen = SelectObject(hdc, hPen); 
 
     hBrush = CreateSolidBrush (clrBack);
-    hOldBrush = SelectObject(hdc, hBrush);
+    hOldBrush = (HBRUSH__*)SelectObject(hdc, hBrush);
 
 	Polygon(hdc, (POINT *)pPoints,iCount);
 
@@ -536,7 +536,7 @@ void FillSolidRect(HDC hdc, RECT const *rc, COLORREF color)
     HBRUSH hOldBrush;
 
     hBrush = CreateSolidBrush (color);
-    hOldBrush = SelectObject(hdc, hBrush);
+    hOldBrush = (HBRUSH__*)SelectObject(hdc, hBrush);
 	FillRect(hdc, rc, hBrush);
 	SelectObject(hdc, hOldBrush); 
     DeleteObject(hBrush);

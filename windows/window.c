@@ -230,7 +230,7 @@ void process_cmdline(LPSTR cmdline)
 	    HANDLE filemap;
 	    Config *cp;
 	    if (sscanf(p + 1, "%p", &filemap) == 1 &&
-		(cp = MapViewOfFile(filemap, FILE_MAP_READ,
+		(cp = (Config*)MapViewOfFile(filemap, FILE_MAP_READ,
 				    0, 0, sizeof(Config))) != NULL) {
 		cfg = *cp;
 		UnmapViewOfFile(cp);
@@ -1044,10 +1044,10 @@ static void exact_textout(HDC hdc, int x, int y, CONST RECT *lprc,
     memset(classbuffer, GCPCLASS_NEUTRAL, cbCount);
 
     gcpr.lStructSize = sizeof(gcpr);
-    gcpr.lpGlyphs = (void *)buffer;
-    gcpr.lpClass = (void *)classbuffer;
+    gcpr.lpGlyphs = (WCHAR*)buffer;
+    gcpr.lpClass = (WCHAR*)classbuffer;
     gcpr.nGlyphs = cbCount;
-    GetCharacterPlacementW(hdc, lpString, cbCount, 0, &gcpr,
+    GetCharacterPlacementW(hdc, (const WCHAR*)lpString, cbCount, 0, &gcpr,
 			   FLI_MASK | GCP_CLASSIN | GCP_DIACRITIC);
 
     ExtTextOut(hdc, x, y,
@@ -1099,7 +1099,7 @@ static void general_textout(Context ctx, int x, int y, CONST RECT *lprc,
                           tabitem->font_varpitch ? NULL : lpDx+i, opaque);
 	} else {
 	    ExtTextOutW(hdc, xp, y, ETO_CLIPPED | (opaque ? ETO_OPAQUE : 0),
-			lprc, lpString+i, j-i,
+			lprc, (WCHAR*)(lpString+i), j-i,
                         tabitem->font_varpitch ? NULL : lpDx+i);
 	}
 
@@ -1675,7 +1675,7 @@ static void click(wintabitem* tabitem, Mouse_Button b, int x, int y, int shift, 
 	tabitem->lastact = MA_CLICK;
     }
     if (tabitem->lastact != MA_NOTHING)
-	term_mouse(tabitem->term, b, translate_button(tabitem, b), tabitem->lastact,
+	term_mouse(tabitem->term, b, translate_button(tabitem, b), (Mouse_Action)tabitem->lastact,
 		   x, y, shift, ctrl, alt);
     tabitem->lasttime = thistime;
 }
@@ -1692,7 +1692,7 @@ static Mouse_Button translate_button(wintabitem* tabitem, Mouse_Button button)
 	return tabitem->cfg.mouse_is_xterm == 1 ? MBT_PASTE : MBT_EXTEND;
     if (button == MBT_RIGHT)
 	return tabitem->cfg.mouse_is_xterm == 1 ? MBT_EXTEND : MBT_PASTE;
-    return 0;			       /* shouldn't happen */
+    return (Mouse_Button)0;			       /* shouldn't happen */
 }
 
 void show_mouseptr(wintabitem *tabitem, int show)
@@ -1738,8 +1738,8 @@ void notify_remote_exit(void *frontend)
 	    (tabitem->cfg.close_on_exit == AUTO && exitcode != INT_MAX)) {
 	    wintabitem_close_session(tabitem);
         
-        wintab *wintab = tabitem->parentTab;
-        PostMessage(wintab->hwndTab, WM_PAINT, 0, 0);
+        wintab *tab = (wintab*)(tabitem->parentTab);
+        PostMessage(tab->hwndTab, WM_PAINT, 0, 0);
 	    //PostQuitMessage(0);
 	} else {
 	    tabitem->must_close_session = TRUE;
@@ -1844,7 +1844,7 @@ int on_session_menu(HWND hwnd, UINT message,
     } else /* IDM_NEWSESS */ {
         DWORD in_threadid; /* required for Win9x */
         CreateThread(NULL, 0, config_dialog_threadfunc,
-   		   wParam, 0, &in_threadid);
+   		   (void*)wParam, 0, &in_threadid);
         return 0;
     }
     return 0;
@@ -2074,8 +2074,8 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
             logevent(tabitem, "----- Session restarted -----");
             term_pwron(tabitem->term, FALSE);
             wintabitem_start_backend(tabitem);
-            wintab* wintab = tabitem->parentTab;
-            PostMessage(wintab->hwndTab, WM_PAINT, 0, 0);
+            wintab* tab = (wintab*)(tabitem->parentTab);
+            PostMessage(tab->hwndTab, WM_PAINT, 0, 0);
             }
             break;
         }
@@ -2139,7 +2139,7 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
                 if (i >= tabitem->n_specials)
                     break;
                 if (tabitem->back)
-                    tabitem->back->special(tabitem->backhandle, tabitem->specials[i].code);
+                    tabitem->back->special(tabitem->backhandle, (Telnet_Special)tabitem->specials[i].code);
                 net_pending_errors();
             }
 	}
@@ -2248,13 +2248,13 @@ int on_button(wintabitem* tabitem, HWND hWnd, UINT message,
 	    }
 
 	    if (press) {
-		click(tabitem, button,
+		click(tabitem, (Mouse_Button)button,
 		      TO_CHR_X(X_POS(lParam)), TO_CHR_Y(Y_POS(lParam)),
 		      wParam & MK_SHIFT, wParam & MK_CONTROL,
 		      is_alt_pressed());
 		SetCapture(tabitem->page.hwndCtrl);
 	    } else {
-		term_mouse(tabitem->term, button, translate_button(tabitem, button), MA_RELEASE,
+		term_mouse(tabitem->term, (Mouse_Button)button, translate_button(tabitem, (Mouse_Button)button), MA_RELEASE,
 			   TO_CHR_X(X_POS(lParam)),
 			   TO_CHR_Y(Y_POS(lParam)), wParam & MK_SHIFT,
 			   wParam & MK_CONTROL, is_alt_pressed());
@@ -2382,7 +2382,7 @@ int on_sizing(wintabitem* tabitem, HWND hwnd, UINT message,
 	    LPRECT r = (LPRECT) lParam;
         RECT rc;
         GetClientRect(hwnd, &rc); 
-        wintab_resize(tabitem->parentTab, &rc);
+        wintab_resize((wintab*)tabitem->parentTab, &rc);
 
 	    if ( !need_backend_resize && tabitem->cfg.resize_action == RESIZE_EITHER &&
 		    (tabitem->cfg.height != tabitem->term->rows || tabitem->cfg.width != tabitem->term->cols )) {
@@ -2578,7 +2578,7 @@ int on_palette_changed(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
     if ((HWND) wParam != hwnd && tabitem->pal != NULL) {
-        wintabitem *item = get_ctx(tabitem);
+        wintabitem *item = (wintabitem*)get_ctx(tabitem);
 	    if (item && item->hdc) {
     		if (RealizePalette(item->hdc) > 0)
     		    UpdateColors(item->hdc);
@@ -2592,7 +2592,7 @@ int on_query_new_palette(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
     if (tabitem->pal != NULL) {
-        wintabitem *item = get_ctx(tabitem);
+        wintabitem *item = (wintabitem*)get_ctx(tabitem);
 	    if (item && item->hdc) {
 		if (RealizePalette(item->hdc) > 0)
 		    UpdateColors(item->hdc);
@@ -2661,7 +2661,7 @@ int on_key(wintabitem* tabitem, HWND hwnd, UINT message,
                 return 0;
             }
 		    if (tabitem->ldisc)
-			ldisc_send(tabitem->ldisc, buf, len, 1);
+			ldisc_send(tabitem->ldisc, (char*)buf, len, 1);
 		    show_mouseptr(tabitem, 0);
 		}
 	    }
@@ -2699,7 +2699,7 @@ int on_ime_composition(wintabitem* tabitem, HWND hwnd, UINT message,
 	term_seen_key_event(tabitem->term);
 	for (i = 0; i < n; i += 2) {
 	    if (tabitem->ldisc)
-		luni_send(tabitem->ldisc, (unsigned short *)(buff+i), 1, 1);
+		luni_send(tabitem->ldisc, (wchar_t* )(buff+i), 1, 1);
 	}
 	free(buff);
     }
@@ -2717,7 +2717,7 @@ int on_ime_char(wintabitem* tabitem, HWND hwnd, UINT message,
 	    buf[0] = wParam >> 8;
 	    term_seen_key_event(tabitem->term);
 	    if (tabitem->ldisc)
-		lpage_send(tabitem->ldisc, kbd_codepage, buf, 2, 1);
+		lpage_send(tabitem->ldisc, kbd_codepage, (char*)buf, 2, 1);
 	} else {
 	    char c = (unsigned char) wParam;
 	    term_seen_key_event(tabitem->term);
@@ -2801,12 +2801,12 @@ int on_default(wintabitem* tabitem, HWND hwnd, UINT message,
 		    p.x = X_POS(lParam); p.y = Y_POS(lParam);
 		    if (ScreenToClient(hwnd, &p)) {
 			/* send a mouse-down followed by a mouse up */
-			term_mouse(tabitem->term, b, translate_button(tabitem, b),
+			term_mouse(tabitem->term, (Mouse_Button)b, translate_button(tabitem, (Mouse_Button)b),
 				   MA_CLICK,
 				   TO_CHR_X(p.x),
 				   TO_CHR_Y(p.y), shift_pressed,
 				   control_pressed, is_alt_pressed());
-			term_mouse(tabitem->term, b, translate_button(tabitem, b),
+			term_mouse(tabitem->term, (Mouse_Button)b, translate_button(tabitem, (Mouse_Button)b),
 				   MA_RELEASE, TO_CHR_X(p.x),
 				   TO_CHR_Y(p.y), shift_pressed,
 				   control_pressed, is_alt_pressed());
@@ -3376,7 +3376,7 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
             /* print Glyphs as they are, without Windows' Shaping*/
             general_textout(ctx, x + xoffset,
                             y - tabitem->font_height * (lattr==LATTR_BOT) + text_adjust,
-                            &line_box, wbuf, len, lpDx,
+                            &line_box, (short unsigned int*)wbuf, len, lpDx,
                             opaque && !(attr & TATTR_COMBINING));
 
             /* And the shadow bold hack. */
@@ -3404,10 +3404,10 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
 	if (lattr == LATTR_BOT)
 	    dec = dec * 2 - tabitem->font_height;
 
-	oldpen = SelectObject(hdc, CreatePen(PS_SOLID, 0, fg));
+	oldpen = (HPEN__*)SelectObject(hdc, CreatePen(PS_SOLID, 0, fg));
 	MoveToEx(hdc, x, y + dec, NULL);
 	LineTo(hdc, x + len * char_width, y + dec);
-	oldpen = SelectObject(hdc, oldpen);
+	oldpen = (HPEN__*)SelectObject(hdc, oldpen);
 	DeleteObject(oldpen);
     }
 }
@@ -3469,9 +3469,9 @@ void do_cursor(Context ctx, int x, int y, wchar_t *text, int len,
 	pts[2].x = pts[3].x = x + char_width - 1;
 	pts[0].y = pts[3].y = pts[4].y = y;
 	pts[1].y = pts[2].y = y + tabitem->font_height - 1;
-	oldpen = SelectObject(hdc, CreatePen(PS_SOLID, 0, tabitem->colours[261]));
+	oldpen = (HPEN__*)SelectObject(hdc, CreatePen(PS_SOLID, 0, tabitem->colours[261]));
 	Polyline(hdc, pts, 5);
-	oldpen = SelectObject(hdc, oldpen);
+	oldpen = (HPEN__*)SelectObject(hdc, oldpen);
 	DeleteObject(oldpen);
     } else if ((attr & (TATTR_ACTCURS | TATTR_PASCURS)) && ctype != 0) {
 	int startx, starty, dx, dy, length, i;
@@ -3494,10 +3494,10 @@ void do_cursor(Context ctx, int x, int y, wchar_t *text, int len,
 	if (attr & TATTR_ACTCURS) {
 	    HPEN oldpen;
 	    oldpen =
-		SelectObject(hdc, CreatePen(PS_SOLID, 0, tabitem->colours[261]));
+	    		(HPEN__*)SelectObject(hdc, CreatePen(PS_SOLID, 0, tabitem->colours[261]));
 	    MoveToEx(hdc, startx, starty, NULL);
 	    LineTo(hdc, startx + dx * length, starty + dy * length);
-	    oldpen = SelectObject(hdc, oldpen);
+	    oldpen = (HPEN__*)SelectObject(hdc, oldpen);
 	    DeleteObject(oldpen);
 	} else {
 	    for (i = 0; i < length; i++) {
@@ -4227,7 +4227,7 @@ static int TranslateKey(wintabitem* tabitem, UINT message, WPARAM wParam, LPARAM
 		break;
 	    }
 	    if (xkey) {
-		p += format_arrow_key(p, tabitem->term, xkey, shift_state);
+		p += format_arrow_key((char*)p, tabitem->term, xkey, shift_state);
 		return p - output;
 	    }
 	}
@@ -4355,13 +4355,13 @@ static int TranslateKey(wintabitem* tabitem, UINT message, WPARAM wParam, LPARAM
 			     */
 			    term_seen_key_event(tabitem->term);
 			    if (tabitem->ldisc)
-				ldisc_send(tabitem->ldisc, &ch, 1, 1);
+				ldisc_send(tabitem->ldisc, (char*)&ch, 1, 1);
 			}
 			alt_sum = 0;
 		    } else {
 			term_seen_key_event(tabitem->term);
 			if (tabitem->ldisc)
-			    lpage_send(tabitem->ldisc, kbd_codepage, &ch, 1, 1);
+			    lpage_send(tabitem->ldisc, kbd_codepage, (char*)&ch, 1, 1);
 		    }
 		} else {
 		    if(capsOn && ch < 0x80) {
@@ -4479,7 +4479,7 @@ void free_ctx(void *frontend, Context ctx)
     assert(frontend != NULL && ctx != NULL);
     wintabitem *tabitem = (wintabitem *)ctx;
     if (tabitem->hdc){
-        SelectPalette(tabitem->hdc, GetStockObject(DEFAULT_PALETTE), FALSE);
+        SelectPalette(tabitem->hdc, (HPALETTE__*)GetStockObject(DEFAULT_PALETTE), FALSE);
         ReleaseDC(tabitem->page.hwndCtrl, tabitem->hdc);
         tabitem->hdc = NULL;
     }
@@ -4511,7 +4511,7 @@ void palette_set(void *frontend, int n, int r, int g, int b)
 	return;
     real_palette_set(frontend, n, r, g, b);
     if (tabitem->pal) {
-        wintabitem *tabitem = get_ctx(frontend);
+        wintabitem *tabitem = (wintabitem*)get_ctx(frontend);
         assert(tabitem != NULL);
     	HDC hdc = tabitem->hdc;
         assert (hdc != NULL);
@@ -4551,7 +4551,7 @@ void palette_reset(void *frontend)
     if (tabitem->pal) {
 	HDC hdc;
 	SetPaletteEntries(tabitem->pal, 0, NALLCOLOURS, tabitem->logpal->palPalEntry);
-	wintabitem *tabitem = get_ctx(frontend);
+	wintabitem *tabitem = (wintabitem*)get_ctx(frontend);
     assert(tabitem != NULL);
     hdc = tabitem->hdc;
     assert (hdc != NULL);
@@ -4625,7 +4625,7 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
 	return;
 
     memcpy(lock, data, len * sizeof(wchar_t));
-    WideCharToMultiByte(CP_ACP, 0, data, len, lock2, len2, NULL, NULL);
+    WideCharToMultiByte(CP_ACP, 0, data, len, (CHAR*)lock2, len2, NULL, NULL);
 
     if (tabitem->cfg.rtf_paste) {
 	wchar_t unitab[256];
@@ -4946,7 +4946,7 @@ int process_clipdata(HGLOBAL clipdata, int unicode)
     clipboard_length = 0;
 
     if (unicode) {
-	wchar_t *p = GlobalLock(clipdata);
+	wchar_t *p = (wchar_t*)GlobalLock(clipdata);
 	wchar_t *p2;
 
 	if (p) {
@@ -4959,7 +4959,7 @@ int process_clipdata(HGLOBAL clipdata, int unicode)
 	    return TRUE;
 	}
     } else {
-	char *s = GlobalLock(clipdata);
+	char *s = (char*)GlobalLock(clipdata);
 	int i;
 
 	if (s) {

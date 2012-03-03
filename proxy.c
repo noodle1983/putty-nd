@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#undef _NO_OLDNAMES
 #include <string.h>
 
 #define DEFINE_PLUG_METHOD_MACROS
@@ -44,14 +45,14 @@ void proxy_activate (Proxy_Socket p)
     /* send buffered OOB writes */
     while (bufchain_size(&p->pending_oob_output_data) > 0) {
 	bufchain_prefix(&p->pending_oob_output_data, &data, &len);
-	output_after += sk_write_oob(p->sub_socket, data, len);
+	output_after += sk_write_oob(p->sub_socket, (const char*)data, len);
 	bufchain_consume(&p->pending_oob_output_data, len);
     }
 
     /* send buffered normal writes */
     while (bufchain_size(&p->pending_output_data) > 0) {
 	bufchain_prefix(&p->pending_output_data, &data, &len);
-	output_after += sk_write(p->sub_socket, data, len);
+	output_after += sk_write(p->sub_socket, (const char*)data, len);
 	bufchain_consume(&p->pending_output_data, len);
     }
 

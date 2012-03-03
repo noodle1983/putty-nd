@@ -23,52 +23,7 @@
  *    The C variant won't give the right answer, either.
  */
 
-#if defined __GNUC__ && defined __i386__
-typedef unsigned long BignumInt;
-typedef unsigned long long BignumDblInt;
-#define BIGNUM_INT_MASK  0xFFFFFFFFUL
-#define BIGNUM_TOP_BIT   0x80000000UL
-#define BIGNUM_INT_BITS  32
-#define MUL_WORD(w1, w2) ((BignumDblInt)w1 * w2)
-#define DIVMOD_WORD(q, r, hi, lo, w) \
-    __asm__("div %2" : \
-	    "=d" (r), "=a" (q) : \
-	    "r" (w), "d" (hi), "a" (lo))
-#elif defined _MSC_VER && defined _M_IX86
-typedef unsigned __int32 BignumInt;
-typedef unsigned __int64 BignumDblInt;
-#define BIGNUM_INT_MASK  0xFFFFFFFFUL
-#define BIGNUM_TOP_BIT   0x80000000UL
-#define BIGNUM_INT_BITS  32
-#define MUL_WORD(w1, w2) ((BignumDblInt)w1 * w2)
-/* Note: MASM interprets array subscripts in the macro arguments as
- * assembler syntax, which gives the wrong answer. Don't supply them.
- * <http://msdn2.microsoft.com/en-us/library/bf1dw62z.aspx> */
-#define DIVMOD_WORD(q, r, hi, lo, w) do { \
-    __asm mov edx, hi \
-    __asm mov eax, lo \
-    __asm div w \
-    __asm mov r, edx \
-    __asm mov q, eax \
-} while(0)
-#else
-typedef unsigned short BignumInt;
-typedef unsigned long BignumDblInt;
-#define BIGNUM_INT_MASK  0xFFFFU
-#define BIGNUM_TOP_BIT   0x8000U
-#define BIGNUM_INT_BITS  16
-#define MUL_WORD(w1, w2) ((BignumDblInt)w1 * w2)
-#define DIVMOD_WORD(q, r, hi, lo, w) do { \
-    BignumDblInt n = (((BignumDblInt)hi) << BIGNUM_INT_BITS) | lo; \
-    q = n / w; \
-    r = n % w; \
-} while (0)
-#endif
 
-#define BIGNUM_INT_BYTES (BIGNUM_INT_BITS / 8)
-
-#define BIGNUM_INTERNAL
-typedef BignumInt *Bignum;
 
 #include "ssh.h"
 
@@ -693,7 +648,7 @@ void bignum_set_bit(Bignum bn, int bitnum, int value)
  */
 int ssh1_write_bignum(void *data, Bignum bn)
 {
-    unsigned char *p = data;
+    unsigned char *p = (unsigned char *)data;
     int len = ssh1_bignum_length(bn);
     int i;
     int bitc = bignum_bitcount(bn);

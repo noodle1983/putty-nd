@@ -242,6 +242,7 @@ static void cipherlist_handler(union control *ctrl, void *dlg,
 }
 
 #ifndef NO_GSSAPI
+
 static void gsslist_handler(union control *ctrl, void *dlg,
 			    void *data, int event)
 {
@@ -497,7 +498,7 @@ static void sessionsaver_handler(union control *ctrl, void *dlg,
 	    dlg_alloc_privdata(ssd->editbox, dlg, SAVEDSESSION_LEN);
 	savedsession[0] = '\0';
     } else {
-	savedsession = dlg_get_privdata(ssd->editbox, dlg);
+	savedsession = (char*)dlg_get_privdata(ssd->editbox, dlg);
     }
 
     if (event == EVENT_REFRESH) {
@@ -1341,21 +1342,21 @@ void setup_config_box(struct controlbox *b, int midsession,
         c = ctrl_checkbox(s, "", 0,
     		 HELPCTX(no_help), 
     		 dlg_stdcheckbox_handler,
-             I(offsetof(Config,autocmd_enable[i])));
+             I(offsetof(Config,autocmd_enable)+i*sizeof(((Config*)0)->autocmd_enable[0])));
     	c->generic.column = 0;
 		c->checkbox.aligntoedit = 1;
         
         c = ctrl_editbox(s, 0, 0, 100,
     			 HELPCTX(no_help),
     			 dlg_stdeditbox_handler,
-    			 I(offsetof(Config,expect[i])),
+    			 I(offsetof(Config,expect) + i*sizeof(((Config*)0)->expect[0])),
     		     I(sizeof(((Config *)0)->expect[i])));
     	c->generic.column = 1;
 
     	c = ctrl_editbox(s, 0, 0, 100,
     			 HELPCTX(no_help),
     			 dlg_stdeditbox_handler, 
-    			 I(offsetof(Config,autocmd[i])),
+    			 I(offsetof(Config,autocmd)+ i* sizeof(((Config*)0)->autocmd[0])),
     		     I(sizeof(((Config *)0)->autocmd[i])));
     	c->generic.column = 2;
         bc = c;
@@ -1363,10 +1364,10 @@ void setup_config_box(struct controlbox *b, int midsession,
         c = ctrl_checkbox(s, "", 0,
     		 HELPCTX(no_help), 
     		 dlg_pwdcheckbox_handler,
-             I(offsetof(Config,autocmd_hide[i])));
+             I(offsetof(Config,autocmd_hide)+ i* sizeof(((Config*)0)->autocmd_hide[0])));
     	c->generic.column = 3;
 		c->checkbox.aligntoedit = 1;
-        c->checkbox.relctrl = bc;
+        c->checkbox.relctrl = (config*)bc;
     }
 	ctrl_columns(s, 1, 100);
 	
@@ -1877,7 +1878,7 @@ void setup_config_box(struct controlbox *b, int midsession,
 #endif
 
 	    {
-		char *label = backend_from_proto(PROT_SSH) ?
+		const char *label = backend_from_proto(PROT_SSH) ?
 		    "Logical name of remote host (e.g. for SSH key lookup):" :
 		    "Logical name of remote host:";
 		s = ctrl_getset(b, "Connection", "identity",

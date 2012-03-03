@@ -57,7 +57,7 @@ void ctlposinit(struct ctlpos *cp, HWND hwnd,
 }
 
 HWND doctl(struct ctlpos *cp, RECT r,
-	   char *wclass, int wstyle, int exstyle, char *wtext, int wid)
+	   char *wclass, int wstyle, int exstyle, const char *wtext, int wid)
 {
     HWND ctl;
     /*
@@ -403,7 +403,7 @@ char *staticwrap(struct ctlpos *cp, HWND hwnd, char *text, int *lines)
      * GetTextExtent*, or silly things will happen.
      */
     newfont = (HFONT)SendMessage(hwnd, WM_GETFONT, 0, 0);
-    oldfont = SelectObject(hdc, newfont);
+    oldfont = (HFONT__*)SelectObject(hdc, newfont);
 
     while (*p) {
 	if (!GetTextExtentExPoint(hdc, p, strlen(p), width,
@@ -1265,7 +1265,7 @@ void winctrl_cleanup(struct winctrls *wc)
 {
     struct winctrl *c;
 
-    while ((c = index234(wc->byid, 0)) != NULL) {
+    while ((c = (struct winctrl *)index234(wc->byid, 0)) != NULL) {
 	winctrl_remove(wc, c);
 	sfree(c->data);
 	sfree(c);
@@ -1280,34 +1280,34 @@ void winctrl_add(struct winctrls *wc, struct winctrl *c)
 {
     struct winctrl *ret;
     if (c->ctrl) {
-	ret = add234(wc->byctrl, c);
+	ret = (struct winctrl *)add234(wc->byctrl, c);
 	assert(ret == c);
     }
-    ret = add234(wc->byid, c);
+    ret = (struct winctrl *)add234(wc->byid, c);
     assert(ret == c);
 }
 
 void winctrl_remove(struct winctrls *wc, struct winctrl *c)
 {
     struct winctrl *ret;
-    ret = del234(wc->byctrl, c);
-    ret = del234(wc->byid, c);
+    ret = (struct winctrl *)del234(wc->byctrl, c);
+    ret = (struct winctrl *)del234(wc->byid, c);
     assert(ret == c);
 }
 
 struct winctrl *winctrl_findbyctrl(struct winctrls *wc, union control *ctrl)
 {
-    return find234(wc->byctrl, ctrl, winctrl_cmp_byctrl_find);
+    return (struct winctrl *)find234(wc->byctrl, ctrl, winctrl_cmp_byctrl_find);
 }
 
 struct winctrl *winctrl_findbyid(struct winctrls *wc, int id)
 {
-    return find234(wc->byid, &id, winctrl_cmp_byid_find);
+    return (struct winctrl *)find234(wc->byid, &id, winctrl_cmp_byid_find);
 }
 
 struct winctrl *winctrl_findbyindex(struct winctrls *wc, int index)
 {
-    return index234(wc->byid, index);
+    return (struct winctrl *)index234(wc->byid, index);
 }
 
 void winctrl_layout(struct dlgparam *dp, struct winctrls *wc,
@@ -1580,7 +1580,7 @@ void winctrl_layout(struct dlgparam *dp, struct winctrls *wc,
 	    if (ctrl->listbox.draglist) {
 		data = snew(struct prefslist);
 		num_ids = 4;
-		prefslist(data, &pos, ctrl->listbox.height, escaped,
+		prefslist((struct prefslist*)data, &pos, ctrl->listbox.height, escaped,
 			  base_id, base_id+1, base_id+2, base_id+3);
 		shortcuts[nshortcuts++] = 'u';   /* Up */
 		shortcuts[nshortcuts++] = 'd';   /* Down */
@@ -1872,7 +1872,7 @@ int winctrl_handle_command(struct dlgparam *dp, UINT msg,
 	    winctrl_set_focus(ctrl, dp, HIWORD(wParam) == BN_SETFOCUS);
 	if (ctrl->listbox.draglist) {
 	    int pret;
-	    pret = handle_prefslist(c->data, NULL, 0, (msg != WM_COMMAND),
+	    pret = handle_prefslist((struct prefslist*)c->data, NULL, 0, (msg != WM_COMMAND),
 				    dp->hwnd, wParam, lParam);
 	    if (pret & 2)
 		ctrl->generic.handler(ctrl, dp, dp->data, EVENT_VALCHANGE);
@@ -2031,7 +2031,7 @@ int winctrl_context_help(struct dlgparam *dp, HWND hwnd, int id)
     if (!c->ctrl || !c->ctrl->generic.helpctx.p)
 	return 0;		       /* no help available for this ctrl */
 
-    launch_help(hwnd, c->ctrl->generic.helpctx.p);
+    launch_help(hwnd, (const char*)c->ctrl->generic.helpctx.p);
     return 1;
 }
 
@@ -2313,7 +2313,8 @@ void dlg_filesel_get(union control *ctrl, void *dlg, Filename *fn)
 
 void dlg_fontsel_set(union control *ctrl, void *dlg, FontSpec fs)
 {
-    char *buf, *boldstr;
+    char *buf;
+    const char *boldstr;
     struct dlgparam *dp = (struct dlgparam *)dlg;
     struct winctrl *c = dlg_findbyctrl(dp, ctrl);
     assert(c && c->ctrl->generic.type == CTRL_FONTSELECT);
@@ -2568,7 +2569,7 @@ void dp_cleanup(struct dlgparam *dp)
     struct perctrl_privdata *p;
 
     if (dp->privdata) {
-	while ( (p = index234(dp->privdata, 0)) != NULL ) {
+	while ( (p = (struct perctrl_privdata*)index234(dp->privdata, 0)) != NULL ) {
 	    del234(dp->privdata, p);
 	    if (p->needs_free)
 		sfree(p->data);
@@ -2586,7 +2587,7 @@ void *dlg_get_privdata(union control *ctrl, void *dlg)
     struct dlgparam *dp = (struct dlgparam *)dlg;
     struct perctrl_privdata tmp, *p;
     tmp.ctrl = ctrl;
-    p = find234(dp->privdata, &tmp, NULL);
+    p = (struct perctrl_privdata*)find234(dp->privdata, &tmp, NULL);
     if (p)
 	return p->data;
     else
@@ -2598,7 +2599,7 @@ void dlg_set_privdata(union control *ctrl, void *dlg, void *ptr)
     struct dlgparam *dp = (struct dlgparam *)dlg;
     struct perctrl_privdata tmp, *p;
     tmp.ctrl = ctrl;
-    p = find234(dp->privdata, &tmp, NULL);
+    p = (struct perctrl_privdata*)find234(dp->privdata, &tmp, NULL);
     if (!p) {
 	p = snew(struct perctrl_privdata);
 	p->ctrl = ctrl;
@@ -2613,7 +2614,7 @@ void *dlg_alloc_privdata(union control *ctrl, void *dlg, size_t size)
     struct dlgparam *dp = (struct dlgparam *)dlg;
     struct perctrl_privdata tmp, *p;
     tmp.ctrl = ctrl;
-    p = find234(dp->privdata, &tmp, NULL);
+    p = (struct perctrl_privdata*)find234(dp->privdata, &tmp, NULL);
     if (!p) {
 	p = snew(struct perctrl_privdata);
 	p->ctrl = ctrl;

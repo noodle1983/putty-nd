@@ -11,10 +11,11 @@
 
 #include "putty.h"
 
+enum LogContextState{ L_CLOSED, L_OPENING, L_OPEN, L_ERROR };
 /* log session to file stuff ... */
 struct LogContext {
     FILE *lgfp;
-    enum { L_CLOSED, L_OPENING, L_OPEN, L_ERROR } state;
+    LogContextState state;
     bufchain queue;
     Filename currlogfilename;
     void *frontend;

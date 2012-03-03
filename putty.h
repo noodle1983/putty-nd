@@ -387,7 +387,7 @@ struct backend_tag {
     /* back->reconfig() passes in a replacement configuration. */
     void (*reconfig) (void *handle, Config *cfg);
     /* back->send() returns the current amount of buffered data. */
-    int (*send) (void *handle, char *buf, int len);
+    int (*send) (void *handle, const char *buf, int len);
     /* back->sendbuffer() does the same thing but without attempting a send */
     int (*sendbuffer) (void *handle);
     void (*size) (void *handle, int width, int height);
@@ -904,10 +904,10 @@ int term_get_userpass_input(Terminal *term, prompts_t *p,
 			    unsigned char *in, int inlen);
 void autocmd_init(Config *cfg);
 void exec_autocmd(void *handle, Config *cfg,
-    char *recv_buf, int len, 
-    int (*send) (void *handle, char *buf, int len));
+    const char *recv_buf, int len, 
+    int (*send) (void *handle, const char *buf, int len));
 const char* get_autocmd(Config *cfg,
-    char *recv_buf, int len);
+    const char *recv_buf, int len);
 int autocmd_get_passwd_input(prompts_t *p, Config *cfg);
 
 int format_arrow_key(char *buf, Terminal *term, int xkey, int ctrl);
@@ -970,7 +970,7 @@ extern Backend ssh_backend;
  */
 void *ldisc_create(Config *, Terminal *, Backend *, void *, void *);
 void ldisc_free(void *);
-void ldisc_send(void *handle, char *buf, int len, int interactive);
+void ldisc_send(void *handle, const char *buf, int len, int interactive);
 
 /*
  * Exports from ldiscucs.c.

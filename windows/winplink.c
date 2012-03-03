@@ -244,7 +244,7 @@ int stdin_gotdata(struct handle *h, void *data, int len)
     noise_ultralight(len);
     if (connopen && back->connected(backhandle)) {
 	if (len > 0) {
-	    return back->send(backhandle, data, len);
+	    return back->send(backhandle, (char*)data, len);
 	} else {
 	    back->special(backhandle, TS_EOF);
 	    return 0;
@@ -693,7 +693,7 @@ int main(int argc, char **argv)
 	    }
 	} else if (n == WAIT_OBJECT_0 + nhandles + 1) {
 	    MSG msg;
-	    while (PeekMessage(&msg, INVALID_HANDLE_VALUE,
+	    while (PeekMessage(&msg, (HWND__*)INVALID_HANDLE_VALUE,
 			       WM_AGENT_CALLBACK, WM_AGENT_CALLBACK,
 			       PM_REMOVE)) {
 		struct agent_callback *c = (struct agent_callback *)msg.lParam;

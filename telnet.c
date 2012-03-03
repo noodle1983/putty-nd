@@ -124,16 +124,16 @@ static char *telopt(int opt)
 }
 
 static void telnet_size(void *handle, int width, int height);
-
+typedef enum {
+	REQUESTED, ACTIVE, INACTIVE, REALLY_INACTIVE
+    } OptState;
 struct Opt {
     int send;			       /* what we initially send */
     int nsend;			       /* -ve send if requested to stop it */
     int ack, nak;		       /* +ve and -ve acknowledgements */
     int option;			       /* the option code */
     int index;			       /* index into telnet->opt_states[] */
-    enum {
-	REQUESTED, ACTIVE, INACTIVE, REALLY_INACTIVE
-    } initial_state;
+    OptState initial_state;
 };
 
 enum {
@@ -175,7 +175,10 @@ static const struct Opt *const opts[] = {
     &o_naws, &o_tspeed, &o_ttype, &o_oenv, &o_nenv, &o_echo,
     &o_we_sga, &o_they_sga, &o_we_bin, &o_they_bin, NULL
 };
-
+typedef enum {
+	TOP_LEVEL, SEENIAC, SEENWILL, SEENWONT, SEENDO, SEENDONT,
+	    SEENSB, SUBNEGOT, SUBNEG_IAC, SEENCR
+    } TelnetState;
 typedef struct telnet_tag {
     const struct plug_function_table *fn;
     /* the above field _must_ be first in the structure */
@@ -196,10 +199,7 @@ typedef struct telnet_tag {
     unsigned char *sb_buf;
     int sb_size;
 
-    enum {
-	TOP_LEVEL, SEENIAC, SEENWILL, SEENWONT, SEENDO, SEENDONT,
-	    SEENSB, SUBNEGOT, SUBNEG_IAC, SEENCR
-    } state;
+    TelnetState state;
 
     Config cfg;
 
@@ -210,7 +210,7 @@ typedef struct telnet_tag {
 
 #define SB_DELTA 1024
 
-static void c_write(Telnet telnet, char *buf, int len)
+static void c_write(Telnet telnet, const char *buf, int len)
 {
     int backlog;
     backlog = from_backend(telnet->frontend, 0, buf, len);
@@ -815,7 +815,7 @@ static void telnet_reconfig(void *handle, Config *cfg)
 /*
  * Called to send data down the Telnet connection.
  */
-static int telnet_send(void *handle, char *buf, int len)
+static int telnet_send(void *handle, const char *buf, int len)
 {
     Telnet telnet = (Telnet) handle;
     unsigned char *p, *end;

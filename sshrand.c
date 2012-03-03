@@ -132,7 +132,7 @@ static void random_stir(void)
 
 void random_add_noise(void *noise, int length)
 {
-    unsigned char *p = noise;
+    unsigned char *p = (unsigned char*)noise;
     int i;
 
     if (!random_active)
@@ -166,7 +166,7 @@ void random_add_noise(void *noise, int length)
 
 void random_add_heavynoise(void *noise, int length)
 {
-    unsigned char *p = noise;
+    unsigned char *p = (unsigned char*)noise;
     int i;
 
     while (length >= POOLSIZE) {
@@ -183,7 +183,7 @@ void random_add_heavynoise(void *noise, int length)
 
 static void random_add_heavynoise_bitbybit(void *noise, int length)
 {
-    unsigned char *p = noise;
+    unsigned char *p = (unsigned char*)noise;
     int i;
 
     while (length >= POOLSIZE - pool.poolpos) {

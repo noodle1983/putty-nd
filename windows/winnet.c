@@ -79,7 +79,7 @@ struct Socket_tag {
 
 struct SockAddr_tag {
     int refcount;
-    char *error;
+    const char *error;
     int resolved;
 #ifndef NO_IPV6
     struct addrinfo *ais;	       /* Addresses IPv6 style. */
@@ -312,7 +312,7 @@ void sk_cleanup(void)
     int i;
 
     if (sktree) {
-	for (i = 0; (s = index234(sktree, i)) != NULL; i++) {
+	for (i = 0; (s = (Actual_Socket)index234(sktree, i)) != NULL; i++) {
 	    p_closesocket(s->s);
 	}
 	freetree234(sktree);
@@ -853,17 +853,17 @@ static DWORD try_connect(Actual_Socket sock)
 
     if (sock->oobinline) {
 	BOOL b = TRUE;
-	p_setsockopt(s, SOL_SOCKET, SO_OOBINLINE, (void *) &b, sizeof(b));
+	p_setsockopt(s, SOL_SOCKET, SO_OOBINLINE, (char *) &b, sizeof(b));
     }
 
     if (sock->nodelay) {
 	BOOL b = TRUE;
-	p_setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (void *) &b, sizeof(b));
+	p_setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (char *) &b, sizeof(b));
     }
 
     if (sock->keepalive) {
 	BOOL b = TRUE;
-	p_setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, (void *) &b, sizeof(b));
+	p_setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, (char *) &b, sizeof(b));
     }
 
     /*
@@ -1276,7 +1276,7 @@ void try_send(Actual_Socket s)
 	    urgentflag = 0;
 	    bufchain_prefix(&s->output_data, &data, &len);
 	}
-	nsent = p_send(s->s, data, len, urgentflag);
+	nsent = p_send(s->s, (char*)data, len, urgentflag);
 	noise_ultralight(nsent);
 	if (nsent <= 0) {
 	    err = (nsent < 0 ? p_WSAGetLastError() : 0);
@@ -1379,7 +1379,7 @@ int select_result(WPARAM wParam, LPARAM lParam)
     if (wParam == 0)
 	return 1;		       /* boggle */
 
-    s = find234(sktree, (void *) wParam, cmpforsearch);
+    s = (Actual_Socket)find234(sktree, (void *) wParam, cmpforsearch);
     if (!s)
 	return 1;		       /* boggle */
 
@@ -1469,7 +1469,7 @@ int select_result(WPARAM wParam, LPARAM lParam)
 	ret = p_recv(s->s, buf, sizeof(buf), MSG_OOB);
 	noise_ultralight(ret);
 	if (ret <= 0) {
-	    char *str = (ret == 0 ? "Internal networking trouble" :
+	    const char *str = (ret == 0 ? "Internal networking trouble" :
 			 winsock_error_string(p_WSAGetLastError()));
 	    /* We're inside the Windows frontend here, so we know
 	     * that the frontend handle is unnecessary. */
@@ -1569,7 +1569,7 @@ void net_pending_errors(void)
      */
 
     do {
-	for (i = 0; (s = index234(sktree, i)) != NULL; i++) {
+	for (i = 0; (s = (Actual_Socket)index234(sktree, i)) != NULL; i++) {
 	    if (s->pending_error) {
 		/*
 		 * An error has occurred on this socket. Pass it to the
@@ -1636,7 +1636,7 @@ void socket_reselect_all(void)
     Actual_Socket s;
     int i;
 
-    for (i = 0; (s = index234(sktree, i)) != NULL; i++) {
+    for (i = 0; (s = (Actual_Socket)index234(sktree, i)) != NULL; i++) {
 	if (!s->frozen)
 	    do_select(s->s, 1);
     }
@@ -1649,19 +1649,19 @@ SOCKET first_socket(int *state)
 {
     Actual_Socket s;
     *state = 0;
-    s = index234(sktree, (*state)++);
+    s = (Actual_Socket)index234(sktree, (*state)++);
     return s ? s->s : INVALID_SOCKET;
 }
 
 SOCKET next_socket(int *state)
 {
-    Actual_Socket s = index234(sktree, (*state)++);
+    Actual_Socket s = (Actual_Socket)index234(sktree, (*state)++);
     return s ? s->s : INVALID_SOCKET;
 }
 
 extern int socket_writable(SOCKET skt)
 {
-    Actual_Socket s = find234(sktree, (void *)skt, cmpforsearch);
+    Actual_Socket s = (Actual_Socket )find234(sktree, (void *)skt, cmpforsearch);
 
     if (s)
 	return bufchain_size(&s->output_data) > 0;
@@ -1695,8 +1695,7 @@ char *get_hostname(void)
     return hostname;
 }
 
-SockAddr platform_get_x11_unix_address(const char *display, int displaynum,
-				       char **canonicalname)
+SockAddr platform_get_x11_unix_address(const char *display, int displaynum)
 {
     SockAddr ret = snew(struct SockAddr_tag);
     memset(ret, 0, sizeof(struct SockAddr_tag));

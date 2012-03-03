@@ -171,7 +171,7 @@ static tree234 *passphrases = NULL;
 static void forget_passphrases(void)
 {
     while (count234(passphrases) > 0) {
-	char *pp = index234(passphrases, 0);
+	char *pp = (char *)index234(passphrases, 0);
 	memset(pp, 0, strlen(pp));
 	delpos234(passphrases, 0);
 	free(pp);
@@ -332,7 +332,7 @@ static void keylist_update(void)
 
     if (keylist) {
 	SendDlgItemMessage(keylist, 100, LB_RESETCONTENT, 0, 0);
-	for (i = 0; NULL != (rkey = index234(rsakeys, i)); i++) {
+	for (i = 0; NULL != (rkey = (RSAKey*)index234(rsakeys, i)); i++) {
 	    char listentry[512], *p;
 	    /*
 	     * Replace two spaces in the fingerprint with tabs, for
@@ -350,7 +350,7 @@ static void keylist_update(void)
 	    SendDlgItemMessage(keylist, 100, LB_ADDSTRING,
 			       0, (LPARAM) listentry);
 	}
-	for (i = 0; NULL != (skey = index234(ssh2keys, i)); i++) {
+	for (i = 0; NULL != (skey = (struct ssh2_userkey*)index234(ssh2keys, i)); i++) {
 	    char listentry[512], *p;
 	    int len;
 	    /*
@@ -422,7 +422,7 @@ static void add_keyfile(Filename filename)
 		sfree(msg);
 		return;
 	    }
-	    keylist = get_keylist1(&keylistlen);
+	    keylist = (unsigned char*)get_keylist1(&keylistlen);
 	} else {
 	    unsigned char *blob2;
 	    blob = ssh2_userkey_loadpub(&filename, NULL, &bloblen,
@@ -441,7 +441,7 @@ static void add_keyfile(Filename filename)
 	    sfree(blob);
 	    blob = blob2;
 
-	    keylist = get_keylist2(&keylistlen);
+	    keylist = (unsigned char*)get_keylist2(&keylistlen);
 	}
 	if (keylist) {
 	    if (keylistlen < 4) {
@@ -525,7 +525,7 @@ static void add_keyfile(Filename filename)
     do {
 	if (needs_pass) {
 	    /* try all the remembered passphrases first */
-	    char *pp = index234(passphrases, attempts);
+	    char *pp = (char*)index234(passphrases, attempts);
 	    if(pp) {
 		strcpy(passphrase, pp);
 	    } else {
@@ -615,7 +615,7 @@ static void add_keyfile(Filename filename)
 	    ret = agent_query(request, reqlen, &vresponse, &resplen,
 			      NULL, NULL);
 	    assert(ret == 1);
-	    response = vresponse;
+	    response = (unsigned char*)vresponse;
 	    if (resplen < 5 || response[4] != SSH_AGENT_SUCCESS)
 		MessageBox(NULL, "The already running Pageant "
 			   "refused to add the key.", APPNAME,
@@ -662,7 +662,7 @@ static void add_keyfile(Filename filename)
 	    ret = agent_query(request, reqlen, &vresponse, &resplen,
 			      NULL, NULL);
 	    assert(ret == 1);
-	    response = vresponse;
+	    response = (unsigned char*)vresponse;
 	    if (resplen < 5 || response[4] != SSH_AGENT_SUCCESS)
 		MessageBox(NULL, "The already running Pageant "
 			   "refused to add the key.", APPNAME,
@@ -695,7 +695,7 @@ static void *make_keylist1(int *length)
      */
     len = 4;
     nkeys = 0;
-    for (i = 0; NULL != (key = index234(rsakeys, i)); i++) {
+    for (i = 0; NULL != (key = (struct RSAKey *)index234(rsakeys, i)); i++) {
 	nkeys++;
 	blob = rsa_public_blob(key, &bloblen);
 	len += bloblen;
@@ -709,7 +709,7 @@ static void *make_keylist1(int *length)
 
     PUT_32BIT(p, nkeys);
     p += 4;
-    for (i = 0; NULL != (key = index234(rsakeys, i)); i++) {
+    for (i = 0; NULL != (key = (struct RSAKey *)index234(rsakeys, i)); i++) {
 	blob = rsa_public_blob(key, &bloblen);
 	memcpy(p, blob, bloblen);
 	p += bloblen;
@@ -739,7 +739,7 @@ static void *make_keylist2(int *length)
      */
     len = 4;
     nkeys = 0;
-    for (i = 0; NULL != (key = index234(ssh2keys, i)); i++) {
+    for (i = 0; NULL != (key = (struct ssh2_userkey *)index234(ssh2keys, i)); i++) {
 	nkeys++;
 	len += 4;	       /* length field */
 	blob = key->alg->public_blob(key->data, &bloblen);
@@ -758,7 +758,7 @@ static void *make_keylist2(int *length)
      */
     PUT_32BIT(p, nkeys);
     p += 4;
-    for (i = 0; NULL != (key = index234(ssh2keys, i)); i++) {
+    for (i = 0; NULL != (key = (struct ssh2_userkey *)index234(ssh2keys, i)); i++) {
 	blob = key->alg->public_blob(key->data, &bloblen);
 	PUT_32BIT(p, bloblen);
 	p += 4;
@@ -792,7 +792,7 @@ static void *get_keylist1(int *length)
 
 	retval = agent_query(request, 5, &vresponse, &resplen, NULL, NULL);
 	assert(retval == 1);
-	response = vresponse;
+	response = (unsigned char*)vresponse;
 	if (resplen < 5 || response[4] != SSH1_AGENT_RSA_IDENTITIES_ANSWER)
 	    return NULL;
 
@@ -827,7 +827,7 @@ static void *get_keylist2(int *length)
 
 	retval = agent_query(request, 5, &vresponse, &resplen, NULL, NULL);
 	assert(retval == 1);
-	response = vresponse;
+	response = (unsigned char*)vresponse;
 	if (resplen < 5 || response[4] != SSH2_AGENT_IDENTITIES_ANSWER)
 	    return NULL;
 
@@ -848,8 +848,8 @@ static void *get_keylist2(int *length)
  */
 static void answer_msg(void *msg)
 {
-    unsigned char *p = msg;
-    unsigned char *ret = msg;
+    unsigned char *p = (unsigned char *)msg;
+    unsigned char *ret = (unsigned char *)msg;
     unsigned char *msgend;
     int type;
 
@@ -941,7 +941,7 @@ static void answer_msg(void *msg)
 	    p += 16;
 	    if (msgend < p+4 ||
 		GET_32BIT(p) != 1 ||
-		(key = find234(rsakeys, &reqkey, NULL)) == NULL) {
+		(key = (RSAKey*)find234(rsakeys, &reqkey, NULL)) == NULL) {
 		freebn(reqkey.exponent);
 		freebn(reqkey.modulus);
 		freebn(challenge);
@@ -997,10 +997,10 @@ static void answer_msg(void *msg)
 	    if (msgend < p+datalen)
 		goto failure;
 	    data = p;
-	    key = find234(ssh2keys, &b, cmpkeys_ssh2_asymm);
+	    key = (ssh2_userkey*)find234(ssh2keys, &b, cmpkeys_ssh2_asymm);
 	    if (!key)
 		goto failure;
-	    signature = key->alg->sign(key->data, data, datalen, &siglen);
+	    signature = key->alg->sign(key->data, (char*)data, datalen, &siglen);
 	    len = 5 + 4 + siglen;
 	    PUT_32BIT(ret, len - 4);
 	    ret[4] = SSH2_AGENT_SIGN_RESPONSE;
@@ -1110,7 +1110,7 @@ static void answer_msg(void *msg)
 	    p += 4;
 	    if (msgend < p+alglen)
 		goto failure;
-	    alg = p;
+	    alg = (char*)p;
 	    p += alglen;
 
 	    key = snew(struct ssh2_userkey);
@@ -1183,7 +1183,7 @@ static void answer_msg(void *msg)
 	    if (n < 0)
 		goto failure;
 
-	    key = find234(rsakeys, &reqkey, NULL);
+	    key = (RSAKey*)find234(rsakeys, &reqkey, NULL);
 	    freebn(reqkey.exponent);
 	    freebn(reqkey.modulus);
 	    PUT_32BIT(ret, 1);
@@ -1217,7 +1217,7 @@ static void answer_msg(void *msg)
 	    b.blob = p;
 	    p += b.len;
 
-	    key = find234(ssh2keys, &b, cmpkeys_ssh2_asymm);
+	    key = (ssh2_userkey*)find234(ssh2keys, &b, cmpkeys_ssh2_asymm);
 	    if (!key)
 		goto failure;
 
@@ -1239,7 +1239,7 @@ static void answer_msg(void *msg)
 	{
 	    struct RSAKey *rkey;
 
-	    while ((rkey = index234(rsakeys, 0)) != NULL) {
+	    while ((rkey = (RSAKey *)index234(rsakeys, 0)) != NULL) {
 		del234(rsakeys, rkey);
 		freersakey(rkey);
 		sfree(rkey);
@@ -1257,7 +1257,7 @@ static void answer_msg(void *msg)
 	{
 	    struct ssh2_userkey *skey;
 
-	    while ((skey = index234(ssh2keys, 0)) != NULL) {
+	    while ((skey = (struct ssh2_userkey *)index234(ssh2keys, 0)) != NULL) {
 		del234(ssh2keys, skey);
 		skey->alg->freekey(skey->data);
 		sfree(skey);
@@ -1542,7 +1542,7 @@ static int CALLBACK KeyListProc(HWND hwnd, UINT msg,
 		 * things hence altering the offset of subsequent items
 		 */
 	    for (i = sCount - 1; (itemNum >= 0) && (i >= 0); i--) {
-			skey = index234(ssh2keys, i);
+			skey = (ssh2_userkey*)index234(ssh2keys, i);
 			
 			if (selectedArray[itemNum] == rCount + i) {
 				del234(ssh2keys, skey);
@@ -1554,7 +1554,7 @@ static int CALLBACK KeyListProc(HWND hwnd, UINT msg,
 		
 		/* do the same for the rsa keys */
 		for (i = rCount - 1; (itemNum >= 0) && (i >= 0); i--) {
-			rkey = index234(rsakeys, i);
+			rkey = (RSAKey*)index234(rsakeys, i);
 
 			if(selectedArray[itemNum] == i) {
 				del234(rsakeys, rkey);
@@ -1939,10 +1939,11 @@ void cleanup_exit(int code)
     exit(code);
 }
 
-int flags = FLAG_SYNCAGENT;
+//int flags = FLAG_SYNCAGENT;
 
 int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 {
+	flags = FLAG_SYNCAGENT;
     WNDCLASS wndclass;
     MSG msg;
     HMODULE advapi;
@@ -2104,7 +2105,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
 	wndclass.hInstance = inst;
 	wndclass.hIcon = LoadIcon(inst, MAKEINTRESOURCE(IDI_MAINICON));
 	wndclass.hCursor = LoadCursor(NULL, IDC_IBEAM);
-	wndclass.hbrBackground = GetStockObject(BLACK_BRUSH);
+	wndclass.hbrBackground = (HBRUSH__*)GetStockObject(BLACK_BRUSH);
 	wndclass.lpszMenuName = NULL;
 	wndclass.lpszClassName = APPNAME;
 

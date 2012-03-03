@@ -44,7 +44,7 @@ struct X11Private {
 
 static int xdmseen_cmp(void *a, void *b)
 {
-    struct XDMSeen *sa = a, *sb = b;
+    struct XDMSeen *sa = (struct XDMSeen *)a, *sb = (struct XDMSeen *)b;
     return sa->time > sb->time ? 1 :
 	   sa->time < sb->time ? -1 :
            memcmp(sa->clientid, sb->clientid, sizeof(sa->clientid));
@@ -258,7 +258,7 @@ void x11_free_display(struct X11Display *disp)
 {
     if (disp->xdmseen != NULL) {
 	struct XDMSeen *seen;
-	while ((seen = delpos234(disp->xdmseen, 0)) != NULL)
+	while ((seen = (struct XDMSeen *)delpos234(disp->xdmseen, 0)) != NULL)
 	    sfree(seen);
 	freetree234(disp->xdmseen);
     }
@@ -318,14 +318,14 @@ static char *x11_verify(unsigned long peer_ip, int peer_port,
 	seen->time = t;
 	memcpy(seen->clientid, data+8, 6);
 	assert(disp->xdmseen != NULL);
-	ret = add234(disp->xdmseen, seen);
+	ret = (struct XDMSeen *)add234(disp->xdmseen, seen);
 	if (ret != seen) {
 	    sfree(seen);
 	    return "XDM-AUTHORIZATION-1 data replayed";
 	}
 	/* While we're here, purge entries too old to be replayed. */
 	for (;;) {
-	    seen = index234(disp->xdmseen, 0);
+	    seen = (struct XDMSeen *)index234(disp->xdmseen, 0);
 	    assert(seen != NULL);
 	    if (t - seen->time <= XDM_MAXSKEW)
 		break;
@@ -509,7 +509,7 @@ static int x11_closing(Plug plug, const char *error_msg, int error_code,
      * so if an error occurred on the socket, we just ignore it
      * and treat it like a proper close.
      */
-    sshfwd_close(pr->c);
+    sshfwd_close((ssh_channel*)pr->c);
     x11_close(pr->s);
     return 1;
 }
@@ -518,7 +518,7 @@ static int x11_receive(Plug plug, int urgent, char *data, int len)
 {
     struct X11Private *pr = (struct X11Private *) plug;
 
-    if (sshfwd_write(pr->c, data, len) > 0) {
+    if (sshfwd_write((ssh_channel*)pr->c, data, len) > 0) {
 	pr->throttled = 1;
 	sk_set_frozen(pr->s, 1);
     }
@@ -530,7 +530,7 @@ static void x11_sent(Plug plug, int bufsize)
 {
     struct X11Private *pr = (struct X11Private *) plug;
 
-    sshfwd_unthrottle(pr->c, bufsize);
+    sshfwd_unthrottle((ssh_channel*)pr->c, bufsize);
 }
 
 /*
@@ -722,8 +722,8 @@ int x11_send(Socket s, char *data, int len)
 	    PUT_16BIT(pr->firstpkt[0], reply + 6, msgsize >> 2);/* data len */
 	    memset(reply + 8, 0, msgsize);
 	    memcpy(reply + 8, message, msglen);
-	    sshfwd_write(pr->c, (char *)reply, 8 + msgsize);
-	    sshfwd_close(pr->c);
+	    sshfwd_write((ssh_channel*)pr->c, (char *)reply, 8 + msgsize);
+	    sshfwd_close((ssh_channel*)pr->c);
 	    x11_close(s);
 	    sfree(reply);
 	    sfree(message);

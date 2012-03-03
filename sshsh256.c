@@ -201,14 +201,14 @@ static void *sha256_init(void)
 
 static void sha256_bytes(void *handle, void *p, int len)
 {
-    SHA256_State *s = handle;
+    SHA256_State *s = (SHA256_State *)handle;
 
     SHA256_Bytes(s, p, len);
 }
 
 static void sha256_final(void *handle, unsigned char *output)
 {
-    SHA256_State *s = handle;
+    SHA256_State *s = (SHA256_State *)handle;
 
     SHA256_Final(s, output);
     sfree(s);

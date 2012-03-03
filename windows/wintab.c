@@ -38,6 +38,8 @@ extern int on_key(wintabitem* tabitem, HWND hwnd, UINT message,
 extern int on_button(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
 extern void process_log_status(wintabitem* tabitem);
+int on_session_menu(HWND hwnd, UINT message,
+				WPARAM wParam, LPARAM lParam);
 
 const char* const WINTAB_PAGE_CLASS = "WintabPage";
 int wintabpage_registed = 0;
@@ -885,11 +887,11 @@ int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
     hdc = BeginPaint(hwnd, &p);
     
     hBrush = CreateSolidBrush (wintab->bg_col);
-    hOldBrush = SelectObject(hdc, hBrush);
+    hOldBrush = (HBRUSH__*)SelectObject(hdc, hBrush);
     FillRect(hdc, &p.rcPaint, hBrush); 
 
     hSelBrush = CreateSolidBrush (wintab->sel_col);
-    hOldBrush = SelectObject(hdc, hSelBrush);
+    hOldBrush = (HBRUSH__*)SelectObject(hdc, hSelBrush);
     
     hPen = CreatePen(PS_SOLID, 1, wintab->sel_col);
     hOldPen = SelectObject(hdc, hPen); 
@@ -1020,7 +1022,7 @@ int wintab_on_rclick(wintab* wintab, HWND hWnd, UINT message,
     if (i >= tabitem->n_specials)
         return 0;
     if (tabitem->back)
-        tabitem->back->special(tabitem->backhandle, tabitem->specials[i].code);
+        tabitem->back->special(tabitem->backhandle, (Telnet_Special)tabitem->specials[i].code);
     net_pending_errors();
     return 0;
 }
@@ -1052,7 +1054,7 @@ int wintab_on_drawbtn(wintab* wintab, HWND hWnd, UINT message,
 LRESULT CALLBACK SearchEditWndProc(HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    wintab* tab = win_get_data(hWnd);
+    wintab* tab = (wintab*)win_get_data(hWnd);
     if (tab == NULL) 
         return 0; 
     //debug(("[SearchEditWndProc]%s:%s\n", hWnd == tab->hSearchEdit? "SearchEditMsg"
@@ -1239,11 +1241,11 @@ VOID CALLBACK wintab_timerProc(HWND hWnd, UINT uMsg, UINT_PTR idEvent, DWORD dwT
     
     RECT wc;
     POINT pt;
-    wintab* wintab = win_get_data(hWnd);
+    wintab* tab = (wintab*)(win_get_data(hWnd));
     
-    GetWindowRect(wintab->hwndTab, &wc);
+    GetWindowRect(tab->hwndTab, &wc);
     GetCursorPos(&pt);
-    ScreenToClient(wintab->hwndTab, &pt);
+    ScreenToClient(tab->hwndTab, &pt);
     int width = wc.right - wc.left;
     int height = wc.bottom - wc.top;
     
@@ -1273,7 +1275,7 @@ VOID CALLBACK wintab_timerProc(HWND hWnd, UINT uMsg, UINT_PTR idEvent, DWORD dwT
 LRESULT CALLBACK WintabWndProc(HWND hWnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 { 
-    wintab* tab = win_get_data(hWnd);
+    wintab* tab = (wintab*)win_get_data(hWnd);
     if (tab == NULL) return 0;
     //debug(("[WintabWndProc]%s:%s\n", hWnd == tab->hwndTab? "TabMsg"
     //                        : "UnknowMsg", TranslateWMessage(message))); 
@@ -1529,7 +1531,7 @@ void wintabitem_cfgtopalette(wintabitem *tabitem)
 void wintabitem_systopalette(wintabitem *tabitem)
 {
     int i;
-    static const struct { int nIndex; int norm; int bold; } or[] =
+    static const struct { int nIndex; int norm; int bold; } OR[] =
     {
 	{ COLOR_WINDOWTEXT,	256, 257 }, /* Default Foreground */
 	{ COLOR_WINDOW,		258, 259 }, /* Default Background */
@@ -1537,14 +1539,14 @@ void wintabitem_systopalette(wintabitem *tabitem)
 	{ COLOR_HIGHLIGHT,	261, 261 }, /* Cursor Colour */
     };
 
-    for (i = 0; i < (sizeof(or)/sizeof(or[0])); i++) {
-    	COLORREF colour = GetSysColor(or[i].nIndex);
-    	tabitem->defpal[or[i].norm].rgbtRed =
-    	   tabitem->defpal[or[i].bold].rgbtRed = GetRValue(colour);
-    	tabitem->defpal[or[i].norm].rgbtGreen =
-    	   tabitem->defpal[or[i].bold].rgbtGreen = GetGValue(colour);
-    	tabitem->defpal[or[i].norm].rgbtBlue =
-    	   tabitem->defpal[or[i].bold].rgbtBlue = GetBValue(colour);
+    for (i = 0; i < (sizeof(OR)/sizeof(OR[0])); i++) {
+    	COLORREF colour = GetSysColor(OR[i].nIndex);
+    	tabitem->defpal[OR[i].norm].rgbtRed =
+    	   tabitem->defpal[OR[i].bold].rgbtRed = GetRValue(colour);
+    	tabitem->defpal[OR[i].norm].rgbtGreen =
+    	   tabitem->defpal[OR[i].bold].rgbtGreen = GetGValue(colour);
+    	tabitem->defpal[OR[i].norm].rgbtBlue =
+    	   tabitem->defpal[OR[i].bold].rgbtBlue = GetBValue(colour);
     }
 }
 
@@ -1662,7 +1664,7 @@ void wintabitem_init_fonts(wintabitem *tabitem, const int pick_width, const int 
 
 	und_dc = CreateCompatibleDC(hdc);
 	und_bm = CreateCompatibleBitmap(hdc, tabitem->font_width, tabitem->font_height);
-	und_oldbm = SelectObject(und_dc, und_bm);
+	und_oldbm = (HBITMAP__*)SelectObject(und_dc, und_bm);
 	SelectObject(und_dc, tabitem->fonts[FONT_UNDERLINE]);
 	SetTextAlign(und_dc, TA_TOP | TA_LEFT | TA_NOUPDATECP);
 	SetTextColor(und_dc, RGB(255, 255, 255));
@@ -1856,7 +1858,7 @@ void wintabitem_init_palette(wintabitem *tabitem)
 	     * This is a genuine case where we must use smalloc
 	     * because the snew macros can't cope.
 	     */
-	    tabitem->logpal = smalloc(sizeof(*tabitem->logpal)
+	    tabitem->logpal = (tagLOGPALETTE*)smalloc(sizeof(*tabitem->logpal)
 			     - sizeof(tabitem->logpal->palPalEntry)
 			     + NALLCOLOURS * sizeof(PALETTEENTRY));
 	    tabitem->logpal->palVersion = 0x300;
@@ -1871,7 +1873,7 @@ void wintabitem_init_palette(wintabitem *tabitem)
 	    if (tabitem->pal) {
     		SelectPalette(hdc, tabitem->pal, FALSE);
     		RealizePalette(hdc);
-    		SelectPalette(hdc, GetStockObject(DEFAULT_PALETTE), FALSE);
+    		SelectPalette(hdc, (HPALETTE__*)GetStockObject(DEFAULT_PALETTE), FALSE);
 	    }
 	}
 	ReleaseDC(tabitem->page.hwndCtrl, hdc);
@@ -1948,7 +1950,7 @@ void wintabitem_require_resize(wintabitem *tabitem, int term_width, int term_hei
     int parent_width = page_width + tabitem->page.extra_width;
     int parent_height = page_height + tabitem->page.extra_height;
     
-    wintab_require_resize(tabitem->parentTab, parent_width, parent_height); 
+    wintab_require_resize((wintab*)tabitem->parentTab, parent_width, parent_height);
 
     SetWindowPos(tabitem->page.hwndCtrl, NULL, 0, 0, 
         page_width, page_height, SWP_NOMOVE | SWP_NOZORDER); 
@@ -1961,7 +1963,7 @@ void wintabitem_require_resize(wintabitem *tabitem, int term_width, int term_hei
 
 void wintabitem_get_extra_size(wintabitem *tabitem, int *extra_width, int *extra_height)
 {
-    wintab_get_extra_size(tabitem->parentTab, extra_width, extra_height);
+    wintab_get_extra_size((wintab*)tabitem->parentTab, extra_width, extra_height);
     *extra_width += tabitem->page.extra_page_width + tabitem->page.extra_width;
     *extra_height += tabitem->page.extra_page_height + tabitem->page.extra_height;
 }
@@ -2140,10 +2142,10 @@ int wintabitem_on_paint(wintabitem* tabitem, HWND hwnd, UINT message,
     	HPEN   edge, oldpen;
     	fillcolour = CreateSolidBrush (
     			    tmp_tabitem.colours[ATTR_DEFBG>>ATTR_BGSHIFT]);
-    	oldbrush = SelectObject(tmp_tabitem.hdc, fillcolour);
+    	oldbrush = (HBRUSH__*)SelectObject(tmp_tabitem.hdc, fillcolour);
     	edge = CreatePen(PS_SOLID, 0, 
     			    tmp_tabitem.colours[ATTR_DEFBG>>ATTR_BGSHIFT]);
-    	oldpen = SelectObject(tmp_tabitem.hdc, edge);
+    	oldpen = (HPEN__*)SelectObject(tmp_tabitem.hdc, edge);
 
     	/*
     	 * Jordan Russell reports that this apparently
@@ -2421,7 +2423,7 @@ LRESULT CALLBACK WintabpageWndProc(HWND hwnd, UINT message,
     //extern wintab tab;
     //debug(("[WintabpageWndProc]%s:%s\n", hwnd == tab.items[tab.cur]->page.hwndCtrl ? "PageMsg"
     //                        : "UnknowMsg", TranslateWMessage(message)));
-    wintabitem* tabitem = win_get_data(hwnd);
+    wintabitem* tabitem = (wintabitem*)win_get_data(hwnd);
     if (tabitem == NULL){
         return DefWindowProc(hwnd, message, wParam, lParam);
     }

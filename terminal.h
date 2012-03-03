@@ -78,6 +78,32 @@ typedef struct{
     pos end;
 } hit_pos;
 
+typedef enum {
+	NO_SELECTION, ABOUT_TO, DRAGGING, SELECTED
+    } SelState;
+typedef enum {
+	TOPLEVEL,
+	SEEN_ESC,
+	SEEN_CSI,
+	SEEN_OSC,
+	SEEN_OSC_W,
+
+	DO_CTRLS,
+
+	SEEN_OSC_P,
+	OSC_STRING, OSC_MAYBE_ST,
+	VT52_ESC,
+	VT52_Y1,
+	VT52_Y2,
+	VT52_FG,
+	VT52_BG
+    }TermState;
+typedef enum {
+	LEXICOGRAPHIC, RECTANGULAR
+    }SelType;
+typedef enum {
+	SM_CHAR, SM_WORD, SM_LINE
+    }SelMode;
 struct terminal_tag {
 
     int compatibility_level;
@@ -190,33 +216,11 @@ struct terminal_tag {
 
     unsigned char *tabs;
 
-    enum {
-	TOPLEVEL,
-	SEEN_ESC,
-	SEEN_CSI,
-	SEEN_OSC,
-	SEEN_OSC_W,
+    TermState termstate;
 
-	DO_CTRLS,
-
-	SEEN_OSC_P,
-	OSC_STRING, OSC_MAYBE_ST,
-	VT52_ESC,
-	VT52_Y1,
-	VT52_Y2,
-	VT52_FG,
-	VT52_BG
-    } termstate;
-
-    enum {
-	NO_SELECTION, ABOUT_TO, DRAGGING, SELECTED
-    } selstate;
-    enum {
-	LEXICOGRAPHIC, RECTANGULAR
-    } seltype;
-    enum {
-	SM_CHAR, SM_WORD, SM_LINE
-    } selmode;
+    SelState selstate;
+    int seltype;
+    SelMode selmode;
     pos selstart, selend, selanchor;
 
     short wordness[256];

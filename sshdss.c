@@ -376,7 +376,7 @@ static void *dss_createkey(unsigned char *pub_blob, int pub_len,
     unsigned char digest[20];
     Bignum ytest;
 
-    dss = dss_newkey((char *) pub_blob, pub_len);
+    dss = (struct dss_key*)dss_newkey((char *) pub_blob, pub_len);
     dss->x = getmp(&pb, &priv_len);
 
     /*
@@ -470,7 +470,7 @@ static int dss_pubkey_bits(void *blob, int len)
     struct dss_key *dss;
     int ret;
 
-    dss = dss_newkey((char *) blob, len);
+    dss = (struct dss_key*)dss_newkey((char *) blob, len);
     ret = bignum_bitcount(dss->p);
     dss_freekey(dss);
 

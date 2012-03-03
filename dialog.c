@@ -223,7 +223,7 @@ static union control *ctrl_new(struct controlset *s, int type,
 /* `ncolumns' is followed by that many percentages, as integers. */
 union control *ctrl_columns(struct controlset *s, int ncolumns, ...)
 {
-    union control *c = ctrl_new(s, CTRL_COLUMNS, P(NULL), NULL, P(NULL));
+    union control *c = ctrl_new(s, CTRL_COLUMNS, P((void*)NULL), NULL, P((void*)NULL));
     assert(s->ncolumns == 1 || ncolumns == 1);
     c->columns.ncols = ncolumns;
     s->ncolumns = ncolumns;
@@ -241,7 +241,7 @@ union control *ctrl_columns(struct controlset *s, int ncolumns, ...)
     return c;
 }
 
-union control *ctrl_editbox(struct controlset *s, char *label, char shortcut,
+union control *ctrl_editbox(struct controlset *s, const char *label, char shortcut,
 			    int percentage,
 			    intorptr helpctx, handler_fn handler,
 			    intorptr context, intorptr context2)
@@ -323,7 +323,7 @@ union control *ctrl_radiobuttons(struct controlset *s, char *label,
     return c;
 }
 
-union control *ctrl_pushbutton(struct controlset *s,char *label,char shortcut,
+union control *ctrl_pushbutton(struct controlset *s,const char *label,char shortcut,
 			       intorptr helpctx, handler_fn handler,
 			       intorptr context)
 {
@@ -409,14 +409,14 @@ union control *ctrl_fontsel(struct controlset *s,char *label,char shortcut,
 
 union control *ctrl_tabdelay(struct controlset *s, union control *ctrl)
 {
-    union control *c = ctrl_new(s, CTRL_TABDELAY, P(NULL), NULL, P(NULL));
+    union control *c = ctrl_new(s, CTRL_TABDELAY, P((void*)NULL), NULL, P((void*)NULL));
     c->tabdelay.ctrl = ctrl;
     return c;
 }
 
 union control *ctrl_text(struct controlset *s, char *text, intorptr helpctx)
 {
-    union control *c = ctrl_new(s, CTRL_TEXT, helpctx, NULL, P(NULL));
+    union control *c = ctrl_new(s, CTRL_TEXT, helpctx, NULL, P((void*)NULL));
     c->text.label = dupstr(text);
     return c;
 }
@@ -601,8 +601,8 @@ void dlg_pwdcheckbox_handler(union control *ctrl, void *dlg,
 {
     dlg_stdcheckbox_handler(ctrl, dlg, data, event);
     if (ctrl->checkbox.relctrl){
-        dlg_editbox_set_hide(ctrl->checkbox.relctrl, dlg, 
+        dlg_editbox_set_hide((control*)ctrl->checkbox.relctrl, dlg,
             dlg_checkbox_get(ctrl, dlg));
-        dlg_set_focus(ctrl->checkbox.relctrl, dlg);
+        dlg_set_focus((control*)ctrl->checkbox.relctrl, dlg);
     }
 }

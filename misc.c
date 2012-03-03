@@ -600,7 +600,7 @@ void debug_printf(char *fmt, ...)
 void debug_memdump(void *buf, int len, int L)
 {
     int i;
-    unsigned char *p = buf;
+    unsigned char *p = (unsigned char *)buf;
     char foo[17];
     if (L) {
 	int delta;
@@ -705,14 +705,18 @@ void autocmd_init(Config *cfg)
  */
 
 void exec_autocmd(void *handle, Config *cfg,
-    char *recv_buf, int len, 
-    int (*send) (void *handle, char *buf, int len))
+    const char *recv_buf, int len, 
+    int (*send) (void *handle, const char *buf, int len))
 {
-    char* autocmd = get_autocmd(cfg, recv_buf, len);
+    const char* autocmd = get_autocmd(cfg, recv_buf, len);
     if (autocmd == NULL)
         return;
-    if (strlen(autocmd) > 0)
-        send(handle, autocmd,strlen(autocmd));
+	int cmdlen = strlen(autocmd);
+	cmdlen = cmdlen > 127 ? 127 : cmdlen;
+    if (cmdlen > 0)
+    {
+        send(handle, autocmd,cmdlen);
+    }
     send(handle, "\n", 1);
 }
 
@@ -721,7 +725,7 @@ void exec_autocmd(void *handle, Config *cfg,
  * NULL if unmatched
  */
 const char* get_autocmd(Config *cfg,
-    char *recv_buf, int len)
+    const char *recv_buf, int len)
 {
     /* in case the packet is coming partially */
     const int  LSIZE = sizeof(cfg->autocmd_lastprint) - 1;

@@ -416,9 +416,9 @@ static IShellLink *make_shell_link(const char *appname,
     }
 
     /* Create the new item. */
-    if (!SUCCEEDED(CoCreateInstance(&CLSID_ShellLink, NULL,
+    if (!SUCCEEDED(CoCreateInstance(CLSID_ShellLink, NULL,
                                     CLSCTX_INPROC_SERVER,
-                                    COMPTR(IShellLink, &ret))))
+                                    *COMPTR(IShellLink, &ret))))
         return NULL;
 
     /* Set path, parameters, icon and description. */
@@ -489,9 +489,9 @@ static void update_jumplist_from_registry(void)
      * Create an ICustomDestinationList: the top-level object which
      * deals with jump list management.
      */
-    if (!SUCCEEDED(CoCreateInstance(&CLSID_DestinationList, NULL,
+    if (!SUCCEEDED(CoCreateInstance(CLSID_DestinationList, NULL,
                                     CLSCTX_INPROC_SERVER,
-                                    COMPTR(ICustomDestinationList, &pCDL))))
+                                    *COMPTR(ICustomDestinationList, &pCDL))))
         goto cleanup;
 
     /*
@@ -512,9 +512,9 @@ static void update_jumplist_from_registry(void)
      * Create an object collection to form the 'Recent Sessions'
      * category on the jump list.
      */
-    if (!SUCCEEDED(CoCreateInstance(&CLSID_EnumerableObjectCollection,
+    if (!SUCCEEDED(CoCreateInstance(CLSID_EnumerableObjectCollection,
                                     NULL, CLSCTX_INPROC_SERVER,
-                                    COMPTR(IObjectCollection, &collection))))
+                                    *COMPTR(IObjectCollection, &collection))))
         goto cleanup;
 
     /*
@@ -577,9 +577,9 @@ static void update_jumplist_from_registry(void)
      * Create an object collection to form the 'Tasks' category on the
      * jump list.
      */
-    if (!SUCCEEDED(CoCreateInstance(&CLSID_EnumerableObjectCollection,
+    if (!SUCCEEDED(CoCreateInstance(CLSID_EnumerableObjectCollection,
                                     NULL, CLSCTX_INPROC_SERVER,
-                                    COMPTR(IObjectCollection, &collection))))
+                                    *COMPTR(IObjectCollection, &collection))))
         goto cleanup;
 
     /*
@@ -619,9 +619,9 @@ static void update_jumplist_from_registry(void)
      * Create another object collection to form the user tasks
      * category.
      */
-    if (!SUCCEEDED(CoCreateInstance(&CLSID_EnumerableObjectCollection,
+    if (!SUCCEEDED(CoCreateInstance(CLSID_EnumerableObjectCollection,
                                     NULL, CLSCTX_INPROC_SERVER,
-                                    COMPTR(IObjectCollection, &collection))))
+                                    *COMPTR(IObjectCollection, &collection))))
         goto cleanup;
 
     /*
@@ -667,8 +667,8 @@ void clear_jumplist(void)
 {
     ICustomDestinationList *pCDL;
 
-    if (CoCreateInstance(&CLSID_DestinationList, NULL, CLSCTX_INPROC_SERVER,
-                         COMPTR(ICustomDestinationList, &pCDL)) == S_OK) {
+    if (CoCreateInstance(CLSID_DestinationList, NULL, CLSCTX_INPROC_SERVER,
+                         *COMPTR(ICustomDestinationList, &pCDL)) == S_OK) {
         pCDL->lpVtbl->DeleteList(pCDL, NULL);
         pCDL->lpVtbl->Release(pCDL);
     }

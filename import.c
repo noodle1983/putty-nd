@@ -253,7 +253,7 @@ static int ber_write_id_len(void *dest, int id, int length, int flags)
     return len;
 }
 
-static int put_string(void *target, void *data, int len)
+static int put_string(void *target, const void *data, int len)
 {
     unsigned char *d = (unsigned char *)target;
 
@@ -752,9 +752,9 @@ int openssh_write(const Filename *filename, struct ssh2_userkey *key,
         assert(e.start && iqmp.start); /* can't go wrong */
 
         /* We also need d mod (p-1) and d mod (q-1). */
-        bd = bignum_from_bytes(d.start, d.bytes);
-        bp = bignum_from_bytes(p.start, p.bytes);
-        bq = bignum_from_bytes(q.start, q.bytes);
+        bd = bignum_from_bytes((unsigned char*)d.start, d.bytes);
+        bp = bignum_from_bytes((unsigned char*)p.start, p.bytes);
+        bq = bignum_from_bytes((unsigned char*)q.start, q.bytes);
         decbn(bp);
         decbn(bq);
         bdmp1 = bigmod(bd, bp);
@@ -1602,7 +1602,7 @@ int sshcom_write(const Filename *filename, struct ssh2_userkey *key,
     pos += 4;			       /* length field, fill in later */
     pos += put_string(outblob+pos, type, strlen(type));
     {
-	char *ciphertype = passphrase ? "3des-cbc" : "none";
+	const char *ciphertype = passphrase ? "3des-cbc" : "none";
 	pos += put_string(outblob+pos, ciphertype, strlen(ciphertype));
     }
     lenpos = pos;		       /* remember this position */

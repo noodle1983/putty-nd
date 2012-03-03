@@ -58,8 +58,8 @@ typedef struct winSsh_gss_ctx {
     TimeStamp expiry;
 } winSsh_gss_ctx;
 
-
-const Ssh_gss_buf gss_mech_krb5={9,"\x2A\x86\x48\x86\xF7\x12\x01\x02\x02"};
+char ssh_mech_krb5_data[] = "\x2A\x86\x48\x86\xF7\x12\x01\x02\x02";
+const Ssh_gss_buf gss_mech_krb5={9,ssh_mech_krb5_data};
 
 const char *gsslogmsg = NULL;
 
@@ -89,7 +89,7 @@ struct ssh_gss_liblist *ssh_gss_setup(const Config *cfg)
 	if (ret == ERROR_SUCCESS && type == REG_SZ) {
 	    buffer = snewn(size + 20, char);
 	    ret = RegQueryValueEx(regkey, "InstallDir", NULL,
-				  &type, buffer, &size);
+				  &type, (BYTE*)buffer, &size);
 	    if (ret == ERROR_SUCCESS && type == REG_SZ) {
 		strcat(buffer, "\\bin\\gssapi32.dll");
 		module = LoadLibrary(buffer);
@@ -394,7 +394,7 @@ static Ssh_gss_stat ssh_sspi_display_status(struct ssh_gss_library *lib,
     }
 
     buf->value = dupstr(msg);
-    buf->length = strlen(buf->value);
+    buf->length = strlen((char*)buf->value);
     
     return SSH_GSS_OK;
 }
@@ -420,7 +420,7 @@ static Ssh_gss_stat ssh_sspi_get_mic(struct ssh_gss_library *lib,
     
     if (winctx->maj_stat != SEC_E_OK ||
 	ContextSizes.cbMaxSignature == 0)
-	return winctx->maj_stat;
+	return (Ssh_gss_stat)winctx->maj_stat;
 
     InputBufferDescriptor.cBuffers = 2;
     InputBufferDescriptor.pBuffers = InputSecurityToken;
@@ -442,7 +442,7 @@ static Ssh_gss_stat ssh_sspi_get_mic(struct ssh_gss_library *lib,
 	hash->value = InputSecurityToken[1].pvBuffer;
     }
 
-    return winctx->maj_stat;
+    return (Ssh_gss_stat)winctx->maj_stat;
 }
 
 static Ssh_gss_stat ssh_sspi_free_mic(struct ssh_gss_library *lib,

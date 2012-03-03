@@ -65,7 +65,7 @@ static int serial_gotdata(struct handle *h, void *data, int len)
 
 	return 0;		       /* placate optimiser */
     } else {
-	return from_backend(serial->frontend, 0, data, len);
+	return from_backend(serial->frontend, 0, (char*)data, len);
     }
 }
 
@@ -303,7 +303,7 @@ static void serial_reconfig(void *handle, Config *cfg)
 /*
  * Called to send data down the serial connection.
  */
-static int serial_send(void *handle, char *buf, int len)
+static int serial_send(void *handle, const char *buf, int len)
 {
     Serial serial = (Serial) handle;
 

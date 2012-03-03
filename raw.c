@@ -27,7 +27,7 @@ typedef struct raw_backend_data {
 
 static void raw_size(void *handle, int width, int height);
 
-static void c_write(Raw raw, char *buf, int len)
+static void c_write(Raw raw, const char *buf, int len)
 {
     int backlog = from_backend(raw->frontend, 0, buf, len);
     sk_set_frozen(raw->s, backlog > RAW_MAX_BACKLOG);
@@ -177,7 +177,7 @@ static void raw_reconfig(void *handle, Config *cfg)
 /*
  * Called to send data down the raw connection.
  */
-static int raw_send(void *handle, char *buf, int len)
+static int raw_send(void *handle, const char *buf, int len)
 {
     Raw raw = (Raw) handle;
 

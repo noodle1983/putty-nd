@@ -631,7 +631,7 @@ void zlib_compress_cleanup(void *handle)
  * length adjustment (which is only valid for packets < 65536
  * bytes, but that seems reasonable enough).
  */
-static int zlib_disable_compression(void *handle)
+int zlib_disable_compression(void *handle)
 {
     struct LZ77Context *ectx = (struct LZ77Context *)handle;
     struct Outbuf *out = (struct Outbuf *) ectx->userdata;
@@ -938,15 +938,16 @@ static int zlib_freetable(struct zlib_table **ztab)
     return (0);
 }
 
-struct zlib_decompress_ctx {
-    struct zlib_table *staticlentable, *staticdisttable;
-    struct zlib_table *currlentable, *currdisttable, *lenlentable;
-    enum {
+typedef enum {
 	START, OUTSIDEBLK,
 	TREES_HDR, TREES_LENLEN, TREES_LEN, TREES_LENREP,
 	INBLK, GOTLENSYM, GOTLEN, GOTDISTSYM,
 	UNCOMP_LEN, UNCOMP_NLEN, UNCOMP_DATA
-    } state;
+    } ZlibDecompressState;
+struct zlib_decompress_ctx {
+    struct zlib_table *staticlentable, *staticdisttable;
+    struct zlib_table *currlentable, *currdisttable, *lenlentable;
+    ZlibDecompressState state;
     int sym, hlit, hdist, hclen, lenptr, lenextrabits, lenaddon, len,
 	lenrep;
     int uncomplen;

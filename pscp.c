@@ -58,7 +58,7 @@ const char *const appname = "PSCP";
  */
 #define MAX_SCP_BUFSIZE 16384
 
-void ldisc_send(void *handle, char *buf, int len, int interactive)
+void ldisc_send(void *handle, const char *buf, int len, int interactive)
 {
     /*
      * This is only here because of the calls to ldisc_send(NULL,
