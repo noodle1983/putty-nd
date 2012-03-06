@@ -73,6 +73,8 @@ static void enact_pending_netevent(void);
 static void flash_window(int mode);
 static void sys_cursor_update(wintabitem *tabitem);
 static int get_fullscreen_rect(RECT * ss);
+int on_reconfig(wintabitem* tabitem, UINT message,
+				WPARAM wParam, LPARAM lParam);
 
 static int kbd_codepage;
 //static HMENU specials_menu = NULL;
@@ -479,6 +481,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     int guess_width, guess_height;
     hinst = inst;
     hwnd = NULL;
+	hConfigWnd = NULL;
     flags = FLAG_VERBOSE | FLAG_INTERACTIVE;
     initialized = 0;
     config_dialog_mutex = CreateMutex(NULL, FALSE, NULL);
@@ -1815,7 +1818,12 @@ static DWORD WINAPI config_dialog_threadfunc(void *param)
 {
     DWORD wait_result = WaitForSingleObject(config_dialog_mutex, 0);
     if (WAIT_OBJECT_0 != wait_result)
+    {
+		SetForegroundWindow(hConfigWnd);
+		SetWindowPos(hConfigWnd, HWND_TOP, 0, 0, 0, 0,
+		     SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
         return -1;
+    }
     
     WPARAM wParam = (WPARAM)param;
     if (wParam == IDM_NEWSESS) {
@@ -1825,6 +1833,9 @@ static DWORD WINAPI config_dialog_threadfunc(void *param)
         }
         SendMessage(hwnd, WM_CREATE_TAB, (WPARAM)0, (LPARAM)0);   
     }
+	else if (wParam == IDM_RECONF) {
+		on_reconfig(wintab_get_active_item(&tab), 0, wParam, 0);
+	}
     ReleaseMutex(config_dialog_mutex);
     return 0;
 }
@@ -1841,7 +1852,7 @@ int on_session_menu(HWND hwnd, UINT message,
     } else if (wParam == IDM_SAVEDSESS) {
         //noodle: please try reconfigure
     	return 0;
-    } else /* IDM_NEWSESS */ {
+    } else /* IDM_NEWSESS / IDM_RECONF*/ {
         DWORD in_threadid; /* required for Win9x */
         CreateThread(NULL, 0, config_dialog_threadfunc,
    		   (void*)wParam, 0, &in_threadid);
@@ -1856,10 +1867,6 @@ int on_reconfig(wintabitem* tabitem, UINT message,
 	Config prev_cfg;
 	int init_lvl = 1;
 	int reconfig_result;
-
-   DWORD wait_result = WaitForSingleObject(config_dialog_mutex, 0);
-   if (WAIT_OBJECT_0 != wait_result)
-        return 0;
    
 	//GetWindowText(hwnd, cfg.wintitle, sizeof(cfg.wintitle));
 	prev_cfg = tabitem->cfg;
@@ -1867,7 +1874,6 @@ int on_reconfig(wintabitem* tabitem, UINT message,
 
 	reconfig_result =
 	    do_reconfig(hwnd, tabitem->back ? tabitem->back->cfg_info(tabitem->backhandle) : 0);
-   ReleaseMutex(config_dialog_mutex);
    if (!reconfig_result)
 	    return 0;
     
@@ -2056,7 +2062,8 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
         case IDM_NEWSESS:
         case IDM_DUPSESS:
         case IDM_SAVEDSESS:
-            on_session_menu(hwnd, message, wParam, lParam);
+		case IDM_RECONF:
+            on_session_menu(hwnd, message, wParam & ~0xF, lParam);
             break;
         case IDM_RESTART:{
             char *str;
@@ -2079,9 +2086,6 @@ int on_menu(wintabitem* tabitem, HWND hwnd, UINT message,
             }
             break;
         }
-        case IDM_RECONF:
-            on_reconfig(tabitem, message, wParam, lParam);
-            break;
         case IDM_COPYALL:
             term_copyall(tabitem->term);
             break;

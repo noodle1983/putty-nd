@@ -336,6 +336,8 @@ static int SaneDialogBox(HINSTANCE hinst,
     RegisterClass(&wc);
 
     hwnd = CreateDialog(hinst, tmpl, hwndparent, lpDialogFunc);
+	extern HWND hConfigWnd;
+	hConfigWnd = hwnd;
 
     SetWindowLongPtr(hwnd, BOXFLAGS, 0); /* flags */
     SetWindowLongPtr(hwnd, BOXRESULT, 0); /* result from SaneEndDialog */
@@ -373,6 +375,7 @@ static int SaneDialogBox(HINSTANCE hinst,
 
     ret=GetWindowLongPtr(hwnd, BOXRESULT);
     DestroyWindow(hwnd);
+	hConfigWnd = NULL;
     return ret;
 }
 
