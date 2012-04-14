@@ -96,7 +96,7 @@ int get_remote_username(Config *cfg, char *user, size_t len)
 static void gpps(void *handle, const char *name, const char *def,
 		 char *val, int len)
 {
-    if (!read_setting_s(handle, name, val, len)) {
+    if (!gStorage->read_setting_s(handle, name, val, len)) {
 	char *pdef;
 
 	pdef = platform_default_s(name);
@@ -118,19 +118,19 @@ static void gpps(void *handle, const char *name, const char *def,
  */
 static void gppfont(void *handle, const char *name, FontSpec *result)
 {
-    if (!read_setting_fontspec(handle, name, result))
+    if (!gStorage->read_setting_fontspec(handle, name, result))
 	*result = platform_default_fontspec(name);
 }
 static void gppfile(void *handle, const char *name, Filename *result)
 {
-    if (!read_setting_filename(handle, name, result))
+    if (!gStorage->read_setting_filename(handle, name, result))
 	*result = platform_default_filename(name);
 }
 
 static void gppi(void *handle, char *name, int def, int *i)
 {
     def = platform_default_i(name, def);
-    *i = read_setting_i(handle, name, def);
+    *i = gStorage->read_setting_i(handle, name, def);
 }
 
 /*
@@ -184,7 +184,7 @@ static void wmap(void *handle, char const *key, char const *value, int len)
 	q++;
     }
     *p = '\0';
-    write_setting_s(handle, key, buf);
+    gStorage->write_setting_s(handle, key, buf);
     sfree(buf);
 }
 
@@ -270,7 +270,7 @@ static void wprefs(void *sesskey, char *name,
 	    l -= sl;
 	}
     }
-    write_setting_s(sesskey, name, buf);
+    gStorage->write_setting_s(sesskey, name, buf);
 }
 
 char *save_settings(const char *section, Config * cfg)
@@ -291,11 +291,11 @@ char *save_settings(const char *section, Config * cfg)
         }
     }
     */
-    sesskey = open_settings_w(section, &errmsg);
+    sesskey = gStorage->open_settings_w(section, &errmsg);
     if (!sesskey)
 	return errmsg;
     save_open_settings(sesskey, cfg);
-    close_settings_w(sesskey);
+    gStorage->close_settings_w(sesskey);
     return NULL;
 }
 
@@ -306,11 +306,11 @@ char *save_isetting(const char *section, char* setting, int value)
 
     if (!strcmp(section, DEFAULT_SESSION_NAME) || !setting || !*setting) 
         return NULL;
-    sesskey = open_settings_w(section, &errmsg);
+    sesskey = gStorage->open_settings_w(section, &errmsg);
     if (!sesskey)
 	return errmsg;
-    write_setting_i(sesskey, setting, value);
-    close_settings_w(sesskey);
+    gStorage->write_setting_i(sesskey, setting, value);
+    gStorage->close_settings_w(sesskey);
     return NULL;
 }
 
@@ -319,161 +319,161 @@ void save_open_settings(void *sesskey, Config *cfg)
     int i;
     char *p;
 
-    write_setting_i(sesskey, "Present", 1);
-    write_setting_s(sesskey, "HostName", cfg->host);
-    write_setting_filename(sesskey, "LogFileName", cfg->logfilename);
-    write_setting_i(sesskey, "LogType", cfg->logtype);
-    write_setting_i(sesskey, "LogFileClash", cfg->logxfovr);
-    write_setting_i(sesskey, "LogFlush", cfg->logflush);
-    write_setting_i(sesskey, "SSHLogOmitPasswords", cfg->logomitpass);
-    write_setting_i(sesskey, "SSHLogOmitData", cfg->logomitdata);
+    gStorage->write_setting_i(sesskey, "Present", 1);
+    gStorage->write_setting_s(sesskey, "HostName", cfg->host);
+    gStorage->write_setting_filename(sesskey, "LogFileName", cfg->logfilename);
+    gStorage->write_setting_i(sesskey, "LogType", cfg->logtype);
+    gStorage->write_setting_i(sesskey, "LogFileClash", cfg->logxfovr);
+    gStorage->write_setting_i(sesskey, "LogFlush", cfg->logflush);
+    gStorage->write_setting_i(sesskey, "SSHLogOmitPasswords", cfg->logomitpass);
+    gStorage->write_setting_i(sesskey, "SSHLogOmitData", cfg->logomitdata);
     p = "raw";
     {
 	const Backend *b = backend_from_proto(cfg->protocol);
 	if (b)
 	    p = b->name;
     }
-    write_setting_s(sesskey, "Protocol", p);
-    write_setting_i(sesskey, "PortNumber", cfg->port);
+    gStorage->write_setting_s(sesskey, "Protocol", p);
+    gStorage->write_setting_i(sesskey, "PortNumber", cfg->port);
     /* The CloseOnExit numbers are arranged in a different order from
      * the standard FORCE_ON / FORCE_OFF / AUTO. */
-    write_setting_i(sesskey, "CloseOnExit", (cfg->close_on_exit+2)%3);
-    write_setting_i(sesskey, "WarnOnClose", !!cfg->warn_on_close);
-    write_setting_i(sesskey, "PingInterval", cfg->ping_interval / 60);	/* minutes */
-    write_setting_i(sesskey, "PingIntervalSecs", cfg->ping_interval % 60);	/* seconds */
-    write_setting_i(sesskey, "TCPNoDelay", cfg->tcp_nodelay);
-    write_setting_i(sesskey, "TCPKeepalives", cfg->tcp_keepalives);
-    write_setting_s(sesskey, "TerminalType", cfg->termtype);
-    write_setting_s(sesskey, "TerminalSpeed", cfg->termspeed);
+    gStorage->write_setting_i(sesskey, "CloseOnExit", (cfg->close_on_exit+2)%3);
+    gStorage->write_setting_i(sesskey, "WarnOnClose", !!cfg->warn_on_close);
+    gStorage->write_setting_i(sesskey, "PingInterval", cfg->ping_interval / 60);	/* minutes */
+    gStorage->write_setting_i(sesskey, "PingIntervalSecs", cfg->ping_interval % 60);	/* seconds */
+    gStorage->write_setting_i(sesskey, "TCPNoDelay", cfg->tcp_nodelay);
+    gStorage->write_setting_i(sesskey, "TCPKeepalives", cfg->tcp_keepalives);
+    gStorage->write_setting_s(sesskey, "TerminalType", cfg->termtype);
+    gStorage->write_setting_s(sesskey, "TerminalSpeed", cfg->termspeed);
     wmap(sesskey, "TerminalModes", cfg->ttymodes, lenof(cfg->ttymodes));
 
     /* Address family selection */
-    write_setting_i(sesskey, "AddressFamily", cfg->addressfamily);
+    gStorage->write_setting_i(sesskey, "AddressFamily", cfg->addressfamily);
 
     /* proxy settings */
-    write_setting_s(sesskey, "ProxyExcludeList", cfg->proxy_exclude_list);
-    write_setting_i(sesskey, "ProxyDNS", (cfg->proxy_dns+2)%3);
-    write_setting_i(sesskey, "ProxyLocalhost", cfg->even_proxy_localhost);
-    write_setting_i(sesskey, "ProxyMethod", cfg->proxy_type);
-    write_setting_s(sesskey, "ProxyHost", cfg->proxy_host);
-    write_setting_i(sesskey, "ProxyPort", cfg->proxy_port);
-    write_setting_s(sesskey, "ProxyUsername", cfg->proxy_username);
-    write_setting_s(sesskey, "ProxyPassword", cfg->proxy_password);
-    write_setting_s(sesskey, "ProxyTelnetCommand", cfg->proxy_telnet_command);
+    gStorage->write_setting_s(sesskey, "ProxyExcludeList", cfg->proxy_exclude_list);
+    gStorage->write_setting_i(sesskey, "ProxyDNS", (cfg->proxy_dns+2)%3);
+    gStorage->write_setting_i(sesskey, "ProxyLocalhost", cfg->even_proxy_localhost);
+    gStorage->write_setting_i(sesskey, "ProxyMethod", cfg->proxy_type);
+    gStorage->write_setting_s(sesskey, "ProxyHost", cfg->proxy_host);
+    gStorage->write_setting_i(sesskey, "ProxyPort", cfg->proxy_port);
+    gStorage->write_setting_s(sesskey, "ProxyUsername", cfg->proxy_username);
+    gStorage->write_setting_s(sesskey, "ProxyPassword", cfg->proxy_password);
+    gStorage->write_setting_s(sesskey, "ProxyTelnetCommand", cfg->proxy_telnet_command);
     wmap(sesskey, "Environment", cfg->environmt, lenof(cfg->environmt));
-    write_setting_s(sesskey, "UserName", cfg->username);
-    write_setting_i(sesskey, "UserNameFromEnvironment", cfg->username_from_env);
-    write_setting_s(sesskey, "LocalUserName", cfg->localusername);
-    write_setting_i(sesskey, "NoPTY", cfg->nopty);
-    write_setting_i(sesskey, "Compression", cfg->compression);
-    write_setting_i(sesskey, "TryAgent", cfg->tryagent);
-    write_setting_i(sesskey, "AgentFwd", cfg->agentfwd);
-    write_setting_i(sesskey, "GssapiFwd", cfg->gssapifwd);
-    write_setting_i(sesskey, "ChangeUsername", cfg->change_username);
+    gStorage->write_setting_s(sesskey, "UserName", cfg->username);
+    gStorage->write_setting_i(sesskey, "UserNameFromEnvironment", cfg->username_from_env);
+    gStorage->write_setting_s(sesskey, "LocalUserName", cfg->localusername);
+    gStorage->write_setting_i(sesskey, "NoPTY", cfg->nopty);
+    gStorage->write_setting_i(sesskey, "Compression", cfg->compression);
+    gStorage->write_setting_i(sesskey, "TryAgent", cfg->tryagent);
+    gStorage->write_setting_i(sesskey, "AgentFwd", cfg->agentfwd);
+    gStorage->write_setting_i(sesskey, "GssapiFwd", cfg->gssapifwd);
+    gStorage->write_setting_i(sesskey, "ChangeUsername", cfg->change_username);
     wprefs(sesskey, "Cipher", ciphernames, CIPHER_MAX,
 	   cfg->ssh_cipherlist);
     wprefs(sesskey, "KEX", kexnames, KEX_MAX, cfg->ssh_kexlist);
-    write_setting_i(sesskey, "RekeyTime", cfg->ssh_rekey_time);
-    write_setting_s(sesskey, "RekeyBytes", cfg->ssh_rekey_data);
-    write_setting_i(sesskey, "SshNoAuth", cfg->ssh_no_userauth);
-    write_setting_i(sesskey, "SshBanner", cfg->ssh_show_banner);
-    write_setting_i(sesskey, "AuthTIS", cfg->try_tis_auth);
-    write_setting_i(sesskey, "AuthKI", cfg->try_ki_auth);
-    write_setting_i(sesskey, "AuthGSSAPI", cfg->try_gssapi_auth);
+    gStorage->write_setting_i(sesskey, "RekeyTime", cfg->ssh_rekey_time);
+    gStorage->write_setting_s(sesskey, "RekeyBytes", cfg->ssh_rekey_data);
+    gStorage->write_setting_i(sesskey, "SshNoAuth", cfg->ssh_no_userauth);
+    gStorage->write_setting_i(sesskey, "SshBanner", cfg->ssh_show_banner);
+    gStorage->write_setting_i(sesskey, "AuthTIS", cfg->try_tis_auth);
+    gStorage->write_setting_i(sesskey, "AuthKI", cfg->try_ki_auth);
+    gStorage->write_setting_i(sesskey, "AuthGSSAPI", cfg->try_gssapi_auth);
 #ifndef NO_GSSAPI
     wprefs(sesskey, "GSSLibs", gsslibkeywords, ngsslibs,
 	   cfg->ssh_gsslist);
-    write_setting_filename(sesskey, "GSSCustom", cfg->ssh_gss_custom);
+    gStorage->write_setting_filename(sesskey, "GSSCustom", cfg->ssh_gss_custom);
 #endif
-    write_setting_i(sesskey, "SshNoShell", cfg->ssh_no_shell);
-    write_setting_i(sesskey, "SshProt", cfg->sshprot);
-    write_setting_s(sesskey, "LogHost", cfg->loghost);
-    write_setting_i(sesskey, "SSH2DES", cfg->ssh2_des_cbc);
-    write_setting_filename(sesskey, "PublicKeyFile", cfg->keyfile);
-    write_setting_s(sesskey, "RemoteCommand", cfg->remote_cmd);
-    write_setting_i(sesskey, "RFCEnviron", cfg->rfc_environ);
-    write_setting_i(sesskey, "PassiveTelnet", cfg->passive_telnet);
-    write_setting_i(sesskey, "BackspaceIsDelete", cfg->bksp_is_delete);
-    write_setting_i(sesskey, "RXVTHomeEnd", cfg->rxvt_homeend);
-    write_setting_i(sesskey, "LinuxFunctionKeys", cfg->funky_type);
-    write_setting_i(sesskey, "NoApplicationKeys", cfg->no_applic_k);
-    write_setting_i(sesskey, "NoApplicationCursors", cfg->no_applic_c);
-    write_setting_i(sesskey, "NoMouseReporting", cfg->no_mouse_rep);
-    write_setting_i(sesskey, "NoRemoteResize", cfg->no_remote_resize);
-    write_setting_i(sesskey, "NoAltScreen", cfg->no_alt_screen);
-    write_setting_i(sesskey, "NoRemoteWinTitle", cfg->no_remote_wintitle);
-    write_setting_i(sesskey, "NoRemoteTabName", cfg->no_remote_tabname);
-    write_setting_i(sesskey, "RemoteQTitleAction", cfg->remote_qtitle_action);
-    write_setting_i(sesskey, "NoDBackspace", cfg->no_dbackspace);
-    write_setting_i(sesskey, "NoRemoteCharset", cfg->no_remote_charset);
-    write_setting_i(sesskey, "ApplicationCursorKeys", cfg->app_cursor);
-    write_setting_i(sesskey, "ApplicationKeypad", cfg->app_keypad);
-    write_setting_i(sesskey, "NetHackKeypad", cfg->nethack_keypad);
-    write_setting_i(sesskey, "AltF4", cfg->alt_f4);
-    write_setting_i(sesskey, "AltSpace", cfg->alt_space);
-    write_setting_i(sesskey, "AltOnly", cfg->alt_only);
-    write_setting_i(sesskey, "ComposeKey", cfg->compose_key);
-    write_setting_i(sesskey, "CtrlAltKeys", cfg->ctrlaltkeys);
-    write_setting_i(sesskey, "TelnetKey", cfg->telnet_keyboard);
-    write_setting_i(sesskey, "TelnetRet", cfg->telnet_newline);
-    write_setting_i(sesskey, "LocalEcho", cfg->localecho);
-    write_setting_i(sesskey, "LocalEdit", cfg->localedit);
-    write_setting_s(sesskey, "Answerback", cfg->answerback);
-    write_setting_i(sesskey, "AlwaysOnTop", cfg->alwaysontop);
-    write_setting_i(sesskey, "FullScreenOnAltEnter", cfg->fullscreenonaltenter);
-    write_setting_i(sesskey, "HideMousePtr", cfg->hide_mouseptr);
-    write_setting_i(sesskey, "SunkenEdge", cfg->sunken_edge);
-    write_setting_i(sesskey, "WindowBorder", cfg->window_border);
-    write_setting_i(sesskey, "CurType", cfg->cursor_type);
-    write_setting_i(sesskey, "BlinkCur", cfg->blink_cur);
-    write_setting_i(sesskey, "Beep", cfg->beep);
-    write_setting_i(sesskey, "BeepInd", cfg->beep_ind);
-    write_setting_filename(sesskey, "BellWaveFile", cfg->bell_wavefile);
-    write_setting_i(sesskey, "BellOverload", cfg->bellovl);
-    write_setting_i(sesskey, "BellOverloadN", cfg->bellovl_n);
-    write_setting_i(sesskey, "BellOverloadT", cfg->bellovl_t
+    gStorage->write_setting_i(sesskey, "SshNoShell", cfg->ssh_no_shell);
+    gStorage->write_setting_i(sesskey, "SshProt", cfg->sshprot);
+    gStorage->write_setting_s(sesskey, "LogHost", cfg->loghost);
+    gStorage->write_setting_i(sesskey, "SSH2DES", cfg->ssh2_des_cbc);
+    gStorage->write_setting_filename(sesskey, "PublicKeyFile", cfg->keyfile);
+    gStorage->write_setting_s(sesskey, "RemoteCommand", cfg->remote_cmd);
+    gStorage->write_setting_i(sesskey, "RFCEnviron", cfg->rfc_environ);
+    gStorage->write_setting_i(sesskey, "PassiveTelnet", cfg->passive_telnet);
+    gStorage->write_setting_i(sesskey, "BackspaceIsDelete", cfg->bksp_is_delete);
+    gStorage->write_setting_i(sesskey, "RXVTHomeEnd", cfg->rxvt_homeend);
+    gStorage->write_setting_i(sesskey, "LinuxFunctionKeys", cfg->funky_type);
+    gStorage->write_setting_i(sesskey, "NoApplicationKeys", cfg->no_applic_k);
+    gStorage->write_setting_i(sesskey, "NoApplicationCursors", cfg->no_applic_c);
+    gStorage->write_setting_i(sesskey, "NoMouseReporting", cfg->no_mouse_rep);
+    gStorage->write_setting_i(sesskey, "NoRemoteResize", cfg->no_remote_resize);
+    gStorage->write_setting_i(sesskey, "NoAltScreen", cfg->no_alt_screen);
+    gStorage->write_setting_i(sesskey, "NoRemoteWinTitle", cfg->no_remote_wintitle);
+    gStorage->write_setting_i(sesskey, "NoRemoteTabName", cfg->no_remote_tabname);
+    gStorage->write_setting_i(sesskey, "RemoteQTitleAction", cfg->remote_qtitle_action);
+    gStorage->write_setting_i(sesskey, "NoDBackspace", cfg->no_dbackspace);
+    gStorage->write_setting_i(sesskey, "NoRemoteCharset", cfg->no_remote_charset);
+    gStorage->write_setting_i(sesskey, "ApplicationCursorKeys", cfg->app_cursor);
+    gStorage->write_setting_i(sesskey, "ApplicationKeypad", cfg->app_keypad);
+    gStorage->write_setting_i(sesskey, "NetHackKeypad", cfg->nethack_keypad);
+    gStorage->write_setting_i(sesskey, "AltF4", cfg->alt_f4);
+    gStorage->write_setting_i(sesskey, "AltSpace", cfg->alt_space);
+    gStorage->write_setting_i(sesskey, "AltOnly", cfg->alt_only);
+    gStorage->write_setting_i(sesskey, "ComposeKey", cfg->compose_key);
+    gStorage->write_setting_i(sesskey, "CtrlAltKeys", cfg->ctrlaltkeys);
+    gStorage->write_setting_i(sesskey, "TelnetKey", cfg->telnet_keyboard);
+    gStorage->write_setting_i(sesskey, "TelnetRet", cfg->telnet_newline);
+    gStorage->write_setting_i(sesskey, "LocalEcho", cfg->localecho);
+    gStorage->write_setting_i(sesskey, "LocalEdit", cfg->localedit);
+    gStorage->write_setting_s(sesskey, "Answerback", cfg->answerback);
+    gStorage->write_setting_i(sesskey, "AlwaysOnTop", cfg->alwaysontop);
+    gStorage->write_setting_i(sesskey, "FullScreenOnAltEnter", cfg->fullscreenonaltenter);
+    gStorage->write_setting_i(sesskey, "HideMousePtr", cfg->hide_mouseptr);
+    gStorage->write_setting_i(sesskey, "SunkenEdge", cfg->sunken_edge);
+    gStorage->write_setting_i(sesskey, "WindowBorder", cfg->window_border);
+    gStorage->write_setting_i(sesskey, "CurType", cfg->cursor_type);
+    gStorage->write_setting_i(sesskey, "BlinkCur", cfg->blink_cur);
+    gStorage->write_setting_i(sesskey, "Beep", cfg->beep);
+    gStorage->write_setting_i(sesskey, "BeepInd", cfg->beep_ind);
+    gStorage->write_setting_filename(sesskey, "BellWaveFile", cfg->bell_wavefile);
+    gStorage->write_setting_i(sesskey, "BellOverload", cfg->bellovl);
+    gStorage->write_setting_i(sesskey, "BellOverloadN", cfg->bellovl_n);
+    gStorage->write_setting_i(sesskey, "BellOverloadT", cfg->bellovl_t
 #ifdef PUTTY_UNIX_H
 		    * 1000
 #endif
 		    );
-    write_setting_i(sesskey, "BellOverloadS", cfg->bellovl_s
+    gStorage->write_setting_i(sesskey, "BellOverloadS", cfg->bellovl_s
 #ifdef PUTTY_UNIX_H
 		    * 1000
 #endif
 		    );
-    write_setting_i(sesskey, "ScrollbackLines", cfg->savelines);
-    write_setting_i(sesskey, "LinesAtAScroll", cfg->scrolllines);
-    write_setting_i(sesskey, "DECOriginMode", cfg->dec_om);
-    write_setting_i(sesskey, "AutoWrapMode", cfg->wrap_mode);
-    write_setting_i(sesskey, "LFImpliesCR", cfg->lfhascr);
-    write_setting_i(sesskey, "CRImpliesLF", cfg->crhaslf);
-    write_setting_i(sesskey, "DisableArabicShaping", cfg->arabicshaping);
-    write_setting_i(sesskey, "DisableBidi", cfg->bidi);
-    write_setting_i(sesskey, "WinNameAlways", cfg->win_name_always);
-    write_setting_s(sesskey, "WinTitle", cfg->wintitle);
-    write_setting_i(sesskey, "TermWidth", cfg->width);
-    write_setting_i(sesskey, "TermHeight", cfg->height);
-    write_setting_fontspec(sesskey, "Font", cfg->font);
-    write_setting_i(sesskey, "FontQuality", cfg->font_quality);
-    write_setting_i(sesskey, "FontVTMode", cfg->vtmode);
-    write_setting_i(sesskey, "UseSystemColours", cfg->system_colour);
-    write_setting_i(sesskey, "TryPalette", cfg->try_palette);
-    write_setting_i(sesskey, "ANSIColour", cfg->ansi_colour);
-    write_setting_i(sesskey, "Xterm256Colour", cfg->xterm_256_colour);
-    write_setting_i(sesskey, "BoldAsColour", cfg->bold_colour);
+    gStorage->write_setting_i(sesskey, "ScrollbackLines", cfg->savelines);
+    gStorage->write_setting_i(sesskey, "LinesAtAScroll", cfg->scrolllines);
+    gStorage->write_setting_i(sesskey, "DECOriginMode", cfg->dec_om);
+    gStorage->write_setting_i(sesskey, "AutoWrapMode", cfg->wrap_mode);
+    gStorage->write_setting_i(sesskey, "LFImpliesCR", cfg->lfhascr);
+    gStorage->write_setting_i(sesskey, "CRImpliesLF", cfg->crhaslf);
+    gStorage->write_setting_i(sesskey, "DisableArabicShaping", cfg->arabicshaping);
+    gStorage->write_setting_i(sesskey, "DisableBidi", cfg->bidi);
+    gStorage->write_setting_i(sesskey, "WinNameAlways", cfg->win_name_always);
+    gStorage->write_setting_s(sesskey, "WinTitle", cfg->wintitle);
+    gStorage->write_setting_i(sesskey, "TermWidth", cfg->width);
+    gStorage->write_setting_i(sesskey, "TermHeight", cfg->height);
+    gStorage->write_setting_fontspec(sesskey, "Font", cfg->font);
+    gStorage->write_setting_i(sesskey, "FontQuality", cfg->font_quality);
+    gStorage->write_setting_i(sesskey, "FontVTMode", cfg->vtmode);
+    gStorage->write_setting_i(sesskey, "UseSystemColours", cfg->system_colour);
+    gStorage->write_setting_i(sesskey, "TryPalette", cfg->try_palette);
+    gStorage->write_setting_i(sesskey, "ANSIColour", cfg->ansi_colour);
+    gStorage->write_setting_i(sesskey, "Xterm256Colour", cfg->xterm_256_colour);
+    gStorage->write_setting_i(sesskey, "BoldAsColour", cfg->bold_colour);
 
     for (i = 0; i < 22; i++) {
 	char buf[20], buf2[30];
 	sprintf(buf, "Colour%d", i);
 	sprintf(buf2, "%d,%d,%d", cfg->colours[i][0],
 		cfg->colours[i][1], cfg->colours[i][2]);
-	write_setting_s(sesskey, buf, buf2);
+	gStorage->write_setting_s(sesskey, buf, buf2);
     }
-    write_setting_i(sesskey, "RawCNP", cfg->rawcnp);
-    write_setting_i(sesskey, "PasteRTF", cfg->rtf_paste);
-    write_setting_i(sesskey, "MouseIsXterm", cfg->mouse_is_xterm);
-    write_setting_i(sesskey, "RectSelect", cfg->rect_select);
-    write_setting_i(sesskey, "MouseOverride", cfg->mouse_override);
+    gStorage->write_setting_i(sesskey, "RawCNP", cfg->rawcnp);
+    gStorage->write_setting_i(sesskey, "PasteRTF", cfg->rtf_paste);
+    gStorage->write_setting_i(sesskey, "MouseIsXterm", cfg->mouse_is_xterm);
+    gStorage->write_setting_i(sesskey, "RectSelect", cfg->rect_select);
+    gStorage->write_setting_i(sesskey, "MouseOverride", cfg->mouse_override);
     for (i = 0; i < 256; i += 32) {
 	char buf[20], buf2[256];
 	int j;
@@ -483,64 +483,64 @@ void save_open_settings(void *sesskey, Config *cfg)
 	    sprintf(buf2 + strlen(buf2), "%s%d",
 		    (*buf2 ? "," : ""), cfg->wordness[j]);
 	}
-	write_setting_s(sesskey, buf, buf2);
+	gStorage->write_setting_s(sesskey, buf, buf2);
     }
-    write_setting_s(sesskey, "LineCodePage", cfg->line_codepage);
-    write_setting_i(sesskey, "CJKAmbigWide", cfg->cjk_ambig_wide);
-    write_setting_i(sesskey, "UTF8Override", cfg->utf8_override);
-    write_setting_s(sesskey, "Printer", cfg->printer);
-    write_setting_i(sesskey, "CapsLockCyr", cfg->xlat_capslockcyr);
-    write_setting_i(sesskey, "ScrollBar", cfg->scrollbar);
-    write_setting_i(sesskey, "ScrollBarFullScreen", cfg->scrollbar_in_fullscreen);
-    write_setting_i(sesskey, "ScrollOnKey", cfg->scroll_on_key);
-    write_setting_i(sesskey, "ScrollOnDisp", cfg->scroll_on_disp);
-    write_setting_i(sesskey, "EraseToScrollback", cfg->erase_to_scrollback);
-    write_setting_i(sesskey, "LockSize", cfg->resize_action);
-    write_setting_i(sesskey, "BCE", cfg->bce);
-    write_setting_i(sesskey, "BlinkText", cfg->blinktext);
-    write_setting_i(sesskey, "X11Forward", cfg->x11_forward);
-    write_setting_s(sesskey, "X11Display", cfg->x11_display);
-    write_setting_i(sesskey, "X11AuthType", cfg->x11_auth);
-    write_setting_filename(sesskey, "X11AuthFile", cfg->xauthfile);
-    write_setting_i(sesskey, "LocalPortAcceptAll", cfg->lport_acceptall);
-    write_setting_i(sesskey, "RemotePortAcceptAll", cfg->rport_acceptall);
+    gStorage->write_setting_s(sesskey, "LineCodePage", cfg->line_codepage);
+    gStorage->write_setting_i(sesskey, "CJKAmbigWide", cfg->cjk_ambig_wide);
+    gStorage->write_setting_i(sesskey, "UTF8Override", cfg->utf8_override);
+    gStorage->write_setting_s(sesskey, "Printer", cfg->printer);
+    gStorage->write_setting_i(sesskey, "CapsLockCyr", cfg->xlat_capslockcyr);
+    gStorage->write_setting_i(sesskey, "ScrollBar", cfg->scrollbar);
+    gStorage->write_setting_i(sesskey, "ScrollBarFullScreen", cfg->scrollbar_in_fullscreen);
+    gStorage->write_setting_i(sesskey, "ScrollOnKey", cfg->scroll_on_key);
+    gStorage->write_setting_i(sesskey, "ScrollOnDisp", cfg->scroll_on_disp);
+    gStorage->write_setting_i(sesskey, "EraseToScrollback", cfg->erase_to_scrollback);
+    gStorage->write_setting_i(sesskey, "LockSize", cfg->resize_action);
+    gStorage->write_setting_i(sesskey, "BCE", cfg->bce);
+    gStorage->write_setting_i(sesskey, "BlinkText", cfg->blinktext);
+    gStorage->write_setting_i(sesskey, "X11Forward", cfg->x11_forward);
+    gStorage->write_setting_s(sesskey, "X11Display", cfg->x11_display);
+    gStorage->write_setting_i(sesskey, "X11AuthType", cfg->x11_auth);
+    gStorage->write_setting_filename(sesskey, "X11AuthFile", cfg->xauthfile);
+    gStorage->write_setting_i(sesskey, "LocalPortAcceptAll", cfg->lport_acceptall);
+    gStorage->write_setting_i(sesskey, "RemotePortAcceptAll", cfg->rport_acceptall);
     wmap(sesskey, "PortForwardings", cfg->portfwd, lenof(cfg->portfwd));
-    write_setting_i(sesskey, "BugIgnore1", 2-cfg->sshbug_ignore1);
-    write_setting_i(sesskey, "BugPlainPW1", 2-cfg->sshbug_plainpw1);
-    write_setting_i(sesskey, "BugRSA1", 2-cfg->sshbug_rsa1);
-    write_setting_i(sesskey, "BugIgnore2", 2-cfg->sshbug_ignore2);
-    write_setting_i(sesskey, "BugHMAC2", 2-cfg->sshbug_hmac2);
-    write_setting_i(sesskey, "BugDeriveKey2", 2-cfg->sshbug_derivekey2);
-    write_setting_i(sesskey, "BugRSAPad2", 2-cfg->sshbug_rsapad2);
-    write_setting_i(sesskey, "BugPKSessID2", 2-cfg->sshbug_pksessid2);
-    write_setting_i(sesskey, "BugRekey2", 2-cfg->sshbug_rekey2);
-    write_setting_i(sesskey, "BugMaxPkt2", 2-cfg->sshbug_maxpkt2);
-    write_setting_i(sesskey, "StampUtmp", cfg->stamp_utmp);
-    write_setting_i(sesskey, "LoginShell", cfg->login_shell);
-    write_setting_i(sesskey, "ScrollbarOnLeft", cfg->scrollbar_on_left);
-    write_setting_fontspec(sesskey, "BoldFont", cfg->boldfont);
-    write_setting_fontspec(sesskey, "WideFont", cfg->widefont);
-    write_setting_fontspec(sesskey, "WideBoldFont", cfg->wideboldfont);
-    write_setting_i(sesskey, "ShadowBold", cfg->shadowbold);
-    write_setting_i(sesskey, "ShadowBoldOffset", cfg->shadowboldoffset);
-    write_setting_s(sesskey, "SerialLine", cfg->serline);
-    write_setting_i(sesskey, "SerialSpeed", cfg->serspeed);
-    write_setting_i(sesskey, "SerialDataBits", cfg->serdatabits);
-    write_setting_i(sesskey, "SerialStopHalfbits", cfg->serstopbits);
-    write_setting_i(sesskey, "SerialParity", cfg->serparity);
-    write_setting_i(sesskey, "SerialFlowControl", cfg->serflow);
-    write_setting_s(sesskey, "WindowClass", cfg->winclass);
+    gStorage->write_setting_i(sesskey, "BugIgnore1", 2-cfg->sshbug_ignore1);
+    gStorage->write_setting_i(sesskey, "BugPlainPW1", 2-cfg->sshbug_plainpw1);
+    gStorage->write_setting_i(sesskey, "BugRSA1", 2-cfg->sshbug_rsa1);
+    gStorage->write_setting_i(sesskey, "BugIgnore2", 2-cfg->sshbug_ignore2);
+    gStorage->write_setting_i(sesskey, "BugHMAC2", 2-cfg->sshbug_hmac2);
+    gStorage->write_setting_i(sesskey, "BugDeriveKey2", 2-cfg->sshbug_derivekey2);
+    gStorage->write_setting_i(sesskey, "BugRSAPad2", 2-cfg->sshbug_rsapad2);
+    gStorage->write_setting_i(sesskey, "BugPKSessID2", 2-cfg->sshbug_pksessid2);
+    gStorage->write_setting_i(sesskey, "BugRekey2", 2-cfg->sshbug_rekey2);
+    gStorage->write_setting_i(sesskey, "BugMaxPkt2", 2-cfg->sshbug_maxpkt2);
+    gStorage->write_setting_i(sesskey, "StampUtmp", cfg->stamp_utmp);
+    gStorage->write_setting_i(sesskey, "LoginShell", cfg->login_shell);
+    gStorage->write_setting_i(sesskey, "ScrollbarOnLeft", cfg->scrollbar_on_left);
+    gStorage->write_setting_fontspec(sesskey, "BoldFont", cfg->boldfont);
+    gStorage->write_setting_fontspec(sesskey, "WideFont", cfg->widefont);
+    gStorage->write_setting_fontspec(sesskey, "WideBoldFont", cfg->wideboldfont);
+    gStorage->write_setting_i(sesskey, "ShadowBold", cfg->shadowbold);
+    gStorage->write_setting_i(sesskey, "ShadowBoldOffset", cfg->shadowboldoffset);
+    gStorage->write_setting_s(sesskey, "SerialLine", cfg->serline);
+    gStorage->write_setting_i(sesskey, "SerialSpeed", cfg->serspeed);
+    gStorage->write_setting_i(sesskey, "SerialDataBits", cfg->serdatabits);
+    gStorage->write_setting_i(sesskey, "SerialStopHalfbits", cfg->serstopbits);
+    gStorage->write_setting_i(sesskey, "SerialParity", cfg->serparity);
+    gStorage->write_setting_i(sesskey, "SerialFlowControl", cfg->serflow);
+    gStorage->write_setting_s(sesskey, "WindowClass", cfg->winclass);
 
     for (i = 0; i < AUTOCMD_COUNT; i++){
         char buf[20];
 	    sprintf(buf, "AutocmdExpect%d", i);
-        write_setting_s(sesskey, buf, cfg->expect[i]);
+        gStorage->write_setting_s(sesskey, buf, cfg->expect[i]);
         sprintf(buf, "Autocmd%d", i);
-        write_setting_s(sesskey, buf, cfg->autocmd[i]);
+        gStorage->write_setting_s(sesskey, buf, cfg->autocmd[i]);
         sprintf(buf, "AutocmdHide%d", i);
-        write_setting_i(sesskey, buf, cfg->autocmd_hide[i]);
+        gStorage->write_setting_i(sesskey, buf, cfg->autocmd_hide[i]);
         sprintf(buf, "AutocmdEnable%d", i);
-        write_setting_i(sesskey, buf, cfg->autocmd_enable[i]);
+        gStorage->write_setting_i(sesskey, buf, cfg->autocmd_enable[i]);
     }
 }
 
@@ -548,11 +548,11 @@ void load_settings(const char *section, Config * cfg)
 {
     void *sesskey;
 
-    sesskey = open_settings_r(section);
+    sesskey = gStorage->open_settings_r(section);
     load_open_settings(sesskey, cfg);
-    close_settings_r(sesskey);
+    gStorage->close_settings_r(sesskey);
 
-	open_read_settings_s(
+	gStorage->open_read_settings_s(
 		"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders", 
 		"Desktop",
 		cfg->default_log_path, 
@@ -573,9 +573,9 @@ int load_isetting(const char *section, char* setting, int defvalue)
     void *sesskey;
     int res = 0;
 
-    sesskey = open_settings_r(section);
+    sesskey = gStorage->open_settings_r(section);
     gppi(sesskey, setting, defvalue, &res);
-    close_settings_r(sesskey);
+    gStorage->close_settings_r(sesskey);
     return res;
 }
 
@@ -949,7 +949,7 @@ void load_open_settings(void *sesskey, Config *cfg)
 void move_settings(const char* fromsession, const char* tosession)
 {
 	copy_settings(fromsession, tosession);
-	del_settings(fromsession);
+	gStorage->del_settings(fromsession);
 }
 
 void copy_settings(const char* fromsession, const char* tosession)
@@ -1000,9 +1000,9 @@ void get_sesslist(struct sesslist *list, int allocate)
 
 	buflen = bufsize = 0;
 	list->buffer = NULL;
-	if ((handle = enum_settings_start()) != NULL) {
+	if ((handle = gStorage->enum_settings_start()) != NULL) {
 	    do {
-		ret = enum_settings_next(handle, otherbuf, sizeof(otherbuf));
+		ret = gStorage->enum_settings_next(handle, otherbuf, sizeof(otherbuf));
 		if (ret) {
 		    int len = strlen(otherbuf) + 1;
 		    if (bufsize < buflen + len) {
@@ -1013,7 +1013,7 @@ void get_sesslist(struct sesslist *list, int allocate)
 		    buflen += strlen(list->buffer + buflen) + 1;
 		}
 	    } while (ret);
-	    enum_settings_finish(handle);
+	    gStorage->enum_settings_finish(handle);
 	}
 	list->buffer = sresize(list->buffer, buflen + 1, char);
 	list->buffer[buflen] = '\0';

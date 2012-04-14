@@ -583,7 +583,7 @@ static void sessionsaver_handler(union control *ctrl, void *dlg,
 	    if (i <= 0) {
 		dlg_beep(dlg);
 	    } else {
-		del_settings(ssd->sesslist.sessions[i]);
+		gStorage->del_settings(ssd->sesslist.sessions[i]);
 		get_sesslist(&ssd->sesslist, FALSE);
 		get_sesslist(&ssd->sesslist, TRUE);
 		dlg_refresh(ssd->listbox, dlg);

@@ -409,10 +409,10 @@ static IShellLink *make_shell_link(const char *appname,
 
     /* Check if this is a valid session, otherwise don't add. */
     if (sessionname) {
-        psettings_tmp = open_settings_r(sessionname);
+        psettings_tmp = gStorage->open_settings_r(sessionname);
         if (!psettings_tmp)
             return NULL;
-        close_settings_r(psettings_tmp);
+        gStorage->close_settings_r(psettings_tmp);
     }
 
     /* Create the new item. */

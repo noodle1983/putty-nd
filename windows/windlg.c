@@ -722,7 +722,7 @@ static void del_session_treeview(HWND hwndSess, HTREEITEM selected_item, const c
     }
 
     if (sess_flag == SESSION_ITEM) {
-		del_settings(session);
+		gStorage->del_settings(session);
 	}else if (sess_flag == SESSION_GROUP){
     	struct sesslist sesslist;
 		int first;
@@ -733,7 +733,7 @@ static void del_session_treeview(HWND hwndSess, HTREEITEM selected_item, const c
 		for (first = first; first < sesslist.nsessions; first++) {
 			if (strncmp(sesslist.sessions[first], session, cmplen)) 
 				break;
-			del_settings(sesslist.sessions[first]);
+			gStorage->del_settings(sesslist.sessions[first]);
 		}
         get_sesslist(&sesslist, FALSE);
 	}
@@ -1224,7 +1224,7 @@ static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM
 		get_sesslist(&sesslist, FALSE);
 		
 		if ((wParam & MK_CONTROL) == 0)
-			del_settings(pre_session);
+			gStorage->del_settings(pre_session);
 		strncpy(pre_session, to_session, sizeof pre_session);
 
         TreeView_SelectDropTarget(hwndSess, NULL);
@@ -1754,7 +1754,7 @@ int verify_ssh_host_key(void *frontend, char *host, int port, char *keytype,
     /*
      * Verify the key against the registry.
      */
-    ret = verify_host_key(host, port, keytype, keystr);
+    ret = gStorage->verify_host_key(host, port, keytype, keystr);
 
     if (ret == 0)		       /* success - key matched OK */
 	return 1;
@@ -1770,7 +1770,7 @@ int verify_ssh_host_key(void *frontend, char *host, int port, char *keytype,
 	sfree(text);
 	sfree(caption);
 	if (mbret == IDYES) {
-	    store_host_key(host, port, keytype, keystr);
+	    gStorage->store_host_key(host, port, keytype, keystr);
 	    return 1;
 	} else if (mbret == IDNO)
 	    return 1;
@@ -1785,7 +1785,7 @@ int verify_ssh_host_key(void *frontend, char *host, int port, char *keytype,
 	sfree(text);
 	sfree(caption);
 	if (mbret == IDYES) {
-	    store_host_key(host, port, keytype, keystr);
+	    gStorage->store_host_key(host, port, keytype, keystr);
 	    return 1;
 	} else if (mbret == IDNO)
 	    return 1;

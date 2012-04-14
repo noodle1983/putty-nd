@@ -299,7 +299,7 @@ void process_cmdline(LPSTR cmdline)
 		    if (message_box(s1, s2,
 				    MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
 				    HELPCTXID(option_cleanup)) == IDYES) {
-			cleanup_all();
+			gStorage->cleanup_all();
 		    }
 		    sfree(s1);
 		    sfree(s2);

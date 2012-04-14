@@ -109,7 +109,7 @@ int verify_ssh_host_key(void *frontend, char *host, int port, char *keytype,
     /*
      * Verify the key against the registry.
      */
-    ret = verify_host_key(host, port, keytype, keystr);
+    ret = gStorage->verify_host_key(host, port, keytype, keystr);
 
     if (ret == 0)		       /* success - key matched OK */
 	return 1;
@@ -140,7 +140,7 @@ int verify_ssh_host_key(void *frontend, char *host, int port, char *keytype,
 
     if (line[0] != '\0' && line[0] != '\r' && line[0] != '\n') {
 	if (line[0] == 'y' || line[0] == 'Y')
-	    store_host_key(host, port, keytype, keystr);
+	    gStorage->store_host_key(host, port, keytype, keystr);
         return 1;
     } else {
 	fprintf(stderr, abandoned);

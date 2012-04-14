@@ -17,6 +17,9 @@
 #define CSIDL_LOCAL_APPDATA 0x001c
 #endif
 
+WinRegStore winRegStore;
+extern IStore* gStorage = &winRegStore;
+
 static const char *const reg_jumplist_key = PUTTY_REG_POS "\\Jumplist";
 static const char *const reg_jumplist_value = "Recent sessions";
 static const char *const puttystr = PUTTY_REG_POS "\\Sessions";
@@ -73,7 +76,7 @@ static void unmungestr(const char *in, char *out, int outlen)
     return;
 }
 
-void *open_settings_w(const char *sessionname, char **errmsg)
+void *WinRegStore::open_settings_w(const char *sessionname, char **errmsg)
 {
     HKEY subkey1, sesskey;
     int ret;
@@ -109,26 +112,26 @@ void *open_settings_w(const char *sessionname, char **errmsg)
     return (void *) sesskey;
 }
 
-void write_setting_s(void *handle, const char *key, const char *value)
+void WinRegStore::write_setting_s(void *handle, const char *key, const char *value)
 {
     if (handle)
 	RegSetValueEx((HKEY) handle, key, 0, REG_SZ, (BYTE*)value,
 		      1 + strlen(value));
 }
 
-void write_setting_i(void *handle, const char *key, int value)
+void WinRegStore::write_setting_i(void *handle, const char *key, int value)
 {
     if (handle)
 	RegSetValueEx((HKEY) handle, key, 0, REG_DWORD,
 		      (CONST BYTE *) &value, sizeof(value));
 }
 
-void close_settings_w(void *handle)
+void WinRegStore::close_settings_w(void *handle)
 {
     RegCloseKey((HKEY) handle);
 }
 
-void *open_settings_r(const char *sessionname)
+void *WinRegStore::open_settings_r(const char *sessionname)
 {
     HKEY subkey1, sesskey;
     char *p;
@@ -153,7 +156,7 @@ void *open_settings_r(const char *sessionname)
     return (void *) sesskey;
 }
 
-char *read_setting_s(void *handle, const char *key, char *buffer, int buflen)
+char *WinRegStore::read_setting_s(void *handle, const char *key, char *buffer, int buflen)
 {
     DWORD type, size;
     size = buflen;
@@ -166,7 +169,7 @@ char *read_setting_s(void *handle, const char *key, char *buffer, int buflen)
 	return buffer;
 }
 
-int open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen)
+int WinRegStore::open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen)
 {
     HKEY hkey;
     char *p;
@@ -191,7 +194,7 @@ int open_read_settings_s(const char *key, const char *subkey, char *buffer, int 
     return 0;
 }
 
-int read_setting_i(void *handle, const char *key, int defvalue)
+int WinRegStore::read_setting_i(void *handle, const char *key, int defvalue)
 {
     DWORD type, val, size;
     size = sizeof(val);
@@ -205,7 +208,7 @@ int read_setting_i(void *handle, const char *key, int defvalue)
 	return val;
 }
 
-int read_setting_fontspec(void *handle, const char *name, FontSpec *result)
+int WinRegStore::read_setting_fontspec(void *handle, const char *name, FontSpec *result)
 {
     char *settingname;
     FontSpec ret;
@@ -228,7 +231,7 @@ int read_setting_fontspec(void *handle, const char *name, FontSpec *result)
     return 1;
 }
 
-void write_setting_fontspec(void *handle, const char *name, FontSpec font)
+void WinRegStore::write_setting_fontspec(void *handle, const char *name, FontSpec font)
 {
     char *settingname;
 
@@ -244,22 +247,22 @@ void write_setting_fontspec(void *handle, const char *name, FontSpec font)
     sfree(settingname);
 }
 
-int read_setting_filename(void *handle, const char *name, Filename *result)
+int WinRegStore::read_setting_filename(void *handle, const char *name, Filename *result)
 {
     return !!read_setting_s(handle, name, result->path, sizeof(result->path));
 }
 
-void write_setting_filename(void *handle, const char *name, Filename result)
+void WinRegStore::write_setting_filename(void *handle, const char *name, Filename result)
 {
     write_setting_s(handle, name, result.path);
 }
 
-void close_settings_r(void *handle)
+void WinRegStore::close_settings_r(void *handle)
 {
     RegCloseKey((HKEY) handle);
 }
 
-void del_settings(const char *sessionname)
+void WinRegStore::del_settings(const char *sessionname)
 {
     HKEY subkey1;
     char *p;
@@ -282,7 +285,7 @@ struct enumsettings {
     int i;
 };
 
-void *enum_settings_start(void)
+void *WinRegStore::enum_settings_start(void)
 {
     struct enumsettings *ret;
     HKEY key;
@@ -299,7 +302,7 @@ void *enum_settings_start(void)
     return ret;
 }
 
-char *enum_settings_next(void *handle, char *buffer, int buflen)
+char *WinRegStore::enum_settings_next(void *handle, char *buffer, int buflen)
 {
     struct enumsettings *e = (struct enumsettings *) handle;
     char *otherbuf;
@@ -314,7 +317,7 @@ char *enum_settings_next(void *handle, char *buffer, int buflen)
     }
 }
 
-void enum_settings_finish(void *handle)
+void WinRegStore::enum_settings_finish(void *handle)
 {
     struct enumsettings *e = (struct enumsettings *) handle;
     RegCloseKey(e->key);
@@ -332,7 +335,7 @@ static void hostkey_regname(char *buffer, const char *hostname,
     mungestr(hostname, buffer + strlen(buffer));
 }
 
-int verify_host_key(const char *hostname, int port,
+int WinRegStore::verify_host_key(const char *hostname, int port,
 		    const char *keytype, const char *key)
 {
     char *otherstr, *regname;
@@ -438,7 +441,7 @@ int verify_host_key(const char *hostname, int port,
 	return 0;		       /* key matched OK in registry */
 }
 
-void store_host_key(const char *hostname, int port,
+void WinRegStore::store_host_key(const char *hostname, int port,
 		    const char *keytype, const char *key)
 {
     char *regname;
@@ -583,7 +586,7 @@ static HANDLE access_random_seed(int action)
     return INVALID_HANDLE_VALUE;
 }
 
-void read_random_seed(noise_consumer_t consumer)
+void WinRegStore::read_random_seed(noise_consumer_t consumer)
 {
     HANDLE seedf = access_random_seed(OPEN_R);
 
@@ -601,7 +604,7 @@ void read_random_seed(noise_consumer_t consumer)
     }
 }
 
-void write_random_seed(void *data, int len)
+void WinRegStore::write_random_seed(void *data, int len)
 {
     HANDLE seedf = access_random_seed(OPEN_W);
 
@@ -711,9 +714,9 @@ static int transform_jumplist_registry
         while (*piterator_old != '\0') {
             if (!rem || strcmp(piterator_old, rem) != 0) {
                 /* Check if this is a valid session, otherwise don't add. */
-                psettings_tmp = (HKEY__*)open_settings_r(piterator_old);
+                psettings_tmp = (HKEY__*)gStorage->open_settings_r(piterator_old);
                 if (psettings_tmp != NULL) {
-                    close_settings_r(psettings_tmp);
+                    gStorage->close_settings_r(psettings_tmp);
                     strcpy(piterator_new, piterator_old);
                     piterator_new += strlen(piterator_new) + 1;
                 }
@@ -795,7 +798,7 @@ static void registry_recursive_remove(HKEY key)
     }
 }
 
-void cleanup_all(void)
+void WinRegStore::cleanup_all(void)
 {
     HKEY key;
     int ret;
