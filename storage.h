@@ -6,9 +6,17 @@
 #ifndef PUTTY_STORAGE_H
 #define PUTTY_STORAGE_H
 
+
+/* ----------------------------------------------------------------------
+ * Functions to access PuTTY's random number seed file.
+ */
+
+typedef void (*noise_consumer_t) (void *data, int len);
+
 class IStore
 {
 public:
+	virtual ~IStore(){};
 	/* ----------------------------------------------------------------------
 	 * Functions to save and restore PuTTY sessions. Note that this is
 	 * only the low-level code to do the reading and writing. The
@@ -57,7 +65,7 @@ public:
 	 */
 	virtual void *open_settings_r(const char *sessionname) = 0;
 	virtual char *read_setting_s(void *handle, const char *key, char *buffer, int buflen) = 0;
-	virtual int open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen) = 0;
+	//virtual int open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen) = 0;
 	virtual int read_setting_i(void *handle, const char *key, int defvalue) = 0;
 	virtual int read_setting_filename(void *handle, const char *key, Filename *value) = 0;
 	virtual int read_setting_fontspec(void *handle, const char *key, FontSpec *font) = 0;
@@ -94,11 +102,6 @@ public:
 	virtual void store_host_key(const char *hostname, int port,
 			    const char *keytype, const char *key) = 0;
 
-	/* ----------------------------------------------------------------------
-	 * Functions to access PuTTY's random number seed file.
-	 */
-
-	typedef void (*noise_consumer_t) (void *data, int len);
 
 	/*
 	 * Read PuTTY's random seed file and pass its contents to a noise
@@ -121,6 +124,7 @@ extern IStore* gStorage;
 
 class WinRegStore: public IStore
 {
+public:
 	virtual void *open_settings_w(const char *sessionname, char **errmsg) ;
 	virtual void write_setting_s(void *handle, const char *key, const char *value) ;
 	virtual void write_setting_i(void *handle, const char *key, int value) ;
@@ -130,7 +134,7 @@ class WinRegStore: public IStore
 	
 	virtual void *open_settings_r(const char *sessionname) ;
 	virtual char *read_setting_s(void *handle, const char *key, char *buffer, int buflen) ;
-	virtual int open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen) ;
+	//virtual int open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen) ;
 	virtual int read_setting_i(void *handle, const char *key, int defvalue) ;
 	virtual int read_setting_filename(void *handle, const char *key, Filename *value) ;
 	virtual int read_setting_fontspec(void *handle, const char *key, FontSpec *font) ;
@@ -157,6 +161,10 @@ class WinRegStore: public IStore
 
 class FileStore: public IStore
 {
+public:
+	FileStore(){*pathM = 0;}
+	FileStore(const char* thePath){strncpy(pathM, thePath, sizeof(pathM));}
+	
 	virtual void *open_settings_w(const char *sessionname, char **errmsg) ;
 	virtual void write_setting_s(void *handle, const char *key, const char *value) ;
 	virtual void write_setting_i(void *handle, const char *key, int value) ;
@@ -166,7 +174,7 @@ class FileStore: public IStore
 	
 	virtual void *open_settings_r(const char *sessionname) ;
 	virtual char *read_setting_s(void *handle, const char *key, char *buffer, int buflen) ;
-	virtual int open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen) ;
+	//virtual int open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen) ;
 	virtual int read_setting_i(void *handle, const char *key, int defvalue) ;
 	virtual int read_setting_filename(void *handle, const char *key, Filename *value) ;
 	virtual int read_setting_fontspec(void *handle, const char *key, FontSpec *font) ;
@@ -189,6 +197,11 @@ class FileStore: public IStore
 	virtual void write_random_seed(void *data, int len) ;
 
 	virtual void cleanup_all(void) ;
+
+private:
+	char *make_filename(int index, const char *subname);
+	
+	char pathM[256];
 }; 
 
 #endif

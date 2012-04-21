@@ -17,8 +17,10 @@
 #define CSIDL_LOCAL_APPDATA 0x001c
 #endif
 
+#ifdef WINNT
 WinRegStore winRegStore;
 extern IStore* gStorage = &winRegStore;
+#endif
 
 static const char *const reg_jumplist_key = PUTTY_REG_POS "\\Jumplist";
 static const char *const reg_jumplist_value = "Recent sessions";
@@ -169,7 +171,7 @@ char *WinRegStore::read_setting_s(void *handle, const char *key, char *buffer, i
 	return buffer;
 }
 
-int WinRegStore::open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen)
+int open_read_settings_s(const char *key, const char *subkey, char *buffer, int buflen)
 {
     HKEY hkey;
     char *p;

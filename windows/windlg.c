@@ -20,6 +20,8 @@
 #include <commdlg.h>
 #include <shellapi.h>
 
+#include <Shlobj.h>
+
 #ifdef MSVC4
 #define TVINSERTSTRUCT  TV_INSERTSTRUCT
 #define TVITEM          TV_ITEM
@@ -89,7 +91,8 @@ enum {
     IDM_ST_DUPGRP  = 4 ,
     IDM_ST_NEWSESSONGRP  = 5 ,
     IDM_ST_DEL     = 6 ,
-    IDM_ST_ROOF    = 7
+    IDM_ST_BACKUP  = 7 ,
+    IDM_ST_ROOF    = 8
 };
 
 struct treeview_faff {
@@ -746,6 +749,45 @@ static void del_session_treeview(HWND hwndSess, HTREEITEM selected_item, const c
 }
 
 /*
+ * backup session item/group
+ */
+static void backup_session_treeview(HWND hwndSess, HTREEITEM selected_item, const char* session, int sess_flag)
+{
+	BROWSEINFO bi;
+    ZeroMemory(&bi,sizeof(BROWSEINFO));
+    LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
+    TCHAR path[MAX_PATH];
+    if(pidl == NULL){
+    	return ;  
+    }
+	SHGetPathFromIDList(pidl,path);
+	
+    if (sess_flag == SESSION_ITEM) {
+		backup_settings(session, path);
+	}else if (sess_flag == SESSION_GROUP){
+    	struct sesslist sesslist;
+		int first;
+        int cmplen = strlen(session);
+
+		get_sesslist(&sesslist, TRUE);
+		first = lower_bound_in_sesslist(&sesslist, session);
+		for (first = first; first < sesslist.nsessions; first++) {
+			if (strncmp(sesslist.sessions[first], session, cmplen)) 
+				break;
+			backup_settings(sesslist.sessions[first], path);
+		}
+        get_sesslist(&sesslist, FALSE);
+	}else{
+		struct sesslist sesslist;
+		get_sesslist(&sesslist, TRUE);
+		for (int i = 0; i < sesslist.nsessions; i++) {
+			backup_settings(sesslist.sessions[i], path);
+		}
+        get_sesslist(&sesslist, FALSE);
+	}
+    return;
+}
+/*
  * Save previous session's configuration and load the current's configuration.
  */
 static LPARAM change_selected_session(HWND hwndSess)
@@ -795,11 +837,14 @@ static HWND create_session_treeview(HWND hwnd, struct treeview_faff* tvfaff)
 		st_popup_menus[i] = CreatePopupMenu();
 	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_NEWSESS, "New &Session");
 	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_NEWGRP, "New &Group");
+	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_BACKUP, "&Backup...");
 	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_NEWSESSONGRP, "New &Session Base On");
 	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_DUPGRP, "Duplicate G&roup");
 	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_DEL, "&Delete");
+	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_BACKUP, "&Backup...");
 	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_DUPSESS, "Duplicate S&ession");
 	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_DEL, "&Delete");
+	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_BACKUP, "&Backup...");
 
     r.left = 3;
     r.right = r.left + 94;
@@ -1036,6 +1081,10 @@ static void show_st_popup_menu(HWND  hwndSess)
         del_session_treeview(hwndSess, hit_item, pre_session, sess_flags);
         return;
     }
+	if (menuid == IDM_ST_BACKUP){
+		backup_session_treeview(hwndSess, hit_item, pre_session, sess_flags);
+        return;
+	}
 
     /* we need to new a session */
     char base_session[256] = {0};

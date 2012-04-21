@@ -2,7 +2,18 @@
  * uxstore.c: Unix-specific implementation of the interface defined
  * in storage.h.
  */
+#ifdef WINNT
+typedef long int off_t;
+#include <windows.h>
 
+int mkdir(const char* dir, int attr)
+{
+	return CreateDirectory(dir, NULL) ? 0 : -1;
+}
+
+#else
+#include <pwd.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +26,6 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <pwd.h>
 #include "putty.h"
 #include "storage.h"
 #include "tree234.h"
@@ -26,12 +36,14 @@
 #define FNLEN 1024 /* XXX */
 #endif
 
+FileStore gFileStore;
+
 enum {
     INDEX_DIR, INDEX_HOSTKEYS, INDEX_HOSTKEYS_TMP, INDEX_RANDSEED,
     INDEX_SESSIONDIR, INDEX_SESSION,
 };
 
-static const char hex[16] = "0123456789ABCDEF";
+static const char hex[17] = "0123456789ABCDEF";
 
 static char *mungestr(const char *in)
 {
@@ -88,27 +100,45 @@ static char *unmungestr(const char *in)
     return ret;
 }
 
-static char *make_filename(int index, const char *subname)
+char *FileStore::make_filename(int index, const char *subname)
 {
     char *env, *tmp, *ret;
 
+	if (*pathM != 0){
+		if (index == INDEX_DIR) {
+			return dupstr(pathM);
+		}else if (index == INDEX_SESSIONDIR) {
+			return dupstr(pathM);
+		}else if (index == INDEX_SESSION) {
+	        char *munged = mungestr(subname);
+			tmp = make_filename(INDEX_SESSIONDIR, NULL);
+			ret = dupprintf("%s/%s", tmp, munged);
+			sfree(tmp);
+			sfree(munged);
+			return ret;
+	    }else {
+			assert(0);
+	    }
+	}
     /*
      * Allow override of the PuTTY configuration location, and of
      * specific subparts of it, by means of environment variables.
      */
     if (index == INDEX_DIR) {
-	struct passwd *pwd;
 
-	env = getenv("PUTTYDIR");
-	if (env)
-	    return dupstr(env);
-	env = getenv("HOME");
-	if (env)
-	    return dupprintf("%s/.putty", env);
-	pwd = getpwuid(getuid());
-	if (pwd && pwd->pw_dir)
-	    return dupprintf("%s/.putty", pwd->pw_dir);
-	return dupstr("/.putty");
+		env = getenv("PUTTYDIR");
+		if (env)
+		    return dupstr(env);
+		env = getenv("HOME");
+		if (env)
+		    return dupprintf("%s/.putty", env);
+#ifndef WINNT
+		struct passwd *pwd;
+		pwd = getpwuid(getuid());
+		if (pwd && pwd->pw_dir)
+		    return dupprintf("%s/.putty", pwd->pw_dir);
+#endif
+		return dupstr("/.putty");
     }
     if (index == INDEX_SESSIONDIR) {
 	env = getenv("PUTTYSESSIONS");
@@ -157,7 +187,7 @@ static char *make_filename(int index, const char *subname)
     return ret;
 }
 
-void *open_settings_w(const char *sessionname, char **errmsg)
+void *FileStore::open_settings_w(const char *sessionname, char **errmsg)
 {
     char *filename;
     FILE *fp;
@@ -192,19 +222,19 @@ void *open_settings_w(const char *sessionname, char **errmsg)
     return fp;
 }
 
-void write_setting_s(void *handle, const char *key, const char *value)
+void FileStore::write_setting_s(void *handle, const char *key, const char *value)
 {
     FILE *fp = (FILE *)handle;
     fprintf(fp, "%s=%s\n", key, value);
 }
 
-void write_setting_i(void *handle, const char *key, int value)
+void FileStore::write_setting_i(void *handle, const char *key, int value)
 {
     FILE *fp = (FILE *)handle;
     fprintf(fp, "%s=%d\n", key, value);
 }
 
-void close_settings_w(void *handle)
+void FileStore::close_settings_w(void *handle)
 {
     FILE *fp = (FILE *)handle;
     fclose(fp);
@@ -260,7 +290,7 @@ void provide_xrm_string(char *string)
     if (!xrmtree)
 	xrmtree = newtree234(keycmp);
 
-    ret = add234(xrmtree, xrms);
+    ret = (struct skeyval*)add234(xrmtree, xrms);
     if (ret) {
 	/* Override an existing string. */
 	del234(xrmtree, ret);
@@ -273,14 +303,18 @@ const char *get_setting(const char *key)
     struct skeyval tmp, *ret;
     tmp.key = key;
     if (xrmtree) {
-	ret = find234(xrmtree, &tmp, NULL);
+	ret = (skeyval*)find234(xrmtree, &tmp, NULL);
 	if (ret)
 	    return ret->value;
     }
+#ifdef WINNT
+	return NULL;
+#else
     return x_get_default(key);
+#endif
 }
 
-void *open_settings_r(const char *sessionname)
+void *FileStore::open_settings_r(const char *sessionname)
 {
     char *filename;
     FILE *fp;
@@ -317,7 +351,7 @@ void *open_settings_r(const char *sessionname)
     return ret;
 }
 
-char *read_setting_s(void *handle, const char *key, char *buffer, int buflen)
+char *FileStore::read_setting_s(void *handle, const char *key, char *buffer, int buflen)
 {
     tree234 *tree = (tree234 *)handle;
     const char *val;
@@ -325,7 +359,7 @@ char *read_setting_s(void *handle, const char *key, char *buffer, int buflen)
 
     tmp.key = key;
     if (tree != NULL &&
-        (kv = find234(tree, &tmp, NULL)) != NULL) {
+        (kv = (struct skeyval*)find234(tree, &tmp, NULL)) != NULL) {
         val = kv->value;
         assert(val != NULL);
     } else
@@ -340,7 +374,7 @@ char *read_setting_s(void *handle, const char *key, char *buffer, int buflen)
     }
 }
 
-int read_setting_i(void *handle, const char *key, int defvalue)
+int FileStore::read_setting_i(void *handle, const char *key, int defvalue)
 {
     tree234 *tree = (tree234 *)handle;
     const char *val;
@@ -348,7 +382,7 @@ int read_setting_i(void *handle, const char *key, int defvalue)
 
     tmp.key = key;
     if (tree != NULL &&
-        (kv = find234(tree, &tmp, NULL)) != NULL) {
+        (kv = (struct skeyval*)find234(tree, &tmp, NULL)) != NULL) {
         val = kv->value;
         assert(val != NULL);
     } else
@@ -360,7 +394,7 @@ int read_setting_i(void *handle, const char *key, int defvalue)
 	return atoi(val);
 }
 
-int read_setting_fontspec(void *handle, const char *name, FontSpec *result)
+int FileStore::read_setting_fontspec(void *handle, const char *name, FontSpec *result)
 {
     /*
      * In GTK1-only PuTTY, we used to store font names simply as a
@@ -392,12 +426,12 @@ int read_setting_fontspec(void *handle, const char *name, FontSpec *result)
 	return TRUE;
     }
 }
-int read_setting_filename(void *handle, const char *name, Filename *result)
+int FileStore::read_setting_filename(void *handle, const char *name, Filename *result)
 {
     return !!read_setting_s(handle, name, result->path, sizeof(result->path));
 }
 
-void write_setting_fontspec(void *handle, const char *name, FontSpec result)
+void FileStore::write_setting_fontspec(void *handle, const char *name, FontSpec result)
 {
     /*
      * read_setting_fontspec had to handle two cases, but when
@@ -408,12 +442,12 @@ void write_setting_fontspec(void *handle, const char *name, FontSpec result)
     write_setting_s(handle, suffname, result.name);
     sfree(suffname);
 }
-void write_setting_filename(void *handle, const char *name, Filename result)
+void FileStore::write_setting_filename(void *handle, const char *name, Filename result)
 {
     write_setting_s(handle, name, result.path);
 }
 
-void close_settings_r(void *handle)
+void FileStore::close_settings_r(void *handle)
 {
     tree234 *tree = (tree234 *)handle;
     struct skeyval *kv;
@@ -421,7 +455,7 @@ void close_settings_r(void *handle)
     if (!tree)
         return;
 
-    while ( (kv = index234(tree, 0)) != NULL) {
+    while ( (kv = (struct skeyval*)index234(tree, 0)) != NULL) {
         del234(tree, kv);
         sfree((char *)kv->key);
         sfree((char *)kv->value);
@@ -431,7 +465,7 @@ void close_settings_r(void *handle)
     freetree234(tree);
 }
 
-void del_settings(const char *sessionname)
+void FileStore::del_settings(const char *sessionname)
 {
     char *filename;
     filename = make_filename(INDEX_SESSION, sessionname);
@@ -439,7 +473,7 @@ void del_settings(const char *sessionname)
     sfree(filename);
 }
 
-void *enum_settings_start(void)
+void *FileStore::enum_settings_start(void)
 {
     DIR *dp;
     char *filename;
@@ -451,11 +485,10 @@ void *enum_settings_start(void)
     return dp;
 }
 
-char *enum_settings_next(void *handle, char *buffer, int buflen)
+char *FileStore::enum_settings_next(void *handle, char *buffer, int buflen)
 {
     DIR *dp = (DIR *)handle;
     struct dirent *de;
-    struct stat st;
     char *fullpath;
     int maxlen, thislen, len;
     char *unmunged;
@@ -472,9 +505,25 @@ char *enum_settings_next(void *handle, char *buffer, int buflen)
 	fullpath[len] = '/';
 	strncpy(fullpath+len+1, de->d_name, thislen - (len+1));
 	fullpath[thislen] = '\0';
+#ifndef WINNT
+	struct stat st;
+    if (stat(fullpath, &st) < 0 || !S_ISREG(st.st_mode))
+         continue;                  /* try another one */
+#else
+	WIN32_FIND_DATA fd;
+	HANDLE hFind = ::FindFirstFile(fullpath,&fd);
+	::FindClose(hFind);
+	if (hFind == INVALID_HANDLE_VALUE)
+	{
+		continue;
+	}
+	else if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+	{
+		continue;
+	}
+	//else file
 
-        if (stat(fullpath, &st) < 0 || !S_ISREG(st.st_mode))
-            continue;                  /* try another one */
+#endif
 
         unmunged = unmungestr(de->d_name);
         strncpy(buffer, unmunged, buflen);
@@ -488,7 +537,7 @@ char *enum_settings_next(void *handle, char *buffer, int buflen)
     return NULL;
 }
 
-void enum_settings_finish(void *handle)
+void FileStore::enum_settings_finish(void *handle)
 {
     DIR *dp = (DIR *)handle;
     closedir(dp);
@@ -503,7 +552,7 @@ void enum_settings_finish(void *handle)
  * 
  *   rsa@22:foovax.example.org 0x23,0x293487364395345345....2343
  */
-int verify_host_key(const char *hostname, int port,
+int FileStore::verify_host_key(const char *hostname, int port,
 		    const char *keytype, const char *key)
 {
     FILE *fp;
@@ -572,7 +621,7 @@ int verify_host_key(const char *hostname, int port,
     return ret;
 }
 
-void store_host_key(const char *hostname, int port,
+void FileStore::store_host_key(const char *hostname, int port,
 		    const char *keytype, const char *key)
 {
     FILE *rfp, *wfp;
@@ -630,8 +679,9 @@ void store_host_key(const char *hostname, int port,
     sfree(newtext);
 }
 
-void read_random_seed(noise_consumer_t consumer)
+void FileStore::read_random_seed(noise_consumer_t consumer)
 {
+#ifndef WINNT
     int fd;
     char *fname;
 
@@ -645,10 +695,12 @@ void read_random_seed(noise_consumer_t consumer)
 	    consumer(buf, ret);
 	close(fd);
     }
+#endif
 }
 
-void write_random_seed(void *data, int len)
+void FileStore::write_random_seed(void *data, int len)
 {
+#ifndef WINNT
     int fd;
     char *fname;
 
@@ -678,8 +730,9 @@ void write_random_seed(void *data, int len)
 
     close(fd);
     sfree(fname);
+#endif
 }
 
-void cleanup_all(void)
+void FileStore::cleanup_all(void)
 {
 }

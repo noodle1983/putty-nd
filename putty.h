@@ -830,15 +830,17 @@ void random_destroy_seed(void);
 /*
  * Exports from settings.c.
  */
+class IStore;
+char *backup_settings(const char *section,const char* path);
 Backend *backend_from_name(const char *name);
 Backend *backend_from_proto(int proto);
 int get_remote_username(Config *cfg, char *user, size_t len);
 char *save_settings(const char *section, Config * cfg);
 char *save_isetting(const char *section, char* setting, int value);
-void save_open_settings(void *sesskey, Config *cfg);
+void save_open_settings(IStore* iStorage, void *sesskey, Config *cfg);
 void load_settings(const char *section, Config * cfg);
 int load_isetting(const char *section, char* setting, int defvalue);
-void load_open_settings(void *sesskey, Config *cfg);
+void load_open_settings(IStore* iStorage, void *sesskey, Config *cfg);
 void move_settings(const char* fromsession, const char* tosession);
 void copy_settings(const char* fromsession, const char* tosession);
 void get_sesslist(struct sesslist *, int allocate);
