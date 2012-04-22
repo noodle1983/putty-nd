@@ -92,7 +92,9 @@ enum {
     IDM_ST_NEWSESSONGRP  = 5 ,
     IDM_ST_DEL     = 6 ,
     IDM_ST_BACKUP  = 7 ,
-    IDM_ST_ROOF    = 8
+    IDM_ST_BACKUP_ALL  = 8 ,
+    IDM_ST_RESTORE = 9 ,
+    IDM_ST_ROOF    = 10
 };
 
 struct treeview_faff {
@@ -787,6 +789,64 @@ static void backup_session_treeview(HWND hwndSess, HTREEITEM selected_item, cons
 	}
     return;
 }
+
+/*
+ * backup session item/group
+ */
+static void restore_session_treeview(HWND hwndSess, HTREEITEM selected_item, const char* session, int sess_flag)
+{
+	OPENFILENAME ofn;
+	TCHAR szOpenFileNames[800*MAX_PATH];
+	TCHAR szPath[MAX_PATH];
+	TCHAR* session_name;
+	int nLen = 0;
+	ZeroMemory( &ofn, sizeof(ofn) );
+	ofn.Flags = OFN_EXPLORER | OFN_ALLOWMULTISELECT;
+	ofn.lStructSize = sizeof(ofn);
+	ofn.lpstrFile = szOpenFileNames;
+	ofn.nMaxFile = sizeof(szOpenFileNames);
+	ofn.lpstrFile[0] = '\0';
+	ofn.lpstrFilter = TEXT("All Files(*.*)\0*.*\0");
+	if( !GetOpenFileName( &ofn ) )
+	{  
+		return;
+	}
+
+	lstrcpyn(szPath, szOpenFileNames, ofn.nFileOffset );
+	szPath[ ofn.nFileOffset ] = '\0';
+	nLen = lstrlen(szPath);
+  
+	if( szPath[nLen-1] != '\\' )
+	{
+		lstrcat(szPath, TEXT("\\"));
+	}
+	FileStore fileStore(szPath);
+  
+	session_name = szOpenFileNames + ofn.nFileOffset;
+	while( *session_name )
+	{   
+		Config tmpCfg;
+		char* unmunged = fileStore.unmungestr(session_name);
+		load_settings(unmunged, &tmpCfg, &fileStore);
+		save_settings(unmunged, &tmpCfg);
+		if (0 == strcmp(unmunged, session))
+		{
+			//reset current session's config 
+			//in case it is reset in change_selected_session
+			cfg = tmpCfg;
+		}
+		sfree(unmunged);
+		session_name += lstrlen(session_name) +1; 
+	}
+
+	char selected_session[256];
+	strncpy(selected_session, session, sizeof(selected_session));
+	struct treeview_faff tvfaff;
+	tvfaff.treeview = hwndSess;
+	memset(tvfaff.lastat, 0, sizeof(tvfaff.lastat));
+	refresh_session_treeview(hwndSess, &tvfaff, selected_session);
+}
+
 /*
  * Save previous session's configuration and load the current's configuration.
  */
@@ -837,14 +897,26 @@ static HWND create_session_treeview(HWND hwnd, struct treeview_faff* tvfaff)
 		st_popup_menus[i] = CreatePopupMenu();
 	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_NEWSESS, "New &Session");
 	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_NEWGRP, "New &Group");
-	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_BACKUP, "&Backup...");
+	AppendMenu(st_popup_menus[SESSION_NONE], MF_SEPARATOR, 0, 0);
+	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_BACKUP_ALL, "&Backup All...");
+	AppendMenu(st_popup_menus[SESSION_NONE], MF_ENABLED, IDM_ST_RESTORE, "&Restore Sessions...");
+	
 	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_NEWSESSONGRP, "New &Session Base On");
 	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_DUPGRP, "Duplicate G&roup");
 	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_DEL, "&Delete");
-	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_BACKUP, "&Backup...");
+	AppendMenu(st_popup_menus[SESSION_GROUP], MF_SEPARATOR, 0, 0);
+	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_BACKUP, "&Backup Group...");
+	AppendMenu(st_popup_menus[SESSION_GROUP], MF_SEPARATOR, 0, 0);
+	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_BACKUP_ALL, "&Backup All...");
+	AppendMenu(st_popup_menus[SESSION_GROUP], MF_ENABLED, IDM_ST_RESTORE, "&Restore Sessions...");
+	
 	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_DUPSESS, "Duplicate S&ession");
 	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_DEL, "&Delete");
-	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_BACKUP, "&Backup...");
+	AppendMenu(st_popup_menus[SESSION_ITEM], MF_SEPARATOR, 0, 0);
+	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_BACKUP, "&Backup Session...");
+	AppendMenu(st_popup_menus[SESSION_ITEM], MF_SEPARATOR, 0, 0);
+	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_BACKUP_ALL, "&Backup All...");
+	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_RESTORE, "&Restore Sessions...");
 
     r.left = 3;
     r.right = r.left + 94;
@@ -1083,6 +1155,14 @@ static void show_st_popup_menu(HWND  hwndSess)
     }
 	if (menuid == IDM_ST_BACKUP){
 		backup_session_treeview(hwndSess, hit_item, pre_session, sess_flags);
+        return;
+	}
+	if (menuid == IDM_ST_BACKUP_ALL){
+		backup_session_treeview(hwndSess, hit_item, pre_session, SESSION_NONE);
+        return;
+	}
+	if (menuid == IDM_ST_RESTORE){
+		restore_session_treeview(hwndSess, hit_item, pre_session, sess_flags);
         return;
 	}
 

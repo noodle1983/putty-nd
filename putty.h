@@ -838,7 +838,7 @@ int get_remote_username(Config *cfg, char *user, size_t len);
 char *save_settings(const char *section, Config * cfg);
 char *save_isetting(const char *section, char* setting, int value);
 void save_open_settings(IStore* iStorage, void *sesskey, Config *cfg);
-void load_settings(const char *section, Config * cfg);
+void load_settings(const char *section, Config * cfg, IStore* iStorage = NULL);
 int load_isetting(const char *section, char* setting, int defvalue);
 void load_open_settings(IStore* iStorage, void *sesskey, Config *cfg);
 void move_settings(const char* fromsession, const char* tosession);

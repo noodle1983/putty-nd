@@ -45,7 +45,7 @@ enum {
 
 static const char hex[17] = "0123456789ABCDEF";
 
-static char *mungestr(const char *in)
+char *FileStore::mungestr(const char *in)
 {
     char *out, *ret;
 
@@ -77,7 +77,7 @@ static char *mungestr(const char *in)
     return ret;
 }
 
-static char *unmungestr(const char *in)
+char *FileStore::unmungestr(const char *in)
 {
     char *out, *ret;
     out = ret = snewn(strlen(in)+1, char);

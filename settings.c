@@ -562,13 +562,14 @@ void save_open_settings(IStore* iStorage, void *sesskey, Config *cfg)
     }
 }
 
-void load_settings(const char *section, Config * cfg)
+void load_settings(const char *section, Config * cfg, IStore* iStorage)
 {
     void *sesskey;
+	IStore* storageInterface = iStorage ? iStorage : gStorage;
 
-    sesskey = gStorage->open_settings_r(section);
-    load_open_settings(gStorage, sesskey, cfg);
-    gStorage->close_settings_r(sesskey);
+    sesskey = storageInterface->open_settings_r(section);
+    load_open_settings(storageInterface, sesskey, cfg);
+    storageInterface->close_settings_r(sesskey);
 /*
 	gStorage->open_read_settings_s(
 		"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders", 

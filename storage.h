@@ -198,6 +198,9 @@ public:
 
 	virtual void cleanup_all(void) ;
 
+	static char *mungestr(const char *in);
+	static char *unmungestr(const char *in);
+
 private:
 	char *make_filename(int index, const char *subname);
 	
