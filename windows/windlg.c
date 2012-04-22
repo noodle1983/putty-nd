@@ -757,12 +757,15 @@ static void backup_session_treeview(HWND hwndSess, HTREEITEM selected_item, cons
 {
 	BROWSEINFO bi;
     ZeroMemory(&bi,sizeof(BROWSEINFO));
+	bi.lpszTitle = TEXT("Select a folder. A new folder 'putty_sessions' will be created under it.");
+	//bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_USENEWUI;
     LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
     TCHAR path[MAX_PATH];
     if(pidl == NULL){
     	return ;  
     }
 	SHGetPathFromIDList(pidl,path);
+	lstrcat(path, TEXT("\\putty_sessions"));
 	
     if (sess_flag == SESSION_ITEM) {
 		backup_settings(session, path);
@@ -806,7 +809,7 @@ static void restore_session_treeview(HWND hwndSess, HTREEITEM selected_item, con
 	ofn.lpstrFile = szOpenFileNames;
 	ofn.nMaxFile = sizeof(szOpenFileNames);
 	ofn.lpstrFile[0] = '\0';
-	ofn.lpstrFilter = TEXT("All Files(*.*)\0*.*\0");
+	ofn.lpstrFilter = TEXT("The Session Files(*.*)\0*.*\0");
 	if( !GetOpenFileName( &ofn ) )
 	{  
 		return;
