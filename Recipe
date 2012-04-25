@@ -272,11 +272,11 @@ SFTP     = sftp int64 logging
 
 # Miscellaneous objects appearing in all the network utilities (not
 # Pageant or PuTTYgen).
-MISC     = timing misc version settings tree234 proxy
+MISC     = timing misc version settings filestore des tree234 proxy
 WINMISC  = MISC winstore winnet winhandl cmdline windefs winmisc winproxy
          + wintime
-UXMISC   = MISC uxstore uxsel uxnet cmdline uxmisc uxproxy time
-OSXMISC  = MISC uxstore uxsel osxsel uxnet uxmisc uxproxy time
+UXMISC   = MISC uxsel uxnet cmdline uxmisc uxproxy time
+OSXMISC  = MISC uxsel osxsel uxnet uxmisc uxproxy time
 
 # Character set library, for use in pterm.
 CHARSET  = sbcsdat slookup sbcs utf8 toucs fromucs xenc mimeenc macenc localenc
@@ -322,21 +322,21 @@ puttygen : [G] winpgen sshrsag sshdssg sshprime sshdes sshbn sshmd5 version
          + sshpubk sshaes sshsh256 sshsh512 import winutils puttygen.res
 	 + tree234 notiming winhelp winnojmp LIBS wintime
 
-pterm    : [X] GTKTERM uxmisc misc ldisc settings uxpty uxsel BE_NONE uxstore
+pterm    : [X] GTKTERM uxmisc misc ldisc settings filestore des uxpty uxsel BE_NONE 
          + uxsignal CHARSET cmdline uxpterm version time xpmpterm xpmptcfg
 	 + nogss
-putty    : [X] GTKTERM uxmisc misc ldisc settings uxsel U_BE_ALL uxstore
+putty    : [X] GTKTERM uxmisc misc ldisc settings des uxsel U_BE_ALL filestore
          + uxsignal CHARSET uxputty NONSSH UXSSH UXMISC ux_x11 xpmputty
          + xpmpucfg
-puttytel : [X] GTKTERM uxmisc misc ldisc settings uxsel U_BE_NOSSH
-	 + uxstore uxsignal CHARSET uxputty NONSSH UXMISC xpmputty xpmpucfg
+puttytel : [X] GTKTERM uxmisc misc ldisc settings des uxsel U_BE_NOSSH
+	 + filestore uxsignal CHARSET uxputty NONSSH UXMISC xpmputty xpmpucfg
 	 + nogss
 
 plink    : [U] uxplink uxcons NONSSH UXSSH U_BE_ALL logging UXMISC uxsignal
          + ux_x11
 
 puttygen : [U] cmdgen sshrsag sshdssg sshprime sshdes sshbn sshmd5 version
-         + sshrand uxnoise sshsha misc sshrsa sshdss uxcons uxstore uxmisc
+         + sshrand uxnoise sshsha misc sshrsa sshdss uxcons filestore uxmisc
          + sshpubk sshaes sshsh256 sshsh512 import puttygen.res time tree234
 	 + uxgen notiming
 
