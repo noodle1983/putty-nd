@@ -22,4 +22,6 @@ int DES_EncryptBlock(ElemType plainBlock[8], ElemType subKeys[16][48], ElemType 
 int DES_DecryptBlock(ElemType cipherBlock[8], ElemType subKeys[16][48], ElemType plainBlock[8]);
 int DES_Encrypt(const char *plainStr, const char *keyStr,char *cipherStr);
 int DES_Decrypt(const char *cipherStr, const int len, const char *keyStr,char *plainStr);
+int DES_Encrypt2Char(const char *plainStr, const char *keyStr,char *cipherStr);
+int DES_DecryptFromChar(const char *cipherStr, const int len, const char *keyStr,char *plainStr);
 

@@ -1,4 +1,5 @@
 #include "des.h"
+#include "assert.h"
  
 static int IP_Table[64] = {  57,49,41,33,25,17,9,1,
 			 59,51,43,35,27,19,11,3,
@@ -338,7 +339,6 @@ int DES_DecryptBlock(ElemType cipherBlock[8], ElemType subKeys[16][48],ElemType 
 
 
 int DES_Encrypt(const char *plainStr, const char *keyStr,char *cipherStr){
-	int count;
 	ElemType plainBlock[8],cipherBlock[8],keyBlock[8];
 	ElemType bKey[64];
 	ElemType subKeys[16][48];
@@ -369,9 +369,8 @@ int DES_Encrypt(const char *plainStr, const char *keyStr,char *cipherStr){
 }
 
 
-int DES_Decrypt(const char *cipherStr, const int len, const char *keyStr,char *plainStr){
-	int count;
-	long fileLen;
+int DES_Decrypt(const char *cipherStr, const int len, const char *keyStr,char *plainStr)
+{
 	ElemType plainBlock[8],cipherBlock[8],keyBlock[8];
 	ElemType bKey[64];
 	ElemType subKeys[16][48];
@@ -391,5 +390,111 @@ int DES_Decrypt(const char *cipherStr, const int len, const char *keyStr,char *p
 	}
 	
 	return decryptLen;
+}
+
+char ENC(char theCh)
+{
+ char ch = (theCh & 0x03F) + ' ';
+     
+ switch (ch)
+  {
+   case ' '  : ch = 'm';
+               break;
+   case '['  : ch = 'd';
+               break;
+   case '\\' : ch = 'e';
+               break;
+   case ']'  : ch = 'f';
+               break;
+   case '^'  : ch = 'g';
+               break;
+   case '\'' : ch = 'h';
+               break;
+  }
+ return(ch);
+}
+
+char* uencode ( const char *in, char* out )
+{
+    int c1, c2, c3, c4;
+     
+    c1 = (*in >> 2) & 0x3F;
+    c2 = (*in << 4) & 0x30 | (in[1] >> 4) & 0x0F; 
+    c3 = (in[1] << 2) & 0x3C | (in[2] >> 6) & 0x03; 
+    c4 = in[2] & 0x3F;
+    *out = ENC(c1); out++;
+    *out = ENC(c2); out++;
+    *out = ENC(c3); out++;
+    *out = ENC(c4); out++;
+	return out;
+}
+
+int DES_Encrypt2Char(const char *plainStr, const char *keyStr,char *cipherStr/*[128]*/)
+{
+	if (strlen(plainStr) > 80){
+		return 0;
+	}
+
+	char tmpOut[128];
+	memset(tmpOut, 0, sizeof(tmpOut));
+	int tmplen = DES_Encrypt(plainStr, keyStr, tmpOut);
+	assert(tmplen < 90);
+	
+	char *tmpIndex = tmpOut;
+	char* out = cipherStr;
+	for (; tmpIndex - tmpOut < tmplen; tmpIndex+=3){
+		out = uencode(tmpIndex, out);
+	}
+	assert((out - cipherStr)%4==0);
+	return (out - cipherStr);
+}
+
+char DECN ( char ch )
+{
+ switch (ch)
+  {
+   case 'm' : ch = ' ';
+	      break;
+   case 'd' : ch = '[';
+	      break;
+   case 'e' : ch = '\\';
+	      break;
+   case 'f' : ch = ']';
+	      break;
+   case 'g' : ch = '^';
+	      break;
+   case 'h' : ch = '\'';
+	      break;
+  }
+    
+ ch = (ch - ' ') & 0x03F;
+     
+ return(ch);
+}
+
+char* udecode ( const char *in, char* out)
+{
+     
+	*out = DECN(*in) << 2 | DECN(in[1]) >> 4; 
+	out ++;
+	*out = DECN(in[1]) << 4 | DECN(in[2]) >> 2; 
+	out ++;	
+	*out = DECN(in[2]) << 6 | DECN(in[3]);
+	out ++;
+  return out;
+}
+
+int DES_DecryptFromChar(const char *cipherStr, const int len, const char *keyStr,char *plainStr/*[128]*/)
+{
+	assert(len%4 == 0);
+	const char* inIndex = cipherStr;
+	char tmpOut[128];
+	memset(tmpOut, 0, sizeof(tmpOut));
+	char* outIndex = tmpOut;
+	for (; inIndex < cipherStr + len; inIndex+=4){
+		outIndex = udecode(inIndex, outIndex);
+	}
+	return DES_Decrypt(tmpOut, (outIndex-tmpOut)/8*8, keyStr, plainStr);
+
 }
 
