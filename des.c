@@ -431,7 +431,7 @@ char* uencode ( const char *in, char* out )
 
 int DES_Encrypt2Char(const char *plainStr, const char *keyStr,char *cipherStr/*[128]*/)
 {
-	if (strlen(plainStr) > 80){
+	if (strlen(plainStr) > 80 || strlen(plainStr) == 0){
 		return 0;
 	}
 

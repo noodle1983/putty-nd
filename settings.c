@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "putty.h"
 #include "storage.h"
+#include "des.h"
 
 /* The cipher order given here is the default order. */
 static const struct keyval ciphernames[] = {
@@ -553,8 +554,30 @@ void save_open_settings(IStore* iStorage, void *sesskey, Config *cfg)
         char buf[20];
 	    sprintf(buf, "AutocmdExpect%d", i);
         iStorage->write_setting_s(sesskey, buf, cfg->expect[i]);
-        sprintf(buf, "Autocmd%d", i);
-        iStorage->write_setting_s(sesskey, buf, cfg->autocmd[i]);
+		
+		if (cfg->autocmd_hide[i]){
+			char encryptStr[128] = {0};
+			if (DES_Encrypt2Char(cfg->autocmd[i] ,PSWD, encryptStr)){
+				cfg->autocmd_encrypted[i] = 1;
+				sprintf(buf, "AutocmdEncrypted%d", i);
+				iStorage->write_setting_i(sesskey, buf, cfg->autocmd_encrypted[i]);
+				sprintf(buf, "Autocmd%d", i);
+				iStorage->write_setting_s(sesskey, buf, encryptStr);
+			}else{
+				cfg->autocmd_encrypted[i] = 0;
+				sprintf(buf, "AutocmdEncrypted%d", i);
+				iStorage->write_setting_i(sesskey, buf, cfg->autocmd_encrypted[i]);
+				sprintf(buf, "Autocmd%d", i);
+		        iStorage->write_setting_s(sesskey, buf, cfg->autocmd[i]);
+			}
+		}else{
+			cfg->autocmd_encrypted[i] = 0;
+			sprintf(buf, "AutocmdEncrypted%d", i);
+			iStorage->write_setting_i(sesskey, buf, cfg->autocmd_encrypted[i]);
+			sprintf(buf, "Autocmd%d", i);
+			iStorage->write_setting_s(sesskey, buf, cfg->autocmd[i]);
+		}
+		
         sprintf(buf, "AutocmdHide%d", i);
         iStorage->write_setting_i(sesskey, buf, cfg->autocmd_hide[i]);
         sprintf(buf, "AutocmdEnable%d", i);
@@ -955,15 +978,38 @@ void load_open_settings(IStore* iStorage, void *sesskey, Config *cfg)
                            :i==1?"assword: "
                            :"", 
                            cfg->expect[i], sizeof(cfg->expect[i]));
+		
                            
-        sprintf(buf, "Autocmd%d", i);
-        gpps(iStorage,  sesskey, buf, "", cfg->autocmd[i], sizeof(cfg->autocmd[i]));
         sprintf(buf, "AutocmdHide%d", i);
         gppi(iStorage,  sesskey, buf, i==1?1:0, &cfg->autocmd_hide[i]);
+		sprintf(buf, "AutocmdEncrypted%d", i);
+        gppi(iStorage,  sesskey, buf, 0, &cfg->autocmd_encrypted[i]);
         sprintf(buf, "AutocmdEnable%d", i);
         gppi(iStorage,  sesskey, buf, 0, &cfg->autocmd_enable[i]);
+        sprintf(buf, "Autocmd%d", i);
+        gpps(iStorage,  sesskey, buf, "", cfg->autocmd[i], sizeof(cfg->autocmd[i]));
+
+		if (cfg->autocmd_hide[i]){
+			if (0 == cfg->autocmd_encrypted[i]){
+				char encryptStr[128] = {0};
+				if (DES_Encrypt2Char(cfg->autocmd[i] ,PSWD, encryptStr)){
+					cfg->autocmd_encrypted[i] = 1;
+					sprintf(buf, "AutocmdEncrypted%d", i);
+					iStorage->write_setting_i(sesskey, buf, cfg->autocmd_encrypted[i]);
+					sprintf(buf, "Autocmd%d", i);
+					iStorage->write_setting_s(sesskey, buf, encryptStr);
+				}
+			}else{
+				char plainStr[128] = {0};
+				if (DES_DecryptFromChar(cfg->autocmd[i] , strlen(cfg->autocmd[i]), PSWD, plainStr)){
+					strcpy(cfg->autocmd[i], plainStr);
+				}
+
+			}
+		}
         
     }
+
 }
 
 void move_settings(const char* fromsession, const char* tosession)

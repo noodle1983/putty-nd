@@ -510,6 +510,7 @@ struct config_tag {
     char expect[AUTOCMD_COUNT][32];
     char autocmd[AUTOCMD_COUNT][128];
     int autocmd_hide[AUTOCMD_COUNT];
+	int autocmd_encrypted[AUTOCMD_COUNT];
     int autocmd_enable[AUTOCMD_COUNT];
     int autocmd_index;
     int autocmd_try;
