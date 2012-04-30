@@ -138,6 +138,7 @@ typedef struct {
     int ignore_clip;
   
     HRGN hRgn, hCloserRgn;
+	int closerX, closerY;
 
     RECT rcDis;
     char disRawName[256];
@@ -217,6 +218,7 @@ int wintab_drawitem(wintab *wintab, HDC hdc, const int index);
 int wintab_on_paint(wintab* wintab, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
 int wintab_hit_tab(wintab *wintab, const int x, const int y);
+void wintab_gen_close_click(wintabitem* tabitem);
 int wintab_on_lclick(wintab* wintab, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK SearchEditWndProc(HWND hWnd, UINT message,

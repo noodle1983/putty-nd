@@ -843,7 +843,9 @@ int wintab_drawitem(wintab *wintab, HDC hdc, const int index)
     }
     SetBkColor(hdc, old_col);
 
-    hRgn = DrawCloseButton(hdc, rc.right-4, (rc.top + rc.bottom)/2, 
+	tabitem->closerX = rc.right-4;
+	tabitem->closerY = (rc.top + rc.bottom)/2;
+    hRgn = DrawCloseButton(hdc, tabitem->closerX, tabitem->closerY, 
             wintab->bd_col, col);
     wintabitem_set_closer_rgn(tabitem, hRgn);
     return 0;
@@ -950,6 +952,16 @@ int wintab_is_dbclick()
     }
     lasttime = thistime;
     return FALSE;
+}
+
+//-----------------------------------------------------------------------
+
+void wintab_gen_close_click(wintabitem* tabitem)
+{
+	PostMessage(hwnd, 
+		WM_LBUTTONDOWN, 
+		0, 
+		MAKELPARAM(tabitem->closerX, tabitem->closerY));
 }
 
 //-----------------------------------------------------------------------
@@ -1370,6 +1382,8 @@ int wintabitem_init(wintab *wintab, wintabitem *tabitem, Config *cfg)
     tabitem->ldisc = NULL;  
     tabitem->pal = NULL;
     tabitem->logpal = NULL;
+	tabitem->closerX = 0;
+	tabitem->closerY = 0;
     set_title(tabitem, cfg->session_name);
     set_icon(tabitem, cfg->session_name);
     char *disrawname = strrchr(cfg->session_name, '#');
