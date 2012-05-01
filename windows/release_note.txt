@@ -15,6 +15,16 @@ PalPay: noodle1983@126.com
 RELEASE NOTE
 ============
 --------------------------------
+putty6.0_nd1.13
+--------------------------------
+1. Bugs
+    1. config dialog can be opened twice and then crash.
+
+2. Other changes
+    1. backup/restore(import/export) the sessions.
+    2. make a config item valid: Session->Close window/tab on exit.
+
+--------------------------------
 putty6.0_nd1.12
 --------------------------------
 1. Bugs
