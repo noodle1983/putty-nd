@@ -115,6 +115,7 @@ const BYTE XORmaskCursor[] = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 
 HCURSOR hCopyCurs = NULL; 
 int showSessionTreeview = 0;
+const int SESSION_TREEVIEW_WIDTH = 130;
 
 extern Config cfg;		       /* defined in window.c */
 
@@ -475,7 +476,7 @@ static void create_controls(HWND hwnd, char *path)
 	 * Otherwise, we're creating the controls for a particular
 	 * panel.
 	 */
-	ctlposinit(&cp, hwnd, showSessionTreeview? 200 : 100, 3, 13);
+	ctlposinit(&cp, hwnd, showSessionTreeview? (100 + SESSION_TREEVIEW_WIDTH) : 100, 3, 13);
 	wc = &ctrls_panel;
 	base_id = IDCX_PANELBASE;
     }
@@ -922,7 +923,7 @@ static HWND create_session_treeview(HWND hwnd, struct treeview_faff* tvfaff)
 	AppendMenu(st_popup_menus[SESSION_ITEM], MF_ENABLED, IDM_ST_RESTORE, "&Restore Sessions...");
 
     r.left = 3;
-    r.right = r.left + 94;
+    r.right = r.left + SESSION_TREEVIEW_WIDTH - 6;
     r.top = 3;
     r.bottom = r.top + 10;
     MapDialogRect(hwnd, &r);
@@ -936,7 +937,7 @@ static HWND create_session_treeview(HWND hwnd, struct treeview_faff* tvfaff)
     SendMessage(tvstatic, WM_SETFONT, font, MAKELPARAM(TRUE, 0));
 
     r.left = 3;
-    r.right = r.left + 94;
+    r.right = r.left + SESSION_TREEVIEW_WIDTH - 6;
     r.top = 13;
     r.bottom = r.top + 219;
     MapDialogRect(hwnd, &r);
@@ -1397,7 +1398,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 	    hw = GetDesktopWindow();
 	    if (GetWindowRect(hw, &rs) && GetWindowRect(hwnd, &rd)){
             if (showSessionTreeview) 
-                rd.right += 200;
+                rd.right += 100 + SESSION_TREEVIEW_WIDTH;
     		MoveWindow(hwnd,
 			   (rs.right + rs.left + rd.left - rd.right) / 2,
 			   (rs.bottom + rs.top + rd.top - rd.bottom) / 2,
@@ -1439,7 +1440,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 	    WPARAM font;
 	    HWND tvstatic;
 
-	    r.left = showSessionTreeview?103:3;
+	    r.left = showSessionTreeview?(SESSION_TREEVIEW_WIDTH+3):3;
 	    r.right = r.left + 95;
 	    r.top = 3;
 	    r.bottom = r.top + 10;
@@ -1453,7 +1454,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 	    font = SendMessage(hwnd, WM_GETFONT, 0, 0);
 	    SendMessage(tvstatic, WM_SETFONT, font, MAKELPARAM(TRUE, 0));
 
-	    r.left = showSessionTreeview?103:3;
+	    r.left = showSessionTreeview?(SESSION_TREEVIEW_WIDTH+3):3;
 	    r.right = r.left + 95;
 	    r.top = 13;
 	    r.bottom = r.top + 219;
