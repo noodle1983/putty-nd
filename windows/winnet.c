@@ -4,6 +4,7 @@
  * For the IPv6 code in here I am indebted to Jeroen Massar and
  * unfix.org.
  */
+	 
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +15,7 @@
 #include "network.h"
 #include "tree234.h"
 
+#undef __CRT__NO_INLINE
 #include <ws2tcpip.h>
 
 #ifndef NO_IPV6

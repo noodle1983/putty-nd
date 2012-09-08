@@ -3265,6 +3265,10 @@ static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
 	int commentlen;
         int dlgret;
     };
+	int len;
+	char fingerprint[100];
+	char *keystr;
+	unsigned char *pkblob;
     crState(do_ssh1_login_state);
 
     crBegin(ssh->do_ssh1_login_crstate);
@@ -3344,9 +3348,9 @@ static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
 	/*
 	 * First format the key into a string.
 	 */
-	int len = rsastr_len(&hostkey);
-	char fingerprint[100];
-	char *keystr = snewn(len, char);
+	len = rsastr_len(&hostkey);
+	keystr = snewn(len, char);
+
 	rsastr_fmt(keystr, &hostkey);
 	rsa_fingerprint(fingerprint, sizeof(fingerprint), &hostkey);
 
@@ -3646,7 +3650,7 @@ static int do_ssh1_login(Ssh ssh, unsigned char *in, int inlen,
 		s->p += 4;
 		logeventf(ssh, "Pageant has %d SSH-1 keys", s->nkeys);
 		for (s->keyi = 0; s->keyi < s->nkeys; s->keyi++) {
-		    unsigned char *pkblob = s->p;
+		    pkblob = s->p;
 		    s->p += 4;
 		    {
 			int n, ok = FALSE;
@@ -7332,6 +7336,8 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
 	Ssh_gss_stat gss_stat;
 #endif
     };
+
+	char *e;
     crState(do_ssh2_authconn_state);
 
     crBegin(ssh->do_ssh2_authconn_crstate);
@@ -8890,7 +8896,7 @@ static void do_ssh2_authconn(Ssh ssh, unsigned char *in, int inlen,
      * then wait for a whole bunch of successes or failures.
      */
     if (ssh->mainchan && !ssh->ncmode && *ssh->cfg.environmt) {
-	char *e = ssh->cfg.environmt;
+	e = ssh->cfg.environmt;
 	char *var, *varend, *val;
 
 	s->num_env = 0;
