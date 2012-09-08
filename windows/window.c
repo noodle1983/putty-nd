@@ -29,6 +29,7 @@
 #include <commctrl.h>
 #include <richedit.h>
 #include <mmsystem.h>
+#include <windowsx.h>
 
 
 
@@ -75,6 +76,9 @@ static void sys_cursor_update(wintabitem *tabitem);
 static int get_fullscreen_rect(RECT * ss);
 int on_reconfig(wintabitem* tabitem, UINT message,
 				WPARAM wParam, LPARAM lParam);
+
+RECT getMaxWorkArea();
+
 
 static int kbd_codepage;
 //static HMENU specials_menu = NULL;
@@ -2479,7 +2483,13 @@ int on_sizing(wintabitem* tabitem, HWND hwnd, UINT message,
 int on_size(wintabitem* tabitem, HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
-    wintab_onsize(&tab, hwnd, lParam);
+	if (wParam == SIZE_MAXIMIZED || IsZoomed(hwnd)){
+		RECT maxWorkArea = getMaxWorkArea();
+		wintab_onsize(&tab, hwnd, MAKELPARAM(maxWorkArea.right-maxWorkArea.left,
+											maxWorkArea.bottom - maxWorkArea.top));
+	}else{
+    	wintab_onsize(&tab, hwnd, lParam);
+	}
 	if (wParam == SIZE_MINIMIZED)
 	    SetWindowText(hwnd,
 			  tabitem->cfg.win_name_always ? tabitem->window_name : tabitem->icon_name);
@@ -2835,6 +2845,21 @@ int on_default(wintabitem* tabitem, HWND hwnd, UINT message,
 
     return 0;
 }
+
+
+RECT getMaxWorkArea()
+{
+	RECT WorkArea;
+	HMONITOR mon;
+	MONITORINFO mi;
+	mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+	mi.cbSize = sizeof(mi);
+	GetMonitorInfo(mon, &mi);
+	
+	/* structure copy */
+	return fullscr_on_max ? mi.rcMonitor: mi.rcWork;
+}
+
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 				WPARAM wParam, LPARAM lParam)
 {
@@ -2851,16 +2876,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
     switch (message) {
         case WM_GETMINMAXINFO:  
         {   
-            RECT WorkArea;
-            HMONITOR mon;
-        	MONITORINFO mi;
-        	mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-        	mi.cbSize = sizeof(mi);
-        	GetMonitorInfo(mon, &mi);
-
-        	/* structure copy */
-        	WorkArea = fullscr_on_max ? mi.rcMonitor: mi.rcWork;
-            
+             RECT WorkArea = getMaxWorkArea();
             /*
             RECT cli_rc, pri_rc;
             SystemParametersInfo( SPI_GETWORKAREA, 0, &pri_rc, 0 ); 
