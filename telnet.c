@@ -638,14 +638,14 @@ static int telnet_closing(Plug plug, const char *error_msg, int error_code,
 {
     Telnet telnet = (Telnet) plug;
 
+    if (error_msg) {
+		logevent(telnet->frontend, error_msg);
+		connection_fatal(telnet->frontend, "%s", error_msg);
+    }
     if (telnet->s) {
         sk_close(telnet->s);
         telnet->s = NULL;
-	notify_remote_exit(telnet->frontend);
-    }
-    if (error_msg) {
-	logevent(telnet->frontend, error_msg);
-	connection_fatal(telnet->frontend, "%s", error_msg);
+		notify_remote_exit(telnet->frontend);
     }
     /* Otherwise, the remote side closed the connection normally. */
     return 0;

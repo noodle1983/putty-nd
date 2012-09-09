@@ -57,11 +57,11 @@ static int serial_gotdata(struct handle *h, void *data, int len)
 
 	serial_terminate(serial);
 
-	notify_remote_exit(serial->frontend);
-
 	logevent(serial->frontend, error_msg);
 
 	connection_fatal(serial->frontend, "%s", error_msg);
+
+	notify_remote_exit(serial->frontend);
 
 	return 0;		       /* placate optimiser */
     } else {
@@ -77,11 +77,12 @@ static void serial_sentdata(struct handle *h, int new_backlog)
 
 	serial_terminate(serial);
 
-	notify_remote_exit(serial->frontend);
-
 	logevent(serial->frontend, error_msg);
 
 	connection_fatal(serial->frontend, "%s", error_msg);
+
+	notify_remote_exit(serial->frontend);
+
     } else {
 	serial->bufsize = new_backlog;
     }

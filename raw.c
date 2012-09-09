@@ -54,15 +54,15 @@ static int raw_closing(Plug plug, const char *error_msg, int error_code,
 {
     Raw raw = (Raw) plug;
 
+    if (error_msg) {
+		/* A socket error has occurred. */
+		logevent(raw->frontend, error_msg);
+		connection_fatal(raw->frontend, "%s", error_msg);
+    }
     if (raw->s) {
         sk_close(raw->s);
         raw->s = NULL;
-	notify_remote_exit(raw->frontend);
-    }
-    if (error_msg) {
-	/* A socket error has occurred. */
-	logevent(raw->frontend, error_msg);
-	connection_fatal(raw->frontend, "%s", error_msg);
+		notify_remote_exit(raw->frontend);
     }				       /* Otherwise, the remote side closed the connection normally. */
     return 0;
 }

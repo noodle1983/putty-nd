@@ -862,18 +862,24 @@ void connection_fatal(void *frontend, char *fmt, ...)
     
     va_list ap;
     char *stuff, morestuff[100];
+	char *msg; 
 
     va_start(ap, fmt);
     stuff = dupvprintf(fmt, ap);
     va_end(ap);
+
     sprintf(morestuff, "%.70s Fatal Error", appname);
-    MessageBox(tabitem->page.hwndCtrl, stuff, morestuff, MB_ICONERROR | MB_OK);
+	msg = dupprintf("From tab %s:\n%s", tabitem->disName, stuff);
+
+    MessageBox(hwnd, msg, morestuff, MB_ICONERROR | MB_OK);
+
+	sfree(msg);
     sfree(stuff);
 
     //if (tabitem->cfg.close_on_exit == FORCE_ON)
 	//    PostQuitMessage(1);
     //else {
-    tabitem->must_close_session = TRUE;
+    //tabitem->must_close_session = TRUE;
     //}
 }
 

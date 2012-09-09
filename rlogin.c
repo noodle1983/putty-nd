@@ -57,16 +57,16 @@ static int rlogin_closing(Plug plug, const char *error_msg, int error_code,
 			  int calling_back)
 {
     Rlogin rlogin = (Rlogin) plug;
+    if (error_msg) {
+		/* A socket error has occurred. */
+		logevent(rlogin->frontend, error_msg);
+		connection_fatal(rlogin->frontend, "%s", error_msg);
+    }	
     if (rlogin->s) {
         sk_close(rlogin->s);
         rlogin->s = NULL;
-	notify_remote_exit(rlogin->frontend);
-    }
-    if (error_msg) {
-	/* A socket error has occurred. */
-	logevent(rlogin->frontend, error_msg);
-	connection_fatal(rlogin->frontend, "%s", error_msg);
-    }				       /* Otherwise, the remote side closed the connection normally. */
+		notify_remote_exit(rlogin->frontend);
+    }			       /* Otherwise, the remote side closed the connection normally. */
     return 0;
 }
 
