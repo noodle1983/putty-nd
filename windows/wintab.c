@@ -424,7 +424,7 @@ int wintab_del_tab(wintab *wintab, const int index)
 }
 
 //-----------------------------------------------------------------------
-
+RECT getMaxWorkArea();
 int wintab_swith_tab(wintab *wintab)
 {
     int index = wintab->next;
@@ -439,7 +439,11 @@ int wintab_swith_tab(wintab *wintab)
     //init the extra size
     wintabitem *tabitem = wintab->items[wintab->cur];
     RECT rc, cr;
-    GetClientRect(wintab->hwndParent, &rc);    
+	if (!IsZoomed(hwnd)){
+    	GetClientRect(wintab->hwndParent, &rc);    
+	}else {
+		rc = getMaxWorkArea();
+	}
     wintab_resize(wintab, &rc);
     if (tabitem->cfg.resize_action != RESIZE_TERM)
         reset_window(tabitem, 0);
