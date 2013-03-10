@@ -66,7 +66,8 @@ enum {
     EDIT_BEGIN = 0 ,
     EDIT_END  = 1,
 	EDIT_OK = 2,
-	EDIT_CANCEL   = 3
+	EDIT_CANCEL   = 3,
+	EDIT_INIT   = 4
 };
 
 
@@ -317,6 +318,12 @@ static int CALLBACK AboutProc(HWND hwnd, UINT msg,
     return 0;
 }
 
+static void SaneEndDialog(HWND hwnd, int ret)
+{
+    SetWindowLongPtr(hwnd, BOXRESULT, ret);
+    SetWindowLongPtr(hwnd, BOXFLAGS, DF_END);
+}
+
 static int SaneDialogBox(HINSTANCE hinst,
 			 LPCTSTR tmpl,
 			 HWND hwndparent,
@@ -357,15 +364,42 @@ static int SaneDialogBox(HINSTANCE hinst,
     	    if (msg.wParam == VK_CONTROL)
                 drag_session_treeview(NULL
                 	, DRAG_CTRL_DOWN, msg.wParam, msg.lParam);
-            if (msg.wParam == VK_RETURN
-                && edit_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW), EDIT_OK)){
-                continue;
+            if (msg.wParam == VK_RETURN){
+                if ( edit_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW), EDIT_OK)){
+                	continue;
+				}
+				else if (ctrlbox->okbutton != NULL){
+					struct winctrl *wc = dlg_findbyctrl(&dp, ctrlbox->okbutton);
+					winctrl_handle_command(&dp, 
+						WM_COMMAND, 
+						MAKEWPARAM(wc->base_id, BN_CLICKED), 
+						0);
+					if (dp.ended){
+						SaneEndDialog(hwnd, dp.endresult ? 1 : 0);
+						break;
+					}
+					continue;
+				}
             }
-            if (msg.wParam == VK_ESCAPE
-                && (edit_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW), EDIT_CANCEL)
+            if (msg.wParam == VK_ESCAPE){
+                if(edit_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW), EDIT_CANCEL)
                     || drag_session_treeview(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW), 
-                                                DRAG_CANCEL, msg.wParam, msg.lParam))){
-                continue;
+                                                DRAG_CANCEL, msg.wParam, msg.lParam)){
+                	continue;
+
+				}
+				else if (ctrlbox->cancelbutton != NULL){
+					struct winctrl *wc = dlg_findbyctrl(&dp, ctrlbox->cancelbutton);
+					winctrl_handle_command(&dp, 
+						WM_COMMAND, 
+						MAKEWPARAM(wc->base_id, BN_CLICKED), 
+						0);
+					if (dp.ended){
+						SaneEndDialog(hwnd, dp.endresult ? 1 : 0);
+						break;
+					}
+					continue;
+				}
             }
     	}
     		
@@ -383,12 +417,6 @@ static int SaneDialogBox(HINSTANCE hinst,
     DestroyWindow(hwnd);
 	hConfigWnd = NULL;
     return ret;
-}
-
-static void SaneEndDialog(HWND hwnd, int ret)
-{
-    SetWindowLongPtr(hwnd, BOXRESULT, ret);
-    SetWindowLongPtr(hwnd, BOXFLAGS, DF_END);
 }
 
 /*
@@ -592,6 +620,10 @@ static int edit_session_treeview(HWND hwndSess, int eflag)
         return FALSE;
 
 	switch(eflag){
+	case EDIT_INIT:
+		hEdit = NULL;
+		return TRUE;
+		break;
 	case EDIT_BEGIN:
         /* get the pre_session */
 		sess_flags = get_selected_session(hwndSess, pre_session, sizeof pre_session);
@@ -1425,6 +1457,7 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
     	 * Create the session tree view.
     	 */
     	sessionview = create_session_treeview(hwnd, &tvfaff);
+		edit_session_treeview(sessionview, EDIT_INIT);
 
         /*
     	 * Set up the session view contents.

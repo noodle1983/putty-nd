@@ -1237,6 +1237,8 @@ void setup_config_box(struct controlbox *b, int midsession,
 
 
 #endif
+	b->okbutton = ssd->okbutton;
+	b->cancelbutton = ssd->cancelbutton;
     /*
      * The Session panel.
      */

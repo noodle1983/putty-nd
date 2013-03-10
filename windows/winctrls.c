@@ -2040,7 +2040,7 @@ int winctrl_context_help(struct dlgparam *dp, HWND hwnd, int id)
  * mechanism can call to access the dialog box entries.
  */
 
-static struct winctrl *dlg_findbyctrl(struct dlgparam *dp, union control *ctrl)
+struct winctrl *dlg_findbyctrl(struct dlgparam *dp, union control *ctrl)
 {
     int i;
 

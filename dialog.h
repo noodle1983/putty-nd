@@ -441,6 +441,10 @@ struct controlbox {
     int nfrees;
     int freesize;
     void **frees;		       /* array of aux data areas to free */
+	
+	//special ctrl
+	union control * okbutton;
+	union control * cancelbutton;
 };
 
 struct controlbox *ctrl_new_box(void);
@@ -584,6 +588,7 @@ void dlg_stdfontsel_handler(union control *ctrl, void *dlg,
  * Routines the platform-independent dialog code can call to read
  * and write the values of controls.
  */
+struct winctrl *dlg_findbyctrl(struct dlgparam *dp, union control *ctrl);
 void dlg_radiobutton_set(union control *ctrl, void *dlg, int whichbutton);
 int dlg_radiobutton_get(union control *ctrl, void *dlg);
 void dlg_checkbox_set(union control *ctrl, void *dlg, int checked);
