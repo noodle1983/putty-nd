@@ -401,6 +401,9 @@ static int SaneDialogBox(HINSTANCE hinst,
 					continue;
 				}
             }
+			if (msg.wParam == VK_DOWN){
+				SetFocus(GetDlgItem(hwnd,IDCX_SESSIONTREEVIEW));
+			}
     	}
     		
     	flags=GetWindowLongPtr(hwnd, BOXFLAGS);
