@@ -531,7 +531,7 @@ int wintab_resize(wintab *wintab, const RECT *rc)
     wintab->extra_width = wr.right - wr.left - tab_width;
     wintab->extra_height = wr.bottom - wr.top - tab_height;
 
-    xPos = rc->right - border - CLS_BTN_WIDTH;
+    xPos = rc->right - rc->left - border - CLS_BTN_WIDTH;
     SetWindowPos(wintab->hClsBtn, 0, xPos, 0, 
         0, 0, SWP_NOSIZE|SWP_NOZORDER);
     xPos -= MAX_BTN_WIDTH;
