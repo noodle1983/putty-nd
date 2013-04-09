@@ -117,6 +117,7 @@ const BYTE XORmaskCursor[] = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 HCURSOR hCopyCurs = NULL; 
 int showSessionTreeview = 0;
 const int SESSION_TREEVIEW_WIDTH = 130;
+RECT dlgMonitorRect;
 
 extern Config cfg;		       /* defined in window.c */
 
@@ -131,6 +132,7 @@ static int drag_session_treeview(
 	HWND hwndSess, int flags, 
 	WPARAM wParam, LPARAM lParam);
 static int edit_session_treeview(HWND hwndSess, int eflag);
+RECT getMaxWorkArea();
 
 void force_normal(HWND hwnd)
 {
@@ -415,6 +417,13 @@ static int SaneDialogBox(HINSTANCE hinst,
 
     if (gm == 0)
         PostQuitMessage(msg.wParam); /* We got a WM_QUIT, pass it on */
+
+	HMONITOR mon;
+	MONITORINFO mi;
+	mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+	mi.cbSize = sizeof(mi);
+	GetMonitorInfo(mon, &mi);
+	dlgMonitorRect = mi.rcWork;
 
     ret=GetWindowLongPtr(hwnd, BOXRESULT);
     DestroyWindow(hwnd);
@@ -1430,8 +1439,10 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 	{			       /* centre the window */
 	    RECT rs, rd;
 
-	    hw = GetDesktopWindow();
-	    if (GetWindowRect(hw, &rs) && GetWindowRect(hwnd, &rd)){
+	    //hw = GetDesktopWindow();
+		//if (GetWindowRect(hw, &rs) && GetWindowRect(hwnd, &rd)){
+		rs = getMaxWorkArea();
+	    if (GetWindowRect(hwnd, &rd)){
             if (showSessionTreeview) 
                 rd.right += 100 + SESSION_TREEVIEW_WIDTH;
     		MoveWindow(hwnd,

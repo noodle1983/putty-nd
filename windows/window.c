@@ -444,8 +444,11 @@ void creatMainWindow(HINSTANCE inst, int width, int height)
 	    exwinmode |= WS_EX_TOPMOST;
 	if (cfg.sunken_edge)
 	    exwinmode |= WS_EX_CLIENTEDGE;
+	extern RECT dlgMonitorRect;
 	hwnd = CreateWindowEx(exwinmode, appname, appname,
-			      winmode, CW_USEDEFAULT, CW_USEDEFAULT,
+			      winmode, 
+				  (dlgMonitorRect.left + dlgMonitorRect.right - width)/2, 
+				  (dlgMonitorRect.top + dlgMonitorRect.bottom - height)/2,
 			      width, height,
 			      NULL, NULL, inst, NULL);
 }
