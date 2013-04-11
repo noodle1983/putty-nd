@@ -15,6 +15,16 @@ PalPay: noodle1983@126.com
 RELEASE NOTE
 ============
 --------------------------------
+putty6.0_nd1.15
+--------------------------------
+1. Bugs
+    1. The window is maximized with wrong size on my second screen on Windows 7.
+
+2. Other changes
+    1. The setting dialog and the main window are shown in the same screen.
+    2. Type down arrow key to sellect the session in the setting dialog.
+
+--------------------------------
 putty6.0_nd1.14
 --------------------------------
 1. Bugs
