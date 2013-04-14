@@ -24,6 +24,9 @@ putty6.0_nd1.15
     1. The setting dialog and the main window are shown in the same screen.
     2. Type down arrow key to sellect the session in the setting dialog.
 
+3. Known issue
+    1. crashes happens when maximized and changing the font. The root cause is unknown yet.
+
 --------------------------------
 putty6.0_nd1.14
 --------------------------------
