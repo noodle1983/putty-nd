@@ -1080,7 +1080,7 @@ static void refresh_session_treeview(
                     //leave the group in tail alone.
                     if (pre_grp_item){
                         TreeView_Expand(tvfaff->treeview, pre_grp_item,
-                    			(pre_grp_collapse ? TVE_COLLAPSE : TVE_EXPAND));
+                    			((pre_grp_collapse&& filter[0] == 0) ? TVE_COLLAPSE : TVE_EXPAND));
                     }
                     pre_grp_item = item;
                     char grp_session[256] = {0};
@@ -1099,7 +1099,7 @@ static void refresh_session_treeview(
         item = session_treeview_insert(tvfaff, level, sesslist.sessions[i]+b, SESSION_ITEM);
         if (pre_grp_item){
             TreeView_Expand(tvfaff->treeview, pre_grp_item,
-        			(pre_grp_collapse ? TVE_COLLAPSE : TVE_EXPAND));
+        			((pre_grp_collapse&& filter[0] == 0)? TVE_COLLAPSE : TVE_EXPAND));
             pre_grp_item = NULL;
         }
         
