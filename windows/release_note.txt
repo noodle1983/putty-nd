@@ -4,7 +4,9 @@ I have reviewed the putty6.1's code and merge to the master branch.
 It has been changed a lot on the config structure, on which I did lots of extentions.
 So it is not easy to merge.
 Since there are not too many new features(putty-nd's code bases on the commit early this year) and big bugs fixing, I'd like not to merge it to the putty-nd's code at the moment.
-
+putty-nd2 is ongoing, which is draggable and look more like a product.
+Refer to http://putty-nd.blogspot.com/ for more putty-nd2 updates. 
+(Although it is very few message there.)
 
 My comments
 ============
@@ -14,6 +16,17 @@ PalPay: noodle1983@126.com
 
 RELEASE NOTE
 ============
+--------------------------------
+putty6.0_nd1.16
+--------------------------------
+1. Bugs
+
+2. Other changes
+    1. Add a serach bar for the session tree view in the config dialog 
+
+3. Known issue
+    1. crashes happens when maximized and changing the font. The root cause is unknown yet.
+
 --------------------------------
 putty6.0_nd1.15
 --------------------------------
