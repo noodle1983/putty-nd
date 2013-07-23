@@ -1124,13 +1124,13 @@ static void refresh_session_treeview(
 	InvalidateRect(sessionview, NULL, TRUE);
 	if (hfirst){
 	    TreeView_SelectItem(sessionview, hfirst);
-		get_sesslist(&sesslist, FALSE);
 	    change_selected_session(sessionview);
 	}else{
 		strncpy(pre_session, DEFAULT_SESSION_NAME, sizeof(pre_session));
 		load_settings(pre_session, &cfg);
 		dlg_refresh(NULL, &dp);
 	}
+	get_sesslist(&sesslist, FALSE);
 }
 
 /*
