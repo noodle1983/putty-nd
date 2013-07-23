@@ -47,6 +47,7 @@ static struct dlgparam dp;
 
 
 static char pre_session[256] = {0};
+static int dragging = FALSE;
 static bool isFreshingSessionTreeView = false;
 static HMENU st_popup_menus[3];
 enum {
@@ -1045,6 +1046,8 @@ static void refresh_session_treeview(
 	HWND hwndSearchBar = GetDlgItem(dp.hwnd,IDCX_SEARCHBAR);
 	GetWindowText(hwndSearchBar, filter, sizeof(filter));
 
+	save_settings(pre_session, &cfg);
+
 	isFreshingSessionTreeView = true;
     memset(tvfaff->lastat, 0, sizeof(tvfaff->lastat));
 	TreeView_DeleteAllItems(tvfaff->treeview);
@@ -1121,7 +1124,7 @@ static void refresh_session_treeview(
 	InvalidateRect(sessionview, NULL, TRUE);
     TreeView_SelectItem(sessionview, hfirst);
 	get_sesslist(&sesslist, FALSE);
-    load_settings(selected_session_name, &cfg);
+    change_selected_session(sessionview);
 }
 
 /*
@@ -1300,7 +1303,6 @@ static void show_st_popup_menu(HWND  hwndSess)
  */
 static int drag_session_treeview(HWND hwndSess, int flags, WPARAM wParam, LPARAM lParam)
 {
-	static int dragging = FALSE;
 	int curnum = 0;
 	HTREEITEM htiTarget;
 	if (hCopyCurs == NULL)
@@ -1463,7 +1465,8 @@ static int CALLBACK GenericMainDlgProc(HWND hwnd, UINT msg,
 
     switch (msg) {
       case WM_INITDIALOG:
-	dp.hwnd = hwnd;
+	  	dragging = false;
+		dp.hwnd = hwnd;
 
     /*
 	 * Centre the window.
