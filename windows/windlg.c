@@ -1033,6 +1033,7 @@ static void refresh_session_treeview(
 	int level;              //tree item's level
 	int b;                  //index of the tree item's first character
 	char itemstr[64];
+	char selected_session_name[256] = {0};
     struct sesslist sesslist;
     int is_select;
     char session[256] = {0};
@@ -1093,7 +1094,10 @@ static void refresh_session_treeview(
 		}
 		
 		if (b == j){
-            if (is_select) hfirst = item;
+            if (is_select) {
+				hfirst = item;
+				strncpy(selected_session_name, sesslist.sessions[i], sizeof(selected_session_name));
+            }
 			continue;
 		}
         item = session_treeview_insert(tvfaff, level, sesslist.sessions[i]+b, SESSION_ITEM);
@@ -1103,16 +1107,21 @@ static void refresh_session_treeview(
             pre_grp_item = NULL;
         }
         
-        if (is_select) hfirst = item;
+        if (is_select) {
+			hfirst = item;
+			strncpy(selected_session_name, sesslist.sessions[i], sizeof(selected_session_name));
+        }
         
-	    if (!hfirst)
+	    if (!hfirst){
 	        hfirst = item;
+			strncpy(selected_session_name, sesslist.sessions[i], sizeof(selected_session_name));
+	    }
 	}
 	isFreshingSessionTreeView = false;
 	InvalidateRect(sessionview, NULL, TRUE);
     TreeView_SelectItem(sessionview, hfirst);
 	get_sesslist(&sesslist, FALSE);
-    load_settings(select_session?select_session:DEFAULT_SESSION_NAME, &cfg);
+    load_settings(selected_session_name, &cfg);
 }
 
 /*
