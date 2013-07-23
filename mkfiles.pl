@@ -422,7 +422,7 @@ if (defined $makefiles{'cygwin'}) {
       " -D_NO_OLDNAMES -DNO_MULTIMON -DNO_HTMLHELP " .
 	       (join " ", map {"-I$dirpfx$_"} @srcdirs)) .
 	       "\n".
-    "LDFLAGS = -mno-cygwin -s\n".
+    "LDFLAGS = -static -mno-cygwin -s\n".
     &splitline("RCFLAGS = \$(RCINC) --define WIN32=1 --define _WIN32=1".
       " --define WINVER=0x0400")."\n".
     "\n".
